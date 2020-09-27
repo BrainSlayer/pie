@@ -86,7 +86,7 @@ config NOMMU
 	bool
 
 config HAS_MIPS16
-	depends on (mips || mipsel || mips64 || mips64el)
+	depends on (mips || mipsel || mips64 || mips64el) && !TARGET_rtl838x
 	bool
 
 config RFKILL_SUPPORT
