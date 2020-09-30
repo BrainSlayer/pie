@@ -1359,7 +1359,7 @@ static int rtl8390_serdes_probe(struct phy_device *phydev)
 static struct phy_driver rtl838x_phy_driver[] = {
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8214C),
-		.name		= "REATLTEK RTL8214C",
+		.name		= "REALTEK RTL8214C",
 		.features	= PHY_GBIT_FEATURES,
 		.match_phy_device = rtl8214c_match_phy_device,
 		.probe		= rtl8214c_phy_probe,
@@ -1369,7 +1369,7 @@ static struct phy_driver rtl838x_phy_driver[] = {
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8214FC),
-		.name		= "REATLTEK RTL8214FC",
+		.name		= "REALTEK RTL8214FC",
 		.features	= PHY_GBIT_FIBRE_FEATURES,
 		.match_phy_device = rtl8214fc_match_phy_device,
 		.probe		= rtl8214fc_phy_probe,
@@ -1385,7 +1385,7 @@ static struct phy_driver rtl838x_phy_driver[] = {
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8218B_E),
-		.name		= "REATLTEK RTL8218B (external)",
+		.name		= "REALTEK RTL8218B (external)",
 		.features	= PHY_GBIT_FEATURES,
 		.match_phy_device = rtl8218b_ext_match_phy_device,
 		.probe		= rtl8218b_ext_phy_probe,
@@ -1399,7 +1399,7 @@ static struct phy_driver rtl838x_phy_driver[] = {
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8218B_I),
-		.name		= "REATLTEK RTL8218B (internal)",
+		.name		= "REALTEK RTL8218B (internal)",
 		.features	= PHY_GBIT_FEATURES,
 		.probe		= rtl8218b_int_phy_probe,
 		.suspend	= genphy_suspend,
@@ -1412,7 +1412,7 @@ static struct phy_driver rtl838x_phy_driver[] = {
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8218B_I),
-		.name		= "REATLTEK RTL8380 SERDES",
+		.name		= "REALTEK RTL8380 SERDES",
 		.features	= PHY_GBIT_FIBRE_FEATURES,
 		.probe		= rtl838x_serdes_probe,
 		.suspend	= genphy_suspend,
@@ -1424,7 +1424,7 @@ static struct phy_driver rtl838x_phy_driver[] = {
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8393_I),
-		.name		= "REATLTEK RTL8393 SERDES",
+		.name		= "REALTEK RTL8393 SERDES",
 		.features	= PHY_GBIT_FIBRE_FEATURES,
 		.probe		= rtl8393_serdes_probe,
 		.suspend	= genphy_suspend,
@@ -1434,7 +1434,7 @@ static struct phy_driver rtl838x_phy_driver[] = {
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8390_GENERIC),
-		.name		= "REATLTEK RTL8390 Generic",
+		.name		= "REALTEK RTL8390 Generic",
 		.features	= PHY_GBIT_FIBRE_FEATURES,
 		.probe		= rtl8390_serdes_probe,
 		.suspend	= genphy_suspend,
