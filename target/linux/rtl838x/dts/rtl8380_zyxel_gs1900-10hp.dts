@@ -6,7 +6,7 @@
 #include <dt-bindings/gpio/gpio.h>
 
 / {
-	compatible = "zyxel,gs1900", "realtek,rtl838x-soc";
+	compatible = "zyxel,gs1900-10hp", "realtek,rtl838x-soc";
 	model = "Zyxel GS1900-10HP Switch";
 
 	aliases {
@@ -80,7 +80,7 @@
 				reg = <0x160000 0x100000>;
 			};
 			partition@b260000 {
-				label = "runtime";
+				label = "firmware";
 				reg = <0x260000 0x6d0000>;
 				compatible = "denx,uimage";
 			};
