@@ -24,8 +24,8 @@
 		compatible = "gpio-leds";
 
 		led_sys: sys {
-			label = "gs1900_48:green:sys";
-			gpios = <&gpio0 47 GPIO_ACTIVE_LOW>;
+			label = "gs1900_46:green:sys";
+			gpios = <&gpio0 46 GPIO_ACTIVE_HIGH>;
 		};
 	};
 };

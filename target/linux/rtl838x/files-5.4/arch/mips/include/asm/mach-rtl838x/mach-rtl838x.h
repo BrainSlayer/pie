@@ -16,13 +16,11 @@
 #define rtl838x_w32(val, reg)	__raw_writel(val, reg)
 #define rtl838x_w32_mask(clear, set, reg) rtl838x_w32((rtl838x_r32(reg) & ~(clear)) | (set), reg)
 
-#define rtl838x_r8(reg)		__raw_readb(reg)
-#define rtl838x_w8(val, reg)	__raw_writeb(val, reg)
-
 #define sw_r32(reg)		__raw_readl(RTL838X_SW_BASE + reg)
 #define sw_w32(val, reg)	__raw_writel(val, RTL838X_SW_BASE + reg)
 #define sw_w32_mask(clear, set, reg)	\
 				sw_w32((sw_r32(reg) & ~(clear)) | (set), reg)
+
 #define sw_r64(reg)		((((u64)__raw_readl(RTL838X_SW_BASE + reg)) << 32) | \
 				__raw_readl(RTL838X_SW_BASE + reg + 4))
 
@@ -103,7 +101,6 @@
 				)
 
 #define IRR1			(0x0c)
-
 #define IRR1_SETTING_RTL838X	((GPIO_ABCD_RS << 28) | \
 				 (GPIO_EFGH_RS << 24) | \
 				 (RTC_RS       << 20) | \
@@ -112,7 +109,6 @@
 #define IRR1_SETTING_RTL839X	((GPIO_ABCD_RS << 28) | \
 				 (SWCORE_RS    << 16)   \
 				)
-
 
 #define IRR2			(0x10)
 #define IRR2_SETTING		0
@@ -315,16 +311,13 @@
 #define RTL839X_MODEL_NAME_INFO		(0x0FF0)
 #define RTL838X_LED_GLB_CTRL		(0xA000)
 #define RTL839X_LED_GLB_CTRL		(0x00E4)
-#define RTL838X_EXT_GPIO_DIR_0		(0xA08C)
-#define RTL838X_EXT_GPIO_DIR_1		(0xA090)
-#define RTL838X_EXT_GPIO_DATA_0		(0xA094)
-#define RTL838X_EXT_GPIO_DATA_1		(0xA098)
+#define RTL838X_EXT_GPIO_DIR		(0xA08C)
+#define RTL839X_EXT_GPIO_DIR		(0x0214)
+#define RTL838X_EXT_GPIO_DATA		(0xA094)
+#define RTL839X_EXT_GPIO_DATA		(0x021c)
 #define RTL838X_EXT_GPIO_INDRT_ACCESS	(0xA09C)
+#define RTL839X_EXT_GPIO_INDRT_ACCESS	(0x0224)
 #define RTL838X_EXTRA_GPIO_CTRL		(0xA0E0)
-#define RTL838X_EXTRA_GPIO_DIR_0	(0xA0E4)
-#define RTL838X_EXTRA_GPIO_DIR_1	(0xA0E8)
-#define RTL838X_EXTRA_GPIO_DATA_0	(0xA0EC)
-#define RTL838X_EXTRA_GPIO_DATA_1	(0xA0F0)
 #define RTL838X_DMY_REG5		(0x0144)
 #define RTL838X_EXTRA_GPIO_CTRL		(0xA0E0)
 
@@ -374,11 +367,18 @@
 #define RTL838X_LED_P_EN_CTRL		(0xA008)
 
 /* LED control by software */
-#define RTL838X_LED_SW_CTRL		(0xA00C)
+#define RTL838X_LED_SW_CTRL		(0x0128)
+#define RTL839X_LED_SW_CTRL		(0xA00C)
+#define RTL838X_LED_SW_P_EN_CTRL	(0xA010)
+#define RTL839X_LED_SW_P_EN_CTRL	(0x012C)
 #define RTL838X_LED0_SW_P_EN_CTRL	(0xA010)
+#define RTL839X_LED0_SW_P_EN_CTRL	(0x012C)
 #define RTL838X_LED1_SW_P_EN_CTRL	(0xA014)
+#define RTL839X_LED1_SW_P_EN_CTRL	(0x0130)
 #define RTL838X_LED2_SW_P_EN_CTRL	(0xA018)
-#define RTL838X_LED_SW_P_CTRL(p)	(0xA01C + ((p) << 2))
+#define RTL839X_LED2_SW_P_EN_CTRL	(0x0134)
+#define RTL838X_LED_SW_P_CTRL		(0xA01C)
+#define RTL839X_LED_SW_P_CTRL		(0x0144)
 
 #define RTL839X_MAC_EFUSE_CTRL		(0x02ac)
 
