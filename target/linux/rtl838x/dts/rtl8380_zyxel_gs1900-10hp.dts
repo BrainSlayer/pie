@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /dts-v1/;
 
 #include "rtl838x.dtsi"
@@ -17,15 +18,23 @@
 	};
 
 	chosen {
-		bootargs = "console=ttyS0,115200 mem=128M";
+		bootargs = "console=ttyS0,115200";
+	};
+
+	gpio1: rtl8231-gpio {
+		compatible = "realtek,rtl8231-gpio";
+		#gpio-cells = <2>;
+		indirect-access-bus-id = <0>;
+		gpio-controller;
 	};
 
 	keys {
 		compatible = "gpio-keys-polled";
+		poll-interval = <20>;
 
 		reset {
 			label = "reset";
-			gpios = <&gpio0 67 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_RESTART>;
 		};
 	};
@@ -38,10 +47,25 @@
 			gpios = <&gpio0 47 GPIO_ACTIVE_HIGH>;
 		};
 	};
-};
 
-&gpio0 {
-	indirect-access-bus-id = <0>;
+	i2c-gpio-0 {
+		compatible = "i2c-gpio";
+		gpios = <&gpio1 24 GPIO_ACTIVE_HIGH /* sda */
+			 &gpio1 25 GPIO_ACTIVE_HIGH /* sdc */ >;
+		i2c-gpio,delay-us = <2>;
+		i2c-gpio,sda-open-drain;
+		i2c-gpio,scl-open-drain;
+	};
+
+	i2c-gpio-1 {
+		compatible = "i2c-gpio";
+		gpios = <&gpio1 30 GPIO_ACTIVE_HIGH /* sda */
+			 &gpio1 31 GPIO_ACTIVE_HIGH /* sdc */ >;
+		i2c-gpio,delay-us = <2>;
+		i2c-gpio,sda-open-drain;
+		i2c-gpio,scl-open-drain;
+	};
+
 };
 
 &spi0 {
