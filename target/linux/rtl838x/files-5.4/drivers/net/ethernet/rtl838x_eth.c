@@ -62,7 +62,7 @@ struct n_event {
 	uint32_t	slp:6;
 	uint32_t	valid:1;
 	uint32_t	reserved:27;
-} __attribute__ ((aligned(1), packed));
+} __packed __aligned(1);
 
 struct ring_b {
 	uint32_t	rx_r[RXRINGS][RXRINGLEN];
@@ -702,7 +702,8 @@ static int rtl838x_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		ring->tx_r[0][ring->c_tx[0]] = ring->tx_r[0][ring->c_tx[0]] | 0x1;
 
 		/* BUG: before tx fetch, need to make sure right data is accessed
-		 * This might not be necessary on newer RTL839x, though. */
+		 * This might not be necessary on newer RTL839x, though.
+		 */
 		for (i = 0; i < 10; i++) {
 			val = sw_r32(priv->r->dma_if_ctrl);
 			if ((val & 0xc) == 0xc)
@@ -1016,16 +1017,7 @@ static int rtl838x_set_mac_address(struct net_device *dev, void *p)
 
 static int rtl8390_init_mac(struct rtl838x_eth_priv *priv)
 {
-	return 0;
-	printk("Configuring RTL8390 MAC\n");
-
-	// BUG: Please test found in u-boot
-	sw_w32(0x80, RTL839X_MAC_EFUSE_CTRL);
-	sw_w32(0x4, RTL839X_RST_GLB_CTRL);
-	sw_w32(0x3c324f40, RTL839X_MAC_GLB_CTRL);
-	/* Unlimited egress rate */
-	sw_w32(0x1297b961, RTL839X_SCHED_LB_TICK_TKN_CTRL);
-
+	// We will need to set-up EEE and the egress-rate limitation
 	return 0;
 }
 
