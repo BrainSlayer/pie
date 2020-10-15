@@ -48,6 +48,7 @@
 		};
 	};
 
+	/* i2c of the left SFP cage: port 9 */
 	i2c-gpio-0 {
 		compatible = "i2c-gpio";
 		gpios = <&gpio1 24 GPIO_ACTIVE_HIGH /* sda */
@@ -56,7 +57,13 @@
 		i2c-gpio,sda-open-drain;
 		i2c-gpio,scl-open-drain;
 	};
+	/* addional gpios:
+	 * MOD-DEF0: gpio1 26
+	 * LOS: not provided or provided to the SoC
+	 * TX-Fault: gpio1 22
+	 * TX-Disable: gpio1 23 */
 
+	/* i2c of the right SFP cage: port 10 */
 	i2c-gpio-1 {
 		compatible = "i2c-gpio";
 		gpios = <&gpio1 30 GPIO_ACTIVE_HIGH /* sda */
@@ -65,7 +72,11 @@
 		i2c-gpio,sda-open-drain;
 		i2c-gpio,scl-open-drain;
 	};
-
+	/* addional gpios:
+	 * MOD-DEF0: gpio1 32
+	 * LOS: not provided or provided to the SoC
+	 * TX-Fault: gpio1 28
+	 * TX-Disable: gpio1 29 ??? */
 };
 
 &spi0 {
