@@ -16,11 +16,13 @@
 #define rtl838x_w32(val, reg)	__raw_writel(val, reg)
 #define rtl838x_w32_mask(clear, set, reg) rtl838x_w32((rtl838x_r32(reg) & ~(clear)) | (set), reg)
 
+#define rtl838x_r8(reg)		__raw_readb(reg)
+#define rtl838x_w8(val, reg)	__raw_writeb(val, reg)
+
 #define sw_r32(reg)		__raw_readl(RTL838X_SW_BASE + reg)
 #define sw_w32(val, reg)	__raw_writel(val, RTL838X_SW_BASE + reg)
 #define sw_w32_mask(clear, set, reg)	\
 				sw_w32((sw_r32(reg) & ~(clear)) | (set), reg)
-
 #define sw_r64(reg)		((((u64)__raw_readl(RTL838X_SW_BASE + reg)) << 32) | \
 				__raw_readl(RTL838X_SW_BASE + reg + 4))
 
