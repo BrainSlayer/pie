@@ -143,6 +143,18 @@
 #define RTL839X_MIR_DPM_CTRL(grp)		(0x2530 + (((grp) << 2)))
 #define RTL839X_MIR_SPM_CTRL(grp)		(0x2510 + (((grp) << 2)))
 
+/* Storm control */
+#define RTL838X_STORM_CTRL			(0x4700)
+#define RTL838X_STORM_CTRL_LB_CTRL(p)		(0x4884 + (((p) << 2)))
+#define RTL838X_STORM_CTRL_BURST_PPS_0		(0x4874)
+#define RTL838X_STORM_CTRL_BURST_PPS_1		(0x4878)
+#define RTL838X_STORM_CTRL_BURST_0		(0x487c)
+#define RTL838X_STORM_CTRL_BURST_1		(0x4880)
+#define RTL838X_SCHED_CTRL			(0xB980)
+#define RTL838X_SCHED_LB_TICK_TKN_CTRL_0	(0xAD58)
+#define RTL838X_SCHED_LB_TICK_TKN_CTRL_1	(0xAD5C)
+#define RTL838X_SCHED_LB_THR			(0xB984)
+
 enum phy_type {
 	PHY_NONE = 0,
 	PHY_RTL838X_SDS = 1,

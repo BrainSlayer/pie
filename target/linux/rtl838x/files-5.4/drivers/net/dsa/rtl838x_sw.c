@@ -2364,6 +2364,50 @@ static int rtl838x_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	return 1;
 }
 
+static void rtl838x_storm_enable(struct rtl838x_switch_priv *priv, int port, bool enable)
+{
+	// Enable Storm control for that port for UC, MC, and BC
+	if (enable)
+		sw_w32(0x7, RTL838X_STORM_CTRL_LB_CTRL(port));
+	else
+		sw_w32(0x0, RTL838X_STORM_CTRL_LB_CTRL(port));
+}
+
+static void rtl838x_storm_control_init(struct rtl838x_switch_priv *priv)
+{
+	int i;
+
+	pr_info("Enabling Storm control\n");
+	// TICK_PERIOD_PPS
+	if (priv->id == 0x8380)
+		sw_w32_mask(0x3ff << 20, 434 << 20, RTL838X_SCHED_LB_TICK_TKN_CTRL_0);
+
+	// Set burst rate
+	sw_w32(0x00008000, RTL838X_STORM_CTRL_BURST_0); // UC
+	sw_w32(0x80008000, RTL838X_STORM_CTRL_BURST_1); // MC and BC
+
+	// Set burst Packets per Second to 32
+	sw_w32(0x00000020, RTL838X_STORM_CTRL_BURST_PPS_0); // UC
+	sw_w32(0x00200020, RTL838X_STORM_CTRL_BURST_PPS_1); // MC and BC
+
+	// Include IFG in storm control
+	sw_w32_mask(0, 1 << 6, RTL838X_STORM_CTRL);
+	// Rate control is based on bytes/s (0 = packets)
+	sw_w32_mask(0, 1 << 5, RTL838X_STORM_CTRL);
+	// Bandwidth control includes preamble and IFG (10 Bytes)
+	sw_w32_mask(0, 1, RTL838X_SCHED_CTRL);
+
+	// On SoCs except RTL8382M, set burst size of port egress
+	if (priv->id != 0x8382)
+		sw_w32_mask(0xffff, 0x800, RTL838X_SCHED_LB_THR);
+
+	/* Enable storm control on all ports with a PHY */
+	for (i = 0; i < priv->cpu_port; i++) {
+		if (priv->ports[i].phy)
+			rtl838x_storm_enable(priv, i, true);
+	}
+}
+
 static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
 {
 	struct device *dev = priv->dev;
@@ -2446,6 +2490,7 @@ static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
 	if (priv->family_id == RTL8380_FAMILY_ID) {
 		/* Enable PHY control via SoC */
 		sw_w32_mask(0, 1 << 15, RTL838X_SMI_GLB_CTRL);
+		rtl838x_storm_control_init(priv);
 	} else {
 		/* Disable PHY polling via SoC */
 		sw_w32_mask(1 << 7, 0, RTL839X_SMI_GLB_CTRL);
