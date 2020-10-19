@@ -145,6 +145,7 @@
 
 /* Storm control */
 #define RTL838X_STORM_CTRL			(0x4700)
+#define RTL839X_STORM_CTRL			(0x1800)
 #define RTL838X_STORM_CTRL_LB_CTRL(p)		(0x4884 + (((p) << 2)))
 #define RTL838X_STORM_CTRL_BURST_PPS_0		(0x4874)
 #define RTL838X_STORM_CTRL_BURST_PPS_1		(0x4878)
@@ -153,7 +154,24 @@
 #define RTL838X_SCHED_CTRL			(0xB980)
 #define RTL838X_SCHED_LB_TICK_TKN_CTRL_0	(0xAD58)
 #define RTL838X_SCHED_LB_TICK_TKN_CTRL_1	(0xAD5C)
+#define RTL839X_SCHED_LB_TICK_TKN_CTRL_0	(0x1804)
+#define RTL839X_SCHED_LB_TICK_TKN_CTRL_1	(0x1808)
 #define RTL838X_SCHED_LB_THR			(0xB984)
+#define RTL838X_STORM_CTRL_PORT_BC_EXCEED	(0x470C)
+#define RTL838X_STORM_CTRL_PORT_MC_EXCEED	(0x4710)
+#define RTL838X_STORM_CTRL_PORT_UC_EXCEED	(0x4714)
+#define RTL839X_STORM_CTRL_PORT_BC_EXCEED(p)	(0x180c + (((p >> 5) << 2)))
+#define RTL839X_STORM_CTRL_PORT_MC_EXCEED(p)	(0x1814 + (((p >> 5) << 2)))
+#define RTL839X_STORM_CTRL_PORT_UC_EXCEED(p)	(0x181c + (((p >> 5) << 2)))
+#define RTL838X_STORM_CTRL_PORT_UC(p)		(0x4718 + (((p) << 2)))
+#define RTL838X_STORM_CTRL_PORT_MC(p)		(0x478c + (((p) << 2)))
+#define RTL838X_STORM_CTRL_PORT_BC(p)		(0x4800 + (((p) << 2)))
+
+/* Attack prevention */
+#define RTL838X_ATK_PRVNT_PORT_EN		(0x5B00)
+#define RTL838X_ATK_PRVNT_CTRL			(0x5B04)
+#define RTL838X_ATK_PRVNT_ACT			(0x5B08)
+#define RTL838X_ATK_PRVNT_STS			(0x5B1C)
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -170,6 +188,7 @@ struct rtl838x_port {
 	u16 pvid;
 	bool eee_enabled;
 	enum phy_type phy;
+	const struct dsa_port *dp;
 };
 
 struct rtl838x_vlan_info {
@@ -271,6 +290,7 @@ struct rtl838x_switch_priv {
 	u8 cpu_port;
 	u8 port_mask;
 	u32 fib_entries;
+	struct dentry *dbgfs_dir;
 };
 
 extern struct rtl838x_soc_info soc_info;
@@ -282,5 +302,7 @@ extern int rtl838x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 extern int rtl839x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 extern int rtl838x_write_mmd_phy(u32 port, u32 addr, u32 reg, u32 val);
 extern int rtl838x_read_mmd_phy(u32 port, u32 addr, u32 reg, u32 *val);
+
+void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);
 
 #endif /* _RTL838X_H */

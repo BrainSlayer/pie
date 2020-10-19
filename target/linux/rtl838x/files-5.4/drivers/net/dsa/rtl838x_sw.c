@@ -2036,6 +2036,7 @@ static void rtl838x_port_bridge_leave(struct dsa_switch *ds, int port,
 	if (priv->ports[port].enable)
 		priv->r->mask_port_reg_be(0, port_bitmap, priv->r->port_iso_ctrl(port));
 	priv->ports[port].pm &= ~port_bitmap;
+
 	mutex_unlock(&priv->reg_mutex);
 }
 
@@ -2401,11 +2402,25 @@ static void rtl838x_storm_control_init(struct rtl838x_switch_priv *priv)
 	if (priv->id != 0x8382)
 		sw_w32_mask(0xffff, 0x800, RTL838X_SCHED_LB_THR);
 
-	/* Enable storm control on all ports with a PHY */
+	/* Enable storm control on all ports with a PHY and limit rates,
+	 * for UC and MC for both known and unknown addresses */
 	for (i = 0; i < priv->cpu_port; i++) {
-		if (priv->ports[i].phy)
+		if (priv->ports[i].phy) {
+			sw_w32((1 << 18) | 0x8000, RTL838X_STORM_CTRL_PORT_UC(i));
+			sw_w32((1 << 18) | 0x8000, RTL838X_STORM_CTRL_PORT_MC(i));
+			sw_w32(0x000, RTL838X_STORM_CTRL_PORT_BC(i));
 			rtl838x_storm_enable(priv, i, true);
+		}
 	}
+
+	// Attack prevention, enable all attack prevention measures
+	//sw_w32(0x1ffff, RTL838X_ATK_PRVNT_CTRL);
+	/* Attack prevention, drop (bit = 0) problematic packets on all ports.
+	 * Setting bit = 1 means: trap to CPU
+	 */
+	//sw_w32(0, RTL838X_ATK_PRVNT_ACT);
+	// Enable attack prevention on all ports
+	//sw_w32(0x0fffffff, RTL838X_ATK_PRVNT_PORT_EN);
 }
 
 static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
@@ -2456,6 +2471,8 @@ static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
 		if (of_property_read_u32(dn, "reg", &pn))
 			continue;
 
+		priv->ports[pn].dp = dsa_to_port(priv->ds, pn);
+
 		// Check for the integrated SerDes of the RTL8380M first
 		if (of_property_read_bool(dn, "phy-is-integrated")
 			&& priv->id == 0x8380 && pn >= 24) {
@@ -2490,7 +2507,6 @@ static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
 	if (priv->family_id == RTL8380_FAMILY_ID) {
 		/* Enable PHY control via SoC */
 		sw_w32_mask(0, 1 << 15, RTL838X_SMI_GLB_CTRL);
-		rtl838x_storm_control_init(priv);
 	} else {
 		/* Disable PHY polling via SoC */
 		sw_w32_mask(1 << 7, 0, RTL839X_SMI_GLB_CTRL);
@@ -2611,7 +2627,7 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 				IRQF_SHARED, "rtl838x-link-state", priv->ds);
 	} else {
 		err = request_irq(priv->link_state_irq, rtl839x_switch_irq,
-				IRQF_SHARED, "rtl838x-link-state", priv->ds);
+				IRQF_SHARED, "rtl839x-link-state", priv->ds);
 	}
 	if (err) {
 		dev_err(dev, "Error setting up switch interrupt.\n");
@@ -2623,9 +2639,14 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 
 	rtl838x_get_l2aging(priv);
 
+/*	if (priv->family_id == RTL8380_FAMILY_ID)
+		rtl838x_storm_control_init(priv); */
+
 	/* Clear all destination ports for mirror groups */
 	for (i = 0; i < 4; i++)
 		priv->mirror_group_ports[i] = -1;
+
+	rtl838x_dbgfs_init(priv);
 
 	return err;
 }
