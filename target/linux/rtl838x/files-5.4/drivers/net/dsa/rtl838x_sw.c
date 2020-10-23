@@ -133,7 +133,13 @@ inline void rtl838x_exec_tbl1_cmd(u32 cmd)
 inline void rtl839x_exec_tbl1_cmd(u32 cmd)
 {
 	sw_w32(cmd, RTL839X_TBL_ACCESS_CTRL_1);
-	do { } while (sw_r32(RTL839X_TBL_ACCESS_CTRL_1) & (1 << 16));
+	do { } while (sw_r32(RTL839X_TBL_ACCESS_CTRL_1) & (1 << 15));
+}
+
+inline void rtl839x_exec_tbl2_cmd(u32 cmd)
+{
+	sw_w32(cmd, RTL839X_TBL_ACCESS_CTRL_2);
+	do { } while (sw_r32(RTL839X_TBL_ACCESS_CTRL_2) & (1 << 9));
 }
 
 inline int rtl838x_tbl_access_data_0(int i)
@@ -211,9 +217,9 @@ static void rtl839x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	info->hash_uc = !!(u & 4);
 	info->fid = (u >> 3) & 0xff;
 
-	cmd = 1 << 16 /* Execute cmd */
-		| 0 << 15 /* Read */
-		| 0 << 12 /* Table type 0b000 */
+	cmd = 1 << 15 /* Execute cmd */
+		| 0 << 14 /* Read */
+		| 0 << 12 /* Table type 0b00 */
 		| (vlan & 0xfff);
 	rtl839x_exec_tbl1_cmd(cmd);
 	v = sw_r32(RTL838X_TBL_ACCESS_DATA_1(0));
@@ -569,6 +575,15 @@ static u64 rtl839x_read_cam(int idx, struct rtl838x_l2_entry *e)
 
 	entry = (((u64) r[0]) << 12) | ((r[1] & 0xfffffff0) << 12) | ((r[2] >> 4) & 0xfff);
 	return entry;
+}
+
+static void rtl839x_read_scheduling_table(int port)
+{
+	u32 cmd = 1 << 9 /* Execute cmd */
+		| 0 << 8 /* Read */
+		| 0 << 6 /* Table type 0b00 */
+		| (port & 0x3f);
+	rtl839x_exec_tbl2_cmd(cmd);
 }
 
 static const struct rtl838x_reg rtl838x_reg = {
@@ -1346,7 +1361,7 @@ static int rtl838x_set_l2aging(struct dsa_switch *ds, u32 t)
 	return 0;
 }
 
-static void rtl838x_fast_age(struct dsa_switch *ds, int port)
+void rtl838x_fast_age(struct dsa_switch *ds, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int s = priv->family_id == RTL8390_FAMILY_ID ? 2 : 0;
@@ -1478,7 +1493,7 @@ static void dump_fdb(struct rtl838x_switch_priv *priv)
 	mutex_unlock(&priv->reg_mutex);
 }
 
-static void rtl838x_port_get_stp_state(struct rtl838x_switch_priv *priv, int port)
+int rtl838x_port_get_stp_state(struct rtl838x_switch_priv *priv, int port)
 {
 	u32 cmd, msti = 0;
 	u32 port_state[4];
@@ -1488,7 +1503,7 @@ static void rtl838x_port_get_stp_state(struct rtl838x_switch_priv *priv, int por
 
 	/* CPU PORT can only be configured on RTL838x */
 	if (port >= priv->cpu_port || port > 51)
-		return;
+		return -1;
 
 	mutex_lock(&priv->reg_mutex);
 
@@ -1516,6 +1531,8 @@ static void rtl838x_port_get_stp_state(struct rtl838x_switch_priv *priv, int por
 		port_state[i] = sw_r32(priv->r->tbl_access_data_0(i));
 
 	mutex_unlock(&priv->reg_mutex);
+
+	return (port_state[index] >> bit) & 3;
 }
 
 static int rtl838x_port_fdb_dump(struct dsa_switch *ds, int port,
@@ -1667,8 +1684,7 @@ out:
 	return err;
 }
 
-static void rtl838x_port_stp_state_set(struct dsa_switch *ds, int port,
-				       u8 state)
+void rtl838x_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 {
 	u32 cmd, msti = 0;
 	u32 port_state[4];
@@ -2374,7 +2390,38 @@ static void rtl838x_storm_enable(struct rtl838x_switch_priv *priv, int port, boo
 		sw_w32(0x0, RTL838X_STORM_CTRL_LB_CTRL(port));
 }
 
-static void rtl838x_storm_control_init(struct rtl838x_switch_priv *priv)
+u32 rtl838x_get_egress_rate(struct rtl838x_switch_priv *priv, int port)
+{
+	u32 rate;
+
+	if (port > priv->cpu_port)
+		return 0;
+	rate = sw_r32(RTL838X_SCHED_P_EGR_RATE_CTRL(port)) & 0x3fff;
+	return rate;
+}
+
+/* Sets the rate limit, 10MBit/s is equal to a rate value of 625 */
+void rtl838x_set_egress_rate(struct rtl838x_switch_priv *priv, int port, u32 rate)
+{
+	if (port > priv->cpu_port)
+		return;
+	sw_w32(rate, RTL838X_SCHED_P_EGR_RATE_CTRL(port));
+}
+
+/* Set the rate limit for a particular queue in Bits/s
+ * units of the rate is 16Kbps
+ */
+void rtl838x_egress_rate_queue_limit(struct rtl838x_switch_priv *priv, int port,
+					    int queue, u32 rate)
+{
+	if (port > priv->cpu_port)
+		return;
+	if (queue > 7)
+		return;
+	sw_w32(rate, RTL838X_SCHED_Q_EGR_RATE_CTRL(port, queue));
+}
+
+static void rtl838x_rate_control_init(struct rtl838x_switch_priv *priv)
 {
 	int i;
 
@@ -2391,10 +2438,8 @@ static void rtl838x_storm_control_init(struct rtl838x_switch_priv *priv)
 	sw_w32(0x00000020, RTL838X_STORM_CTRL_BURST_PPS_0); // UC
 	sw_w32(0x00200020, RTL838X_STORM_CTRL_BURST_PPS_1); // MC and BC
 
-	// Include IFG in storm control
-	sw_w32_mask(0, 1 << 6, RTL838X_STORM_CTRL);
-	// Rate control is based on bytes/s (0 = packets)
-	sw_w32_mask(0, 1 << 5, RTL838X_STORM_CTRL);
+	// Include IFG in storm control, rate based on bytes/s (0 = packets)
+	sw_w32_mask(0, 1 << 6 | 1 << 5, RTL838X_STORM_CTRL);
 	// Bandwidth control includes preamble and IFG (10 Bytes)
 	sw_w32_mask(0, 1, RTL838X_SCHED_CTRL);
 
@@ -2408,7 +2453,7 @@ static void rtl838x_storm_control_init(struct rtl838x_switch_priv *priv)
 		if (priv->ports[i].phy) {
 			sw_w32((1 << 18) | 0x8000, RTL838X_STORM_CTRL_PORT_UC(i));
 			sw_w32((1 << 18) | 0x8000, RTL838X_STORM_CTRL_PORT_MC(i));
-			sw_w32(0x000, RTL838X_STORM_CTRL_PORT_BC(i));
+			sw_w32(0x8000, RTL838X_STORM_CTRL_PORT_BC(i));
 			rtl838x_storm_enable(priv, i, true);
 		}
 	}
@@ -2421,6 +2466,162 @@ static void rtl838x_storm_control_init(struct rtl838x_switch_priv *priv)
 	//sw_w32(0, RTL838X_ATK_PRVNT_ACT);
 	// Enable attack prevention on all ports
 	//sw_w32(0x0fffffff, RTL838X_ATK_PRVNT_PORT_EN);
+}
+
+/* Sets the rate limit, 10MBit/s is equal to a rate value of 625 */
+u32 rtl839x_get_egress_rate(struct rtl838x_switch_priv *priv, int port)
+{
+	u32 rate;
+
+	pr_debug("%s: Getting egress rate on port %d to %d\n", __func__, port, rate);
+	if (port >= priv->cpu_port)
+		return 0;
+
+	mutex_lock(&priv->reg_mutex);
+
+	rtl839x_read_scheduling_table(port);
+
+	rate = sw_r32(RTL839X_TBL_ACCESS_DATA_2(7));
+	rate <<= 12;
+	rate |= sw_r32(RTL839X_TBL_ACCESS_DATA_2(8)) >> 20;
+
+	mutex_unlock(&priv->reg_mutex);
+
+	return rate;
+}
+
+/* Sets the rate limit, 10MBit/s is equal to a rate value of 625 */
+void rtl839x_set_egress_rate(struct rtl838x_switch_priv *priv, int port, u32 rate)
+{
+	u32 cmd;
+
+	pr_debug("%s: Setting egress rate on port %d to %d\n", __func__, port, rate);
+	if (port >= priv->cpu_port)
+		return;
+
+	mutex_lock(&priv->reg_mutex);
+
+	rtl839x_read_scheduling_table(port);
+
+	sw_w32_mask(0xff, (rate >> 12) & 0xff, RTL839X_TBL_ACCESS_DATA_2(7));
+	sw_w32_mask(0xfff << 20, rate << 20, RTL839X_TBL_ACCESS_DATA_2(8));
+
+	cmd = 1 << 9 /* Execute cmd */
+		| 1 << 8 /* Read */
+		| 0 << 6 /* Table type 0b00 */
+		| (port & 0x3f);
+	rtl839x_exec_tbl2_cmd(cmd);
+
+	mutex_unlock(&priv->reg_mutex);
+}
+
+/* Set the rate limit for a particular queue in Bits/s
+ * units of the rate is 16Kbps
+ */
+void rtl839x_egress_rate_queue_limit(struct rtl838x_switch_priv *priv, int port,
+					int queue, u32 rate)
+{
+	u32 cmd;
+	int lsb = 128 + queue * 20;
+	int low_byte = 8 - (lsb >> 5);
+	int start_bit = lsb - (low_byte << 5);
+	u32 high_mask = 0xfffff	>> (32 - start_bit);
+
+	pr_debug("%s: Setting egress rate on port %d, queue %d to %d\n",
+		__func__, port, queue, rate);
+	if (port >= priv->cpu_port)
+		return;
+	if (queue > 7)
+		return;
+
+	mutex_lock(&priv->reg_mutex);
+
+	rtl839x_read_scheduling_table(port);
+
+	sw_w32_mask(0xfffff << start_bit, (rate & 0xfffff) << start_bit,
+		    RTL839X_TBL_ACCESS_DATA_2(low_byte));
+	if (high_mask)
+		sw_w32_mask(high_mask, (rate & 0xfffff) >> (32- start_bit),
+			    RTL839X_TBL_ACCESS_DATA_2(low_byte - 1));
+
+	cmd = 1 << 9 /* Execute cmd */
+		| 1 << 8 /* Read */
+		| 0 << 6 /* Table type 0b00 */
+		| (port & 0x3f);
+	rtl839x_exec_tbl2_cmd(cmd);
+
+	mutex_unlock(&priv->reg_mutex);
+}
+
+static void rtl839x_rate_control_init(struct rtl838x_switch_priv *priv)
+{
+	int p, q;
+
+	pr_info("%s: enabling rate control\n", __func__);
+	/* Tick length and token size settings for SoC with 250MHz,
+	 * RTL8350 family would use 50MHz
+	 */
+	// Set the special tick period
+	sw_w32(976563, RTL839X_STORM_CTRL_SPCL_LB_TICK_TKN_CTRL);
+	// Ingress tick period and token length 10G
+	sw_w32(18 << 11 | 151, RTL839X_IGR_BWCTRL_LB_TICK_TKN_CTRL_0);
+	// Ingress tick period and token length 1G
+	sw_w32(245 << 11 | 129, RTL839X_IGR_BWCTRL_LB_TICK_TKN_CTRL_1);
+	// Egress tick period 10G, bytes/token 10G and tick period 1G, bytes/token 1G
+	sw_w32(18 << 24 | 151 << 16 | 185 << 8 | 97, RTL839X_SCHED_LB_TICK_TKN_CTRL);
+	// Set the tick period of the CPU and the Token Len
+	sw_w32(3815 << 8 | 1, RTL839X_SCHED_LB_TICK_TKN_PPS_CTRL);
+
+	// Set the Weighted Fair Queueing burst size
+	sw_w32_mask(0xffff, 4500, RTL839X_SCHED_LB_THR);
+
+	// Storm-rate calculation is based on bytes/sec (bit 5), include IFG (bit 6)
+	sw_w32_mask(0, 1 << 5 | 1 << 6, RTL839X_STORM_CTRL);
+
+	/* Based on the rate control mode being bytes/s
+	 * set tick period and token length for 10G
+	 */
+	sw_w32(18 << 10 | 151, RTL839X_STORM_CTRL_LB_TICK_TKN_CTRL_0);
+	/* and for 1G ports */
+	sw_w32(246 << 10 | 129, RTL839X_STORM_CTRL_LB_TICK_TKN_CTRL_1);
+
+	/* Set default burst rates on all ports (the same for 1G / 10G) with a PHY
+	 * for UC, MC and BC
+	 * For 1G port, the minimum burst rate is 1700, maximum 65535,
+	 * For 10G ports it is 2650 and 1048575 respectively */
+	for (p = 0; p < priv->cpu_port; p++) {
+		if (priv->ports[p].phy && !priv->ports[p].is10G) {
+			sw_w32_mask(0xffff, 0x8000, RTL839X_STORM_CTRL_PORT_UC_1(p));
+			sw_w32_mask(0xffff, 0x8000, RTL839X_STORM_CTRL_PORT_MC_1(p));
+			sw_w32_mask(0xffff, 0x8000, RTL839X_STORM_CTRL_PORT_BC_1(p));
+		}
+	}
+
+	/* Setup ingress/egress per-port rate control */
+	for (p = 0; p < priv->cpu_port; p++) {
+		if (!priv->ports[p].phy)
+			continue;
+
+		if (priv->ports[p].is10G)
+			rtl839x_set_egress_rate(priv, p, 625000); // 10GB/s
+		else
+			rtl839x_set_egress_rate(priv, p, 62500);  // 1GB/s
+
+		// Setup queues: all RTL83XX SoCs have 8 queues, maximum rate
+		for (q = 0; q < 8; q++)
+			rtl839x_egress_rate_queue_limit(priv, p, q, 0xfffff);
+
+		if (priv->ports[p].is10G) {
+			// Set high threshold to maximum
+			sw_w32_mask(0xffff, 0xffff, RTL839X_IGR_BWCTRL_PORT_CTRL_10G_0(p));
+		} else {
+			// Set high threshold to maximum
+			sw_w32_mask(0xffff, 0xffff, RTL839X_IGR_BWCTRL_PORT_CTRL_1(p));
+		}
+	}
+
+	// Set global ingress low watermark rate
+	sw_w32(65532, RTL839X_IGR_BWCTRL_CTRL_LB_THR);
 }
 
 static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
@@ -2639,8 +2840,11 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 
 	rtl838x_get_l2aging(priv);
 
-/*	if (priv->family_id == RTL8380_FAMILY_ID)
-		rtl838x_storm_control_init(priv); */
+	pr_info("Enabling rate control\n");
+	if (priv->family_id == RTL8380_FAMILY_ID)
+		rtl838x_rate_control_init(priv);
+	else if (priv->family_id == RTL8390_FAMILY_ID)
+		rtl839x_rate_control_init(priv);
 
 	/* Clear all destination ports for mirror groups */
 	for (i = 0; i < 4; i++)

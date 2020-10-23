@@ -143,7 +143,7 @@
 #define RTL839X_MIR_DPM_CTRL(grp)		(0x2530 + (((grp) << 2)))
 #define RTL839X_MIR_SPM_CTRL(grp)		(0x2510 + (((grp) << 2)))
 
-/* Storm control */
+/* Storm/rate control and scheduling */
 #define RTL838X_STORM_CTRL			(0x4700)
 #define RTL839X_STORM_CTRL			(0x1800)
 #define RTL838X_STORM_CTRL_LB_CTRL(p)		(0x4884 + (((p) << 2)))
@@ -151,12 +151,23 @@
 #define RTL838X_STORM_CTRL_BURST_PPS_1		(0x4878)
 #define RTL838X_STORM_CTRL_BURST_0		(0x487c)
 #define RTL838X_STORM_CTRL_BURST_1		(0x4880)
+#define RTL839X_STORM_CTRL_LB_TICK_TKN_CTRL_0	(0x1804)
+#define RTL839X_STORM_CTRL_LB_TICK_TKN_CTRL_1	(0x1808)
 #define RTL838X_SCHED_CTRL			(0xB980)
+#define RTL839X_SCHED_CTRL			(0x60F4)
 #define RTL838X_SCHED_LB_TICK_TKN_CTRL_0	(0xAD58)
 #define RTL838X_SCHED_LB_TICK_TKN_CTRL_1	(0xAD5C)
 #define RTL839X_SCHED_LB_TICK_TKN_CTRL_0	(0x1804)
 #define RTL839X_SCHED_LB_TICK_TKN_CTRL_1	(0x1808)
+#define RTL839X_STORM_CTRL_SPCL_LB_TICK_TKN_CTRL (0x2000)
+#define RTL839X_IGR_BWCTRL_LB_TICK_TKN_CTRL_0	(0x1604)
+#define RTL839X_IGR_BWCTRL_LB_TICK_TKN_CTRL_1	(0x1608)
+#define RTL839X_SCHED_LB_TICK_TKN_CTRL		(0x60F8)
+#define RTL839X_SCHED_LB_TICK_TKN_PPS_CTRL	(0x6200)
 #define RTL838X_SCHED_LB_THR			(0xB984)
+#define RTL839X_SCHED_LB_THR			(0x60FC)
+#define RTL838X_SCHED_P_EGR_RATE_CTRL(p)	(0xC008 + (((p) << 7)))
+#define RTL838X_SCHED_Q_EGR_RATE_CTRL(p, q)	(0xC00C + (p << 7) + (((q) << 2)))
 #define RTL838X_STORM_CTRL_PORT_BC_EXCEED	(0x470C)
 #define RTL838X_STORM_CTRL_PORT_MC_EXCEED	(0x4710)
 #define RTL838X_STORM_CTRL_PORT_UC_EXCEED	(0x4714)
@@ -166,6 +177,19 @@
 #define RTL838X_STORM_CTRL_PORT_UC(p)		(0x4718 + (((p) << 2)))
 #define RTL838X_STORM_CTRL_PORT_MC(p)		(0x478c + (((p) << 2)))
 #define RTL838X_STORM_CTRL_PORT_BC(p)		(0x4800 + (((p) << 2)))
+#define RTL839X_STORM_CTRL_PORT_UC_0(p)		(0x185C + (((p) << 3)))
+#define RTL839X_STORM_CTRL_PORT_UC_1(p)		(0x1860 + (((p) << 3)))
+#define RTL839X_STORM_CTRL_PORT_MC_0(p)		(0x19FC + (((p) << 3)))
+#define RTL839X_STORM_CTRL_PORT_MC_1(p)		(0x1a00 + (((p) << 3)))
+#define RTL839X_STORM_CTRL_PORT_BC_0(p)		(0x1B9C + (((p) << 3)))
+#define RTL839X_STORM_CTRL_PORT_BC_1(p)		(0x1BA0 + (((p) << 3)))
+#define RTL839X_TBL_ACCESS_CTRL_2		(0x611C)
+#define RTL839X_TBL_ACCESS_DATA_2(i)		(0x6120 + (((i) << 2)))
+#define RTL839X_IGR_BWCTRL_PORT_CTRL_10G_0(p)	(0x1618 + (((p) << 3)))
+#define RTL839X_IGR_BWCTRL_PORT_CTRL_10G_1(p)	(0x161C + (((p) << 3)))
+#define RTL839X_IGR_BWCTRL_PORT_CTRL_0(p)	(0x1640 + (((p) << 3)))
+#define RTL839X_IGR_BWCTRL_PORT_CTRL_1(p)	(0x1644 + (((p) << 3)))
+#define RTL839X_IGR_BWCTRL_CTRL_LB_THR		(0x1614)
 
 /* Attack prevention */
 #define RTL838X_ATK_PRVNT_PORT_EN		(0x5B00)
@@ -188,6 +212,7 @@ struct rtl838x_port {
 	u16 pvid;
 	bool eee_enabled;
 	enum phy_type phy;
+	bool is10G;
 	const struct dsa_port *dp;
 };
 
@@ -304,5 +329,16 @@ extern int rtl838x_write_mmd_phy(u32 port, u32 addr, u32 reg, u32 val);
 extern int rtl838x_read_mmd_phy(u32 port, u32 addr, u32 reg, u32 *val);
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);
+int rtl838x_port_get_stp_state(struct rtl838x_switch_priv *priv, int port);
+void rtl838x_port_stp_state_set(struct dsa_switch *ds, int port, u8 state);
+void rtl838x_fast_age(struct dsa_switch *ds, int port);
+void rtl839x_set_egress_rate(struct rtl838x_switch_priv *priv, int port, u32 rate);
+void rtl839x_egress_rate_queue_limit(struct rtl838x_switch_priv *priv, int port,
+					int queue, u32 rate);
+void rtl838x_set_egress_rate(struct rtl838x_switch_priv *priv, int port, u32 rate);
+void rtl838x_egress_rate_queue_limit(struct rtl838x_switch_priv *priv, int port,
+					    int queue, u32 rate);
+u32 rtl839x_get_egress_rate(struct rtl838x_switch_priv *priv, int port);
+u32 rtl838x_get_egress_rate(struct rtl838x_switch_priv *priv, int port);
 
 #endif /* _RTL838X_H */

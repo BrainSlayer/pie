@@ -46,8 +46,11 @@ extern struct rtl838x_soc_info soc_info;
 #define RING_BUFFER	1600
 
 #define RTL838X_STORM_CTRL_PORT_BC_EXCEED	(0x470C)
+#define RTL839X_STORM_CTRL_PORT_BC_EXCEED	(0x180C)
 #define RTL838X_STORM_CTRL_PORT_MC_EXCEED	(0x4710)
+#define RTL839X_STORM_CTRL_PORT_MC_EXCEED	(0x1814)
 #define RTL838X_STORM_CTRL_PORT_UC_EXCEED	(0x4714)
+#define RTL839X_STORM_CTRL_PORT_UC_EXCEED	(0x181C)
 #define RTL838X_ATK_PRVNT_STS			(0x5B1C)
 
 struct p_hdr {
@@ -267,11 +270,8 @@ static void rtl839x_l2_notification_handler(struct rtl838x_eth_priv *priv)
 	priv->lastEvent = e;
 }
 
-static irqreturn_t rtl838x_net_irq(int irq, void *dev_id)
+static bool rtl838x_rate_warn(void)
 {
-	struct net_device *dev = dev_id;
-	struct rtl838x_eth_priv *priv = netdev_priv(dev);
-	u32 status = sw_r32(priv->r->dma_if_intr_sts);
 	bool triggered = false;
 	u32 atk = sw_r32(RTL838X_ATK_PRVNT_STS);
 	u32 storm_uc = sw_r32(RTL838X_STORM_CTRL_PORT_UC_EXCEED);
@@ -295,7 +295,45 @@ static irqreturn_t rtl838x_net_irq(int irq, void *dev_id)
 		sw_w32(atk, RTL838X_ATK_PRVNT_STS);
 	}
 
+	return triggered;
+}
+
+static bool rtl839x_rate_warn(void)
+{
+	bool triggered = false;
+	u64 storm_uc = rtl839x_get_port_reg_be(RTL839X_STORM_CTRL_PORT_UC_EXCEED);
+	u64 storm_mc = rtl839x_get_port_reg_be(RTL839X_STORM_CTRL_PORT_MC_EXCEED);
+	u64 storm_bc = rtl839x_get_port_reg_be(RTL839X_STORM_CTRL_PORT_BC_EXCEED);
+
+	if (storm_uc || storm_mc || storm_bc) {
+
+		pr_warn("Storm control UC: %016llx, MC: %016llx, BC: %016llx\n",
+			storm_uc, storm_mc, storm_bc);
+
+		rtl839x_set_port_reg_be(storm_uc, RTL839X_STORM_CTRL_PORT_UC_EXCEED);
+		rtl839x_set_port_reg_be(storm_mc, RTL839X_STORM_CTRL_PORT_MC_EXCEED);
+		rtl839x_set_port_reg_be(storm_bc, RTL839X_STORM_CTRL_PORT_BC_EXCEED);
+
+		triggered = true;
+	}
+
+	return triggered;
+}
+
+static irqreturn_t rtl838x_net_irq(int irq, void *dev_id)
+{
+	struct net_device *dev = dev_id;
+	struct rtl838x_eth_priv *priv = netdev_priv(dev);
+	u32 status = sw_r32(priv->r->dma_if_intr_sts);
+	bool triggered = false;
+
 	spin_lock(&priv->lock);
+
+	if (priv->family_id == RTL8390_FAMILY_ID)
+		triggered = rtl839x_rate_warn();
+	else
+		triggered = rtl838x_rate_warn();
+
 	/*  Ignore TX interrupt */
 	if ((status & 0xf0000)) {
 		/* Clear ISR */

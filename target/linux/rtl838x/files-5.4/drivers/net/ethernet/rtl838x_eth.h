@@ -245,6 +245,8 @@ inline u32 rtl839x_get_mac_tx_pause_sts(int p)
 	return (sw_r32(RTL839X_MAC_TX_PAUSE_STS + ((p >> 5) << 2)) & (1 << p));
 }
 
+inline u64 rtl839x_get_port_reg_be(int reg);
+inline void rtl839x_set_port_reg_be(u64 set, int reg);
 
 struct rtl838x_reg {
 	int (*mac_port_ctrl)(int port);
