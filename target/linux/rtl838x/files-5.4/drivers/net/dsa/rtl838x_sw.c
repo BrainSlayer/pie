@@ -192,6 +192,16 @@ inline int rtl839x_vlan_port_pb(int port)
 	return RTL839X_VLAN_PORT_PB_VLAN(port);
 }
 
+inline static int rtl838x_trk_mbr_ctr(int group)
+{
+	return RTL838X_TRK_MBR_CTR + (group << 2);
+}
+
+inline static int rtl839x_trk_mbr_ctr(int group)
+{
+	return RTL839X_TRK_MBR_CTR + (group << 3);
+}
+
 static void rtl839x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 {
 	u32 cmd;
@@ -630,6 +640,7 @@ static const struct rtl838x_reg rtl838x_reg = {
 	.vlan_port_egr_filter = rtl838x_vlan_port_egr_filter,
 	.vlan_port_igr_filter = rtl838x_vlan_port_igr_filter,
 	.vlan_port_pb = rtl838x_vlan_port_pb,
+	.trk_mbr_ctr = rtl838x_trk_mbr_ctr,
 };
 
 static const struct rtl838x_reg rtl839x_reg = {
@@ -676,6 +687,7 @@ static const struct rtl838x_reg rtl839x_reg = {
 	.vlan_port_egr_filter = rtl839x_vlan_port_egr_filter,
 	.vlan_port_igr_filter = rtl839x_vlan_port_igr_filter,
 	.vlan_port_pb = rtl839x_vlan_port_pb,
+	.trk_mbr_ctr = rtl839x_trk_mbr_ctr,
 };
 
 static const struct rtl838x_mib_desc rtl838x_mib[] = {
@@ -1847,6 +1859,71 @@ static void rtl838x_port_mirror_del(struct dsa_switch *ds, int port,
 	mutex_unlock(&priv->reg_mutex);
 }
 
+int rtl838x_lag_add(struct dsa_switch *ds, int group, int port)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	int i;
+
+	pr_info("%s: Adding port %d to LA-group %d\n", __func__, port, group);
+	if (group >= priv->n_lags) {
+		pr_err("Link Agrregation group too large.\n");
+		return -EINVAL;
+	}
+
+	if (port >= priv->cpu_port) {
+		pr_err("Invalid port number.\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&priv->reg_mutex);
+
+	for (i = 0; i < priv->n_lags; i++) {
+		if (priv->lags_port_members[i] & (1ULL < i))
+			break;
+	}
+	if (i != priv->n_lags) {
+		pr_err("%s: Port already member of LAG: %d\n", __func__, i);
+		return -ENOSPC;
+	}
+
+	priv->r->mask_port_reg_be(0, 1ULL << port, priv->r->trk_mbr_ctr(group));
+	priv->lags_port_members[group] |= 1ULL << port;
+
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+
+int rtl838x_lag_del(struct dsa_switch *ds, int group, int port)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+
+	pr_info("%s: Removing port %d from LA-group %d\n", __func__, port, group);
+
+	if (group >= priv->n_lags) {
+		pr_err("Link Agrregation group too large.\n");
+		return -EINVAL;
+	}
+
+	if (port >= priv->cpu_port) {
+		pr_err("Invalid port number.\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&priv->reg_mutex);
+
+	if (!(priv->lags_port_members[group] & (1ULL << port))) {
+		pr_err("%s: Port not member of LAG: %d\n", __func__, group
+		);
+		return -ENOSPC;
+	}
+
+	priv->r->mask_port_reg_be(1ULL << port, 0, priv->r->trk_mbr_ctr(group));
+	priv->lags_port_members[group] &= ~(1ULL << port);
+
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+
 void rtl838x_vlan_profile_dump(int index)
 {
 	u32 profile;
@@ -2792,6 +2869,7 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 		priv->ds->num_ports = 30;
 		priv->fib_entries = 8192;
 		rtl8380_get_version(priv);
+		priv->n_lags = 8;
 	} else {
 		priv->cpu_port = RTL839X_CPU_PORT;
 		priv->port_mask = 0x3f;
@@ -2799,6 +2877,7 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 		priv->ds->num_ports = 53;
 		priv->fib_entries = 16384;
 		rtl8390_get_version(priv);
+		priv->n_lags = 16;
 	}
 	pr_info("Chip version %c\n", priv->version);
 

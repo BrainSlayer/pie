@@ -212,7 +212,7 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 				(u32 *)(RTL838X_SW_BASE + RTL839X_STORM_CTRL_PORT_BC_0(port)));
 	}
 
-	debugfs_create_u32("id", 0444, port_dir, &priv->ports[port].dp->index);
+	debugfs_create_u32("id", 0444, port_dir, (u32 *)&priv->ports[port].dp->index);
 
 	port_ctrl_regset = devm_kzalloc(priv->dev, sizeof(*port_ctrl_regset), GFP_KERNEL);
 	if (!port_ctrl_regset)
@@ -220,7 +220,7 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 
 	port_ctrl_regset->regs = port_ctrl_regs;
 	port_ctrl_regset->nregs = ARRAY_SIZE(port_ctrl_regs);
-	port_ctrl_regset->base = RTL838X_SW_BASE + (port << 2);
+	port_ctrl_regset->base = (void *)(RTL838X_SW_BASE + (port << 2));
 	debugfs_create_regset32("port_ctrl", 0400, port_dir, port_ctrl_regset);
 
 	debugfs_create_file("stp_state", 0600, port_dir, &priv->ports[port], &stp_state_fops);
@@ -234,8 +234,10 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 {
 	struct dentry *rtl838x_dir;
 	struct dentry *port_dir;
+	struct dentry *lag_dir;
 	struct debugfs_regset32 *port_ctrl_regset;
 	int ret, i;
+	char lag_name[10];
 
 	pr_info("%s called\n", __func__);
 	rtl838x_dir = debugfs_lookup(RTL838X_DRIVER_NAME, NULL);
@@ -257,7 +259,8 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 	}
 
 	/* Create directory for CPU-port */
-	port_dir = debugfs_create_dir("cpu_port", rtl838x_dir);	port_ctrl_regset = devm_kzalloc(priv->dev, sizeof(*port_ctrl_regset), GFP_KERNEL);
+	port_dir = debugfs_create_dir("cpu_port", rtl838x_dir);
+	port_ctrl_regset = devm_kzalloc(priv->dev, sizeof(*port_ctrl_regset), GFP_KERNEL);
 	if (!port_ctrl_regset) {
 		ret = -ENOMEM;
 		goto err;
@@ -265,9 +268,20 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 
 	port_ctrl_regset->regs = port_ctrl_regs;
 	port_ctrl_regset->nregs = ARRAY_SIZE(port_ctrl_regs);
-	port_ctrl_regset->base = RTL838X_SW_BASE + (priv->cpu_port << 2);
+	port_ctrl_regset->base = (void *)(RTL838X_SW_BASE + (priv->cpu_port << 2));
 	debugfs_create_regset32("port_ctrl", 0400, port_dir, port_ctrl_regset);
 	debugfs_create_u8("id", 0444, port_dir, &priv->cpu_port);
+
+	/* Create entries for LAGs */
+	for (i=0; i < priv->n_lags; i++) {
+		snprintf(lag_name, sizeof(lag_name), "lag.%02d", i);
+		if (priv->family_id == RTL8380_FAMILY_ID)
+			debugfs_create_x32(lag_name, 0644, rtl838x_dir,
+				(u32 *)(RTL838X_SW_BASE + priv->r->trk_mbr_ctr(i)));
+		else
+			debugfs_create_x64(lag_name, 0644, rtl838x_dir,
+				(u64 *)(RTL838X_SW_BASE + priv->r->trk_mbr_ctr(i)));
+	}
 
 	return;
 err:

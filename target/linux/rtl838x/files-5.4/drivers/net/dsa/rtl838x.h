@@ -191,6 +191,10 @@
 #define RTL839X_IGR_BWCTRL_PORT_CTRL_1(p)	(0x1644 + (((p) << 3)))
 #define RTL839X_IGR_BWCTRL_CTRL_LB_THR		(0x1614)
 
+/* Link aggregation (Trunking) */
+#define RTL839X_TRK_MBR_CTR			(0x2200)
+#define RTL838X_TRK_MBR_CTR			(0x3E00)
+
 /* Attack prevention */
 #define RTL838X_ATK_PRVNT_PORT_EN		(0x5B00)
 #define RTL838X_ATK_PRVNT_CTRL			(0x5B04)
@@ -297,6 +301,7 @@ struct rtl838x_reg {
 	int (*vlan_port_egr_filter)(int port);
 	int (*vlan_port_igr_filter)(int port);
 	int (*vlan_port_pb)(int port);
+	int (*trk_mbr_ctr)(int group);
 };
 
 struct rtl838x_switch_priv {
@@ -316,6 +321,8 @@ struct rtl838x_switch_priv {
 	u8 port_mask;
 	u32 fib_entries;
 	struct dentry *dbgfs_dir;
+	int n_lags;
+	u64 lags_port_members[16];
 };
 
 extern struct rtl838x_soc_info soc_info;
@@ -340,5 +347,7 @@ void rtl838x_egress_rate_queue_limit(struct rtl838x_switch_priv *priv, int port,
 					    int queue, u32 rate);
 u32 rtl839x_get_egress_rate(struct rtl838x_switch_priv *priv, int port);
 u32 rtl838x_get_egress_rate(struct rtl838x_switch_priv *priv, int port);
+int rtl838x_lag_add(struct dsa_switch *ds, int group, int port);
+int rtl838x_lag_del(struct dsa_switch *ds, int group, int port);
 
 #endif /* _RTL838X_H */
