@@ -142,6 +142,17 @@
 #define RTL839X_MIR_CTRL(grp)			(0x2500 + (((grp) << 2)))
 #define RTL839X_MIR_DPM_CTRL(grp)		(0x2530 + (((grp) << 2)))
 #define RTL839X_MIR_SPM_CTRL(grp)		(0x2510 + (((grp) << 2)))
+#define RTL838X_MIR_QID_CTRL(grp)		(0xAD44 + (((grp) << 2)))
+#define RTL838X_MIR_RSPAN_VLAN_CTRL(grp)	(0xA340 + (((grp) << 2)))
+#define RTL838X_MIR_RSPAN_VLAN_CTRL_MAC(grp)	(0xAA70 + (((grp) << 2)))
+#define RTL838X_MIR_RSPAN_TX_CTRL		(0xA350)
+#define RTL838X_MIR_RSPAN_TX_TAG_RM_CTRL	(0xAA80)
+#define RTL838X_MIR_RSPAN_TX_TAG_EN_CTRL	(0xAA84)
+#define RTL839X_MIR_RSPAN_VLAN_CTRL(grp)	(0xA340 + (((grp) << 2)))
+#define RTL839X_MIR_RSPAN_TX_CTRL		(0x69b0)
+#define RTL839X_MIR_RSPAN_TX_TAG_RM_CTRL	(0x2550)
+#define RTL839X_MIR_RSPAN_TX_TAG_EN_CTRL	(0x2554)
+#define RTL839X_MIR_SAMPLE_RATE_CTRL		(0x2558)
 
 /* Storm/rate control and scheduling */
 #define RTL838X_STORM_CTRL			(0x4700)
