@@ -7,6 +7,7 @@
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
+#include <linux/notifier.h>
 #include <linux/of_mdio.h>
 #include <linux/of_net.h>
 #include <linux/of_platform.h>
@@ -1859,6 +1860,7 @@ static void rtl838x_port_mirror_del(struct dsa_switch *ds, int port,
 	mutex_unlock(&priv->reg_mutex);
 }
 
+/* Caller must hold priv->reg_mutex */
 int rtl838x_lag_add(struct dsa_switch *ds, int group, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
@@ -1875,8 +1877,6 @@ int rtl838x_lag_add(struct dsa_switch *ds, int group, int port)
 		return -EINVAL;
 	}
 
-	mutex_lock(&priv->reg_mutex);
-
 	for (i = 0; i < priv->n_lags; i++) {
 		if (priv->lags_port_members[i] & (1ULL < i))
 			break;
@@ -1889,10 +1889,11 @@ int rtl838x_lag_add(struct dsa_switch *ds, int group, int port)
 	priv->r->mask_port_reg_be(0, 1ULL << port, priv->r->trk_mbr_ctr(group));
 	priv->lags_port_members[group] |= 1ULL << port;
 
-	mutex_unlock(&priv->reg_mutex);
+	pr_info("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
 	return 0;
 }
 
+/* Caller must hold priv->reg_mutex */
 int rtl838x_lag_del(struct dsa_switch *ds, int group, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
@@ -1909,7 +1910,6 @@ int rtl838x_lag_del(struct dsa_switch *ds, int group, int port)
 		return -EINVAL;
 	}
 
-	mutex_lock(&priv->reg_mutex);
 
 	if (!(priv->lags_port_members[group] & (1ULL << port))) {
 		pr_err("%s: Port not member of LAG: %d\n", __func__, group
@@ -1920,7 +1920,7 @@ int rtl838x_lag_del(struct dsa_switch *ds, int group, int port)
 	priv->r->mask_port_reg_be(1ULL << port, 0, priv->r->trk_mbr_ctr(group));
 	priv->lags_port_members[group] &= ~(1ULL << port);
 
-	mutex_unlock(&priv->reg_mutex);
+	pr_info("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
 	return 0;
 }
 
@@ -2801,6 +2801,82 @@ static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
 	return 0;
 }
 
+
+static int rtl838x_handle_changeupper(struct rtl838x_switch_priv *priv,
+				      struct net_device *ndev,
+				      struct netdev_notifier_changeupper_info *info)
+{
+	struct net_device *upper = info->upper_dev;
+	int i, j, err;
+
+	if (!netif_is_lag_master(upper))
+		return 0;
+
+	mutex_lock(&priv->reg_mutex);
+
+	for (i = 0; i < priv->n_lags; i++) {
+		if ((!priv->lag_devs[i]) || (priv->lag_devs[i] == upper))
+			break;
+	}
+	for (j = 0; j < priv->cpu_port; j++) {
+		if (priv->ports[j].dp->slave == ndev)
+			break;
+	}
+	if (j >= priv->cpu_port) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (info->linking) {
+		if (!priv->lag_devs[i])
+			priv->lag_devs[i] = upper;
+		err = rtl838x_lag_add(priv->ds, i, priv->ports[j].dp->index);
+		if (err) {
+			err = -EINVAL;
+			goto out;
+		}
+	} else {
+		if (!priv->lag_devs[i])
+			err = -EINVAL;
+		err = rtl838x_lag_del(priv->ds, i, priv->ports[j].dp->index);
+		if (err) {
+			err = -EINVAL;
+			goto out;
+		}
+		if (!priv->lags_port_members[i])
+			priv->lag_devs[i] = NULL;
+	}
+
+out:
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+
+static int rtl838x_netdevice_event(struct notifier_block *this,
+				   unsigned long event, void *ptr)
+{
+	struct net_device *ndev = netdev_notifier_info_to_dev(ptr);
+	struct rtl838x_switch_priv *priv;
+	int err;
+
+	pr_debug("In: %s, event: %lu\n", __func__, event);
+
+	if ((event != NETDEV_CHANGEUPPER) && (event != NETDEV_CHANGELOWERSTATE))
+		return NOTIFY_DONE;
+
+	priv = container_of(this, struct rtl838x_switch_priv, nb);
+	switch (event) {
+	case NETDEV_CHANGEUPPER:
+		err = rtl838x_handle_changeupper(priv, ndev, ptr);
+		break;
+	}
+
+	if (err)
+		return err;
+
+	return NOTIFY_DONE;
+}
+
 static const struct dsa_switch_ops rtl838x_switch_ops = {
 	.get_tag_protocol	= rtl838x_get_tag_protocol,
 	.setup			= rtl838x_setup,
@@ -2928,6 +3004,12 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 	/* Clear all destination ports for mirror groups */
 	for (i = 0; i < 4; i++)
 		priv->mirror_group_ports[i] = -1;
+
+	priv->nb.notifier_call = rtl838x_netdevice_event;
+		if (register_netdevice_notifier(&priv->nb)) {
+			priv->nb.notifier_call = NULL;
+			dev_err(dev, "Failed to register LAG netdev notifier\n");
+	}
 
 	rtl838x_dbgfs_init(priv);
 

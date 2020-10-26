@@ -212,6 +212,8 @@
 #define RTL838X_ATK_PRVNT_ACT			(0x5B08)
 #define RTL838X_ATK_PRVNT_STS			(0x5B1C)
 
+#define MAX_LAGS 16
+
 enum phy_type {
 	PHY_NONE = 0,
 	PHY_RTL838X_SDS = 1,
@@ -333,7 +335,9 @@ struct rtl838x_switch_priv {
 	u32 fib_entries;
 	struct dentry *dbgfs_dir;
 	int n_lags;
-	u64 lags_port_members[16];
+	u64 lags_port_members[MAX_LAGS];
+	struct net_device *lag_devs[MAX_LAGS];
+	struct notifier_block nb;
 };
 
 extern struct rtl838x_soc_info soc_info;
