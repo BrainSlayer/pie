@@ -2030,7 +2030,7 @@ static void rtl838x_vlan_add(struct dsa_switch *ds, int port,
 	if (vlan->flags & BRIDGE_VLAN_INFO_PVID) {
 		for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
 			/* Set both inner and outer PVID of the port */
-			sw_w32((v << 16) | v, priv->r->vlan_port_pb(port));
+			sw_w32((v << 16) | v << 2, priv->r->vlan_port_pb(port));
 		}
 	}
 
@@ -2038,7 +2038,7 @@ static void rtl838x_vlan_add(struct dsa_switch *ds, int port,
 		for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
 			/* Get untagged port memberships of this vlan */
 			priv->r->vlan_tables_read(v, &info);
-			portmask = info.untagged_ports | (1 << port);
+			portmask = info.untagged_ports | (1ULL << port);
 			pr_debug("Untagged ports, VLAN %d: %llx\n", v, portmask);
 			priv->r->vlan_set_untagged(v, portmask);
 		}
@@ -2046,7 +2046,7 @@ static void rtl838x_vlan_add(struct dsa_switch *ds, int port,
 		for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
 			/* Get tagged port memberships of this vlan */
 			priv->r->vlan_tables_read(v, &info);
-			info.tagged_ports |= (1 << port);
+			info.tagged_ports |= (1ULL << port);
 			pr_debug("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
 			priv->r->vlan_set_tagged(v, &info);
 		}
