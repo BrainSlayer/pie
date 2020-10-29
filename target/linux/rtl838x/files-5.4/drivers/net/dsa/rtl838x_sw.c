@@ -777,9 +777,9 @@ static irqreturn_t rtl839x_switch_irq(int irq, void *dev_id)
 	pr_info("RTL8390 Link change: status: %x, ports %llx\n", status, ports);
 
 	for (i = 0; i < 52; i++) {
-		if (ports & (1ULL << i)) {
+		if (ports & BIT_ULL(i)) {
 			link = rtl839x_get_port_reg_le(RTL839X_MAC_LINK_STS);
-			if (link & (1ULL << i))
+			if (link & BIT_ULL(i))
 				dsa_port_phylink_mac_change(ds, i, true);
 			else
 				dsa_port_phylink_mac_change(ds, i, false);
@@ -804,7 +804,7 @@ void rtl838x_fdb_sync(struct work_struct *work)
 	int action;
 
 	while (uw->macs[i]) {
-		action = (uw->macs[i] & (1ULL << 63)) ? SWITCHDEV_FDB_ADD_TO_BRIDGE
+		action = (uw->macs[i] & BIT_ULL(63)) ? SWITCHDEV_FDB_ADD_TO_BRIDGE
 				: SWITCHDEV_FDB_DEL_TO_BRIDGE;
 		u64_to_ether_addr(uw->macs[i] & 0xffffffffffffULL, addr);
 		info.addr = &addr[0];
@@ -1269,7 +1269,7 @@ static int rtl838x_setup(struct dsa_switch *ds)
 	 */
 	for (i = 0; i < priv->cpu_port; i++) {
 		if (priv->ports[i].phy) {
-			priv->r->set_port_reg_be(1ULL << priv->cpu_port | 1ULL << i,
+			priv->r->set_port_reg_be(BIT_ULL(priv->cpu_port) | BIT_ULL(i),
 					      priv->r->port_iso_ctrl(i));
 			port_bitmap |= 1ULL << i;
 		}
@@ -1810,11 +1810,11 @@ static int rtl838x_port_mirror_add(struct dsa_switch *ds, int port,
 		sw_w32((mirror->to_local_port << 4) | 1, RTL839X_MIR_CTRL(group));
 	}
 
-	if (ingress && (priv->r->get_port_reg_be(priv->r->mir_spm(group)) & (1ULL << port))) {
+	if (ingress && (priv->r->get_port_reg_be(priv->r->mir_spm(group)) & BIT_ULL(port))) {
 		mutex_unlock(&priv->reg_mutex);
 		return -EEXIST;
 	}
-	if ((!ingress) && (priv->r->get_port_reg_be(priv->r->mir_dpm(group)) & (1ULL << port))) {
+	if ((!ingress) && (priv->r->get_port_reg_be(priv->r->mir_dpm(group)) & BIT_ULL(port))) {
 		mutex_unlock(&priv->reg_mutex);
 		return -EEXIST;
 	}
@@ -1846,10 +1846,10 @@ static void rtl838x_port_mirror_del(struct dsa_switch *ds, int port,
 	mutex_lock(&priv->reg_mutex);
 	if (mirror->ingress) {
 		/* Ingress, clear source port matrix */
-		priv->r->mask_port_reg_be(1ULL << port, 0, priv->r->mir_spm(group));
+		priv->r->mask_port_reg_be(BIT_ULL(port), 0, priv->r->mir_spm(group));
 	} else {
 		/* Egress, clear destination port matrix */
-		priv->r->mask_port_reg_be(1ULL << port, 0, priv->r->mir_dpm(group));
+		priv->r->mask_port_reg_be(BIT_ULL(port), 0, priv->r->mir_dpm(group));
 	}
 
 	if (!(sw_r32(priv->r->mir_spm(group)) || sw_r32(priv->r->mir_dpm(group)))) {
@@ -1911,14 +1911,14 @@ int rtl838x_lag_del(struct dsa_switch *ds, int group, int port)
 	}
 
 
-	if (!(priv->lags_port_members[group] & (1ULL << port))) {
+	if (!(priv->lags_port_members[group] & BIT_ULL(port))) {
 		pr_err("%s: Port not member of LAG: %d\n", __func__, group
 		);
 		return -ENOSPC;
 	}
 
-	priv->r->mask_port_reg_be(1ULL << port, 0, priv->r->trk_mbr_ctr(group));
-	priv->lags_port_members[group] &= ~(1ULL << port);
+	priv->r->mask_port_reg_be(BIT_ULL(port), 0, priv->r->trk_mbr_ctr(group));
+	priv->lags_port_members[group] &= ~BIT_ULL(port);
 
 	pr_info("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
 	return 0;
@@ -2038,7 +2038,7 @@ static void rtl838x_vlan_add(struct dsa_switch *ds, int port,
 		for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
 			/* Get untagged port memberships of this vlan */
 			priv->r->vlan_tables_read(v, &info);
-			portmask = info.untagged_ports | (1ULL << port);
+			portmask = info.untagged_ports | BIT_ULL(port);
 			pr_debug("Untagged ports, VLAN %d: %llx\n", v, portmask);
 			priv->r->vlan_set_untagged(v, portmask);
 		}
@@ -2046,7 +2046,7 @@ static void rtl838x_vlan_add(struct dsa_switch *ds, int port,
 		for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
 			/* Get tagged port memberships of this vlan */
 			priv->r->vlan_tables_read(v, &info);
-			info.tagged_ports |= (1ULL << port);
+			info.tagged_ports |= BIT_ULL(port);
 			pr_debug("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
 			priv->r->vlan_set_tagged(v, &info);
 		}
@@ -2081,14 +2081,14 @@ static int rtl838x_vlan_del(struct dsa_switch *ds, int port,
 		if (vlan->flags & BRIDGE_VLAN_INFO_UNTAGGED) {
 			/* Get untagged port memberships of this vlan */
 			priv->r->vlan_tables_read(v, &info);
-			portmask = info.untagged_ports & (~(1ULL << port));
+			portmask = info.untagged_ports & (~BIT_ULL(port));
 			pr_info("Untagged ports, VLAN %d: %llx\n", v, portmask);
 			priv->r->vlan_set_untagged(v, portmask);
 		}
 
 		/* Get tagged port memberships of this vlan */
 		priv->r->vlan_tables_read(v, &info);
-		info.tagged_ports &= (~(1ULL << port));
+		info.tagged_ports &= (~BIT_ULL(port));
 		pr_info("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
 		priv->r->vlan_set_tagged(v, &info);
 	}
@@ -2117,11 +2117,11 @@ static void rtl838x_port_bridge_leave(struct dsa_switch *ds, int port,
 			if (dsa_to_port(ds, i)->bridge_dev != bridge)
 				continue;
 			if (priv->ports[i].enable)
-				priv->r->mask_port_reg_be(1ULL << port, 0,
+				priv->r->mask_port_reg_be(BIT_ULL(port), 0,
 						       priv->r->port_iso_ctrl(i));
 			priv->ports[i].pm |= 1ULL << port;
 
-			port_bitmap &= ~(1ULL << i);
+			port_bitmap &= ~BIT_ULL(i);
 		}
 	}
 
@@ -2202,7 +2202,7 @@ static void rtl838x_port_disable(struct dsa_switch *ds, int port)
 		return;
 
 	/* remove port from switch mask of CPU_PORT */
-	priv->r->mask_port_reg_be(1ULL << port, 0, priv->r->port_iso_ctrl(priv->cpu_port));
+	priv->r->mask_port_reg_be(BIT_ULL(port), 0, priv->r->port_iso_ctrl(priv->cpu_port));
 
 	/* remove all other ports in the same bridge from switch mask of port */
 	priv->r->mask_port_reg_be(priv->ports[port].pm, 0LL, priv->r->port_iso_ctrl(port));
@@ -2425,10 +2425,10 @@ static int rtl838x_phylink_mac_link_state(struct dsa_switch *ds, int port,
 		return -EINVAL;
 
 	state->link = 0;
-	if (priv->r->get_port_reg_le(priv->r->mac_link_sts) & (1ULL << port))
+	if (priv->r->get_port_reg_le(priv->r->mac_link_sts) & BIT_ULL(port))
 		state->link = 1;
 	state->duplex = 0;
-	if (priv->r->get_port_reg_le(priv->r->mac_link_dup_sts) & (1ULL << port))
+	if (priv->r->get_port_reg_le(priv->r->mac_link_dup_sts) & BIT_ULL(port))
 		state->duplex = 1;
 
 	speed = priv->r->get_port_reg_le(priv->r->mac_link_spd_sts(port));
@@ -2451,9 +2451,9 @@ static int rtl838x_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	}
 
 	state->pause &= (MLO_PAUSE_RX | MLO_PAUSE_TX);
-	if (priv->r->get_port_reg_le(priv->r->mac_rx_pause_sts) & (1ULL << port))
+	if (priv->r->get_port_reg_le(priv->r->mac_rx_pause_sts) & BIT_ULL(port))
 		state->pause |= MLO_PAUSE_RX;
-	if (priv->r->get_port_reg_le(priv->r->mac_tx_pause_sts) & (1ULL << port))
+	if (priv->r->get_port_reg_le(priv->r->mac_tx_pause_sts) & BIT_ULL(port))
 		state->pause |= MLO_PAUSE_TX;
 	return 1;
 }
