@@ -4,7 +4,7 @@
 #include "rtl83xx.h"
 
 extern struct mutex smi_lock;
-
+extern struct rtl83xx_soc_info soc_info;
 
 static inline void rtl839x_mask_port_reg_be(u64 clear, u64 set, int reg)
 {
@@ -68,6 +68,12 @@ static inline void rtl839x_exec_tbl1_cmd(u32 cmd)
 {
 	sw_w32(cmd, RTL839X_TBL_ACCESS_CTRL_1);
 	do { } while (sw_r32(RTL839X_TBL_ACCESS_CTRL_1) & BIT(16));
+}
+
+inline void rtl839x_exec_tbl2_cmd(u32 cmd)
+{
+	sw_w32(cmd, RTL839X_TBL_ACCESS_CTRL_2);
+	do { } while (sw_r32(RTL839X_TBL_ACCESS_CTRL_2) & (1 << 9));
 }
 
 static inline int rtl839x_tbl_access_data_0(int i)

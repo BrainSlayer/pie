@@ -39,6 +39,7 @@ irqreturn_t rtl839x_switch_irq(int irq, void *dev_id);
 void rtl8390_get_version(struct rtl838x_switch_priv *priv);
 void rtl839x_vlan_profile_dump(int index);
 int rtl83xx_dsa_phy_write(struct dsa_switch *ds, int phy_addr, int phy_reg, u16 val);
+inline void rtl839x_exec_tbl2_cmd(u32 cmd);
 
 #endif /* _NET_DSA_RTL83XX_H */
 

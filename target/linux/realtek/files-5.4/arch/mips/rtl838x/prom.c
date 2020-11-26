@@ -176,6 +176,7 @@ void __init prom_init(void)
 		soc_info.name = "DEFAULT";
 		soc_info.family = 0;
 	}
+
 	pr_info("SoC Type: %s\n", get_system_type());
 
 	prom_init_cmdline();
