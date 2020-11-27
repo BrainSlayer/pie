@@ -142,6 +142,11 @@ static inline int rtl838x_mac_link_spd_sts(int p)
 	return RTL838X_MAC_LINK_SPD_STS(p);
 }
 
+inline static int rtl838x_trk_mbr_ctr(int group)
+{
+	return RTL838X_TRK_MBR_CTR + (group << 2);
+}
+
 static u64 rtl838x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl838x_l2_entry *e)
 {
 	u64 entry;
@@ -290,6 +295,9 @@ const struct rtl838x_reg rtl838x_reg = {
 	.vlan_port_igr_filter = rtl838x_vlan_port_igr_filter,
 	.vlan_port_pb = rtl838x_vlan_port_pb,
 	.vlan_port_tag_sts_ctrl = rtl838x_vlan_port_tag_sts_ctrl,
+	.trk_mbr_ctr = rtl838x_trk_mbr_ctr,
+	.rma_bpdu_fld_pmask = RTL838X_RMA_BPDU_FLD_PMSK,
+	.spcl_trap_eapol_ctrl = RTL838X_SPCL_TRAP_EAPOL_CTRL,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)

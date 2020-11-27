@@ -55,6 +55,7 @@
 #define MAPLE_SDS5_FIB_REG0r			(RTL838X_SDS4_REG28 + 0x980)
 
 /* VLAN registers */
+#define RTL838X_VLAN_CTRL			(0x3A74)
 #define RTL838X_VLAN_PROFILE(idx)		(0x3A88 + ((idx) << 2))
 #define RTL838X_VLAN_PORT_EGR_FLTR		(0x3A84)
 #define RTL838X_VLAN_PORT_PB_VLAN(port)		(0x3C00 + ((port) << 2))
@@ -128,6 +129,8 @@
 #define RTL839X_L2_PORT_NEW_SA_FWD(p)		(0x3900 + (((p >> 4) << 2)))
 #define RTL838X_L2_PORT_SALRN(p)		(0x328c + (((p >> 4) << 2)))
 #define RTL839X_L2_PORT_SALRN(p)		(0x38F0 + (((p >> 4) << 2)))
+#define RTL838X_RMA_BPDU_FLD_PMSK		(0x4348)
+#define RTL839X_RMA_BPDU_FLD_PMSK		(0x125C)
 
 /* Port Mirroring */
 #define RTL838X_MIR_CTRL(grp)			(0x5D00 + (((grp) << 2)))
@@ -335,6 +338,10 @@ struct rtl838x_reg {
 	int (*vlan_port_igr_filter)(int port);
 	int (*vlan_port_pb)(int port);
 	int (*vlan_port_tag_sts_ctrl)(int port);
+	int (*rtl838x_vlan_port_tag_sts_ctrl)(int port);
+	int (*trk_mbr_ctr)(int group);
+	int rma_bpdu_fld_pmask;
+	int spcl_trap_eapol_ctrl;
 };
 
 struct rtl838x_switch_priv {
@@ -354,6 +361,10 @@ struct rtl838x_switch_priv {
 	u8 port_mask;
 	u32 fib_entries;
 	struct dentry *dbgfs_dir;
+	int n_lags;
+	u64 lags_port_members[MAX_LAGS];
+	struct net_device *lag_devs[MAX_LAGS];
+	struct notifier_block nb;
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);

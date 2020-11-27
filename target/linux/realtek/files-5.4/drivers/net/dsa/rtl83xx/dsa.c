@@ -636,7 +636,7 @@ static void rtl83xx_port_bridge_leave(struct dsa_switch *ds, int port,
 	mutex_unlock(&priv->reg_mutex);
 }
 
-static void rtl83xx_port_stp_state_set(struct dsa_switch *ds, int port,
+void rtl83xx_port_stp_state_set(struct dsa_switch *ds, int port,
 				       u8 state)
 {
 	u32 cmd, msti = 0;
@@ -715,7 +715,7 @@ static void rtl83xx_port_stp_state_set(struct dsa_switch *ds, int port,
 	mutex_unlock(&priv->reg_mutex);
 }
 
-static void rtl83xx_fast_age(struct dsa_switch *ds, int port)
+void rtl83xx_fast_age(struct dsa_switch *ds, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int s = priv->family_id == RTL8390_FAMILY_ID ? 2 : 0;

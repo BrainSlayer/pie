@@ -36,8 +36,8 @@ static void dump_fdb(struct rtl838x_switch_priv *priv)
 	mutex_unlock(&priv->reg_mutex);
 }
 
-// TODO: unused
-static void rtl83xx_port_get_stp_state(struct rtl838x_switch_priv *priv, int port)
+// TODO: used only in debugfs
+void rtl83xx_port_get_stp_state(struct rtl838x_switch_priv *priv, int port)
 {
 	u32 cmd, msti = 0;
 	u32 port_state[4];
@@ -278,12 +278,152 @@ static int __init rtl83xx_get_l2aging(struct rtl838x_switch_priv *priv)
 	return t;
 }
 
+/* Caller must hold priv->reg_mutex */
+int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	int i;
+
+	pr_info("%s: Adding port %d to LA-group %d\n", __func__, port, group);
+	if (group >= priv->n_lags) {
+		pr_err("Link Agrregation group too large.\n");
+		return -EINVAL;
+	}
+
+	if (port >= priv->cpu_port) {
+		pr_err("Invalid port number.\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < priv->n_lags; i++) {
+		if (priv->lags_port_members[i] & BIT_ULL(i))
+			break;
+	}
+	if (i != priv->n_lags) {
+		pr_err("%s: Port already member of LAG: %d\n", __func__, i);
+		return -ENOSPC;
+	}
+
+	priv->r->mask_port_reg_be(0, BIT_ULL(port), priv->r->trk_mbr_ctr(group));
+	priv->lags_port_members[group] |= BIT_ULL(port);
+
+	pr_info("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
+	return 0;
+}
+
+/* Caller must hold priv->reg_mutex */
+int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+
+	pr_info("%s: Removing port %d from LA-group %d\n", __func__, port, group);
+
+	if (group >= priv->n_lags) {
+		pr_err("Link Agrregation group too large.\n");
+		return -EINVAL;
+	}
+
+	if (port >= priv->cpu_port) {
+		pr_err("Invalid port number.\n");
+		return -EINVAL;
+	}
+
+
+	if (!(priv->lags_port_members[group] & BIT_ULL(port))) {
+		pr_err("%s: Port not member of LAG: %d\n", __func__, group
+		);
+		return -ENOSPC;
+	}
+
+	priv->r->mask_port_reg_be(BIT_ULL(port), 0, priv->r->trk_mbr_ctr(group));
+	priv->lags_port_members[group] &= ~BIT_ULL(port);
+
+	pr_info("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
+	return 0;
+}
+
+static int rtl83xx_handle_changeupper(struct rtl838x_switch_priv *priv,
+				      struct net_device *ndev,
+				      struct netdev_notifier_changeupper_info *info)
+{
+	struct net_device *upper = info->upper_dev;
+	int i, j, err;
+
+	if (!netif_is_lag_master(upper))
+		return 0;
+
+	mutex_lock(&priv->reg_mutex);
+
+	for (i = 0; i < priv->n_lags; i++) {
+		if ((!priv->lag_devs[i]) || (priv->lag_devs[i] == upper))
+			break;
+	}
+	for (j = 0; j < priv->cpu_port; j++) {
+		if (priv->ports[j].dp->slave == ndev)
+			break;
+	}
+	if (j >= priv->cpu_port) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (info->linking) {
+		if (!priv->lag_devs[i])
+			priv->lag_devs[i] = upper;
+		err = rtl83xx_lag_add(priv->ds, i, priv->ports[j].dp->index);
+		if (err) {
+			err = -EINVAL;
+			goto out;
+		}
+	} else {
+		if (!priv->lag_devs[i])
+			err = -EINVAL;
+		err = rtl83xx_lag_del(priv->ds, i, priv->ports[j].dp->index);
+		if (err) {
+			err = -EINVAL;
+			goto out;
+		}
+		if (!priv->lags_port_members[i])
+			priv->lag_devs[i] = NULL;
+	}
+
+out:
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+
+static int rtl83xx_netdevice_event(struct notifier_block *this,
+				   unsigned long event, void *ptr)
+{
+	struct net_device *ndev = netdev_notifier_info_to_dev(ptr);
+	struct rtl838x_switch_priv *priv;
+	int err;
+
+	pr_debug("In: %s, event: %lu\n", __func__, event);
+
+	if ((event != NETDEV_CHANGEUPPER) && (event != NETDEV_CHANGELOWERSTATE))
+		return NOTIFY_DONE;
+
+	priv = container_of(this, struct rtl838x_switch_priv, nb);
+	switch (event) {
+	case NETDEV_CHANGEUPPER:
+		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
+		break;
+	}
+
+	if (err)
+		return err;
+
+	return NOTIFY_DONE;
+}
+
 static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 {
 	int err = 0, i;
 	struct rtl838x_switch_priv *priv;
 	struct device *dev = &pdev->dev;
 	u64 irq_mask;
+	u64 bpdu_mask;
 
 	pr_debug("Probing RTL838X switch device\n");
 	if (!pdev->dev.of_node) {
@@ -361,14 +501,25 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 
 	rtl83xx_get_l2aging(priv);
 
-/*
-	if (priv->family_id == RTL8380_FAMILY_ID)
-		rtl83xx_storm_control_init(priv);
-*/
+	rtl83xx_setup_qos(priv);
 
 	/* Clear all destination ports for mirror groups */
 	for (i = 0; i < 4; i++)
 		priv->mirror_group_ports[i] = -1;
+
+	priv->nb.notifier_call = rtl83xx_netdevice_event;
+		if (register_netdevice_notifier(&priv->nb)) {
+			priv->nb.notifier_call = NULL;
+			dev_err(dev, "Failed to register LAG netdev notifier\n");
+	}
+
+	// Flood BPDUs to all ports including cpu-port
+	bpdu_mask = soc_info.family == RTL8380_FAMILY_ID ? 0x1FFFFFFF : 0x1FFFFFFFFFFFFF;
+	priv->r->set_port_reg_be(bpdu_mask, priv->r->rma_bpdu_fld_pmask);
+
+	// TRAP 802.1X frames (EAPOL) to the CPU-Port, bypass STP and VLANs
+	sw_w32(7, priv->r->spcl_trap_eapol_ctrl);
+
 
 	rtl838x_dbgfs_init(priv);
 
