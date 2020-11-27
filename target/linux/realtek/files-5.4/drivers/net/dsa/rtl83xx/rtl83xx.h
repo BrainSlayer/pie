@@ -24,7 +24,7 @@ struct rtl83xx_mib_desc {
 	const char *name;
 };
 
-void __init rtl83xx_storm_control_init(struct rtl838x_switch_priv *priv);
+void __init rtl83xx_setup_qos(priv);
 
 /* RTL838x-specific */
 u32 rtl838x_hash(struct rtl838x_switch_priv *priv, u64 seed);

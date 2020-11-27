@@ -557,7 +557,7 @@ void rtl839x_config_qos(void)
 	}
 }
 
-void rtl83xx_setup_qos(struct rtl838x_switch_priv *priv)
+void __init rtl83xx_setup_qos(struct rtl838x_switch_priv *priv)
 {
 	switch_priv = priv;
 
