@@ -232,6 +232,7 @@
  *  Timer/counter for 8390/80/28 TC & MP chip
  */
 #define RTL838X_TIMER0_BASE	((volatile void *)(0xb8003100UL))
+#define RTL93XX_TIMER0_BASE	((volatile void *)(0xb8003200UL))
 #define RTL838X_TIMER0_IRQ	RTL838X_TC0_EXT_IRQ
 
 #define RTL8390TC_TC1DATA	(RTL838X_TIMER0_BASE + 0x04)
@@ -301,6 +302,7 @@
  * GPIO
  */
 #define GPIO_CTRL_REG_BASE		((volatile void *) 0xb8003500)
+#define RTL93XX_GPIO_CTRL_REG_BASE	((volatile void *) 0xb8003300)
 #define RTL838X_GPIO_PABC_CNR		(GPIO_CTRL_REG_BASE + 0x0)
 #define RTL838X_GPIO_PABC_TYPE		(GPIO_CTRL_REG_BASE + 0x04)
 #define RTL838X_GPIO_PABC_DIR		(GPIO_CTRL_REG_BASE + 0x8)
@@ -311,8 +313,10 @@
 
 #define RTL838X_MODEL_NAME_INFO		(0x00D4)
 #define RTL839X_MODEL_NAME_INFO		(0x0FF0)
+#define RTL931X_MODEL_NAME_INFO		(0x0004)
 #define RTL838X_LED_GLB_CTRL		(0xA000)
 #define RTL839X_LED_GLB_CTRL		(0x00E4)
+#define RTL931X_LED_GLB_CTRL		(0x0600)
 #define RTL838X_EXT_GPIO_DIR		(0xA08C)
 #define RTL839X_EXT_GPIO_DIR		(0x0214)
 #define RTL838X_EXT_GPIO_DATA		(0xA094)
@@ -325,6 +329,9 @@
 
 #define RTL838X_GMII_INTF_SEL		(0x1000)
 #define RTL838X_IO_DRIVING_ABILITY_CTRL	(0x1010)
+
+// SYS_LED RTL9310: Pin B5
+
 
 #define RTL838X_GPIO_A7		31
 #define RTL838X_GPIO_A6		30
@@ -362,6 +369,7 @@
 #define	RGCR				(0x1E70)
 #define RTL839X_RST_GLB_CTRL		(0x0014)
 #define RTL838X_RST_GLB_CTRL_1		(0x0040)
+#define RTL931X_RST_GLB_CTRL		(0x0400)
 
 /* LED control by switch */
 #define RTL838X_LED_MODE_SEL		(0x1004)
@@ -421,6 +429,8 @@
 #define RTL8350_FAMILY_ID   (0x8350)
 #define RTL8380_FAMILY_ID   (0x8380)
 #define RTL8330_FAMILY_ID   (0x8330)
+#define RTL9300_FAMILY_ID   (0x9300)
+#define RTL9310_FAMILY_ID   (0x9310)
 
 struct rtl838x_soc_info {
 	unsigned char *name;

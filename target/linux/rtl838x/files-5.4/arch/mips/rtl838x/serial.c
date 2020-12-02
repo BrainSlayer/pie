@@ -86,7 +86,7 @@ int __init rtl838x_serial_init(void)
 
 	p.type = PORT_16550A;
 	p.membase = (unsigned char *) RTL838X_UART0_BASE;
-	p.irq = RTL838X_UART0_IRQ;
+//	p.irq = RTL838X_UART0_IRQ;
 	p.uartclk = SYSTEM_FREQ - (24 * baud);
 	p.flags = UPF_SKIP_TEST | UPF_LOW_LATENCY | UPF_FIXED_TYPE;
 	p.iotype = UPIO_MEM;
@@ -96,6 +96,15 @@ int __init rtl838x_serial_init(void)
 	/* Call early_serial_setup() here, to set up 8250 console driver */
 	if (early_serial_setup(&p) != 0)
 		ret = 1;
+
+	rtl838x_w32(0, RTL838X_UART0_BASE + 0x4);
+	rtl838x_w32(0x62000000, RTL838X_UART0_BASE + 0x0);
+	rtl838x_w32(0, RTL838X_UART0_BASE + 0x4);
+	rtl838x_w32(0x03000000, RTL838X_UART0_BASE + 0xc);
+	rtl838x_w32(0x03000000, RTL838X_UART0_BASE + 0x10);
+	rtl838x_w32(0xc1000000, RTL838X_UART0_BASE + 0x8);
+	rtl838x_w32(0x43000000, RTL838X_UART0_BASE + 0x10);
+
 #endif
 	return 0;
 }

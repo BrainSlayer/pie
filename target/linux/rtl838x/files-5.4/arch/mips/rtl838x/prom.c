@@ -115,6 +115,9 @@ void __init prom_init(void)
 {
 	uint32_t model;
 
+	// LED solid on
+	sw_w32(0x0042b654, RTL931X_LED_GLB_CTRL);
+
 	pr_info("%s called\n", __func__);
 	soc_info.sw_base = RTL838X_SW_BASE;
 
@@ -126,6 +129,12 @@ void __init prom_init(void)
 	    && (model != 0x8380) && (model != 0x8382)) {
 		model = sw_r32(RTL839X_MODEL_NAME_INFO);
 		pr_info("RTL839X model is %x\n", model);
+		model = model >> 16 & 0xFFFF;
+	}
+
+	if ((model & 0x8390) != 0x8390) {
+		model = sw_r32(RTL931X_MODEL_NAME_INFO);
+		pr_info("RTL93XX model is %x\n", model);
 		model = model >> 16 & 0xFFFF;
 	}
 
@@ -163,6 +172,10 @@ void __init prom_init(void)
 	case 0x8393:
 		soc_info.name = "RTL8393";
 		soc_info.family = RTL8390_FAMILY_ID;
+		break;
+	case 0x9313:
+		soc_info.name = "RTL9313";
+		soc_info.family = RTL9310_FAMILY_ID;
 		break;
 	default:
 		soc_info.name = "DEFAULT";

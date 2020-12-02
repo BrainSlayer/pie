@@ -9,18 +9,34 @@
 
 #define RTL838X_CPU_PORT			28
 #define RTL839X_CPU_PORT			52
+#define RTL931X_CPU_PORT			56
 
 #define RTL838X_MAC_PORT_CTRL			(0xd560)
 #define RTL839X_MAC_PORT_CTRL			(0x8004)
+#define RTL931X_MAC_PORT_CTRL			(0x6004)
+
+/* DMA interrupt control and status registers */
 #define RTL838X_DMA_IF_INTR_STS			(0x9f54)
 #define RTL839X_DMA_IF_INTR_STS			(0x7868)
+#define RTL931X_DMA_IF_INTR_RX_RUNOUT_STS	(0x091c)
+#define RTL931X_DMA_IF_INTR_RX_DONE_STS		(0x0920)
+#define RTL931X_DMA_IF_INTR_TX_DONE_STS		(0x0924)
 #define RTL838X_DMA_IF_INTR_MSK			(0x9f50)
 #define RTL839X_DMA_IF_INTR_MSK			(0x7864)
+#define RTL931X_DMA_IF_INTR_RX_RUNOUT_MSK	(0x0910)
+#define RTL931X_DMA_IF_INTR_RX_DONE_MSK		(0x0914)
+#define RTL931X_DMA_IF_INTR_TX_DONE_MSK		(0x0918)
+#define RTL931X_L2_NTFY_IF_INTR_MSK		(0x09E4)
+#define RTL931X_L2_NTFY_IF_INTR_STS		(0x09E8)
+
 #define RTL838X_DMA_IF_CTRL			(0x9f58)
 #define RTL839X_DMA_IF_CTRL			(0x786c)
+/* TODO: RTL931X_DMA_IF_CTRL has different bits meanings */
+#define RTL931X_DMA_IF_CTRL			(0x0928) 
 #define RTL838X_RST_GLB_CTRL_0			(0x003c)
 #define RTL838X_MAC_FORCE_MODE_CTRL		(0xa104)
 #define RTL839X_MAC_FORCE_MODE_CTRL		(0x02bc)
+#define RTL931X_MAC_FORCE_MODE_CTRL		(0x0ddc)
 
 /* MAC address settings */
 #define RTL838X_MAC				(0xa9ec)
@@ -30,14 +46,19 @@
 
 #define RTL838X_DMA_RX_BASE			(0x9f00)
 #define RTL839X_DMA_RX_BASE			(0x780c)
+#define RTL931X_DMA_RX_BASE			(0x0800)
 #define RTL838X_DMA_TX_BASE			(0x9f40)
 #define RTL839X_DMA_TX_BASE			(0x784c)
+#define RTL931X_DMA_TX_BASE			(0x0900)
 #define RTL838X_DMA_IF_RX_RING_SIZE		(0xB7E4)
 #define RTL839X_DMA_IF_RX_RING_SIZE		(0x6038)
+#define RTL931X_DMA_IF_RX_RING_SIZE		(0x2080)
 #define RTL838X_DMA_IF_RX_RING_CNTR		(0xB7E8)
 #define RTL839X_DMA_IF_RX_RING_CNTR		(0x603c)
+#define RTL931X_DMA_IF_RX_RING_CNTR		(0x20AC)
 #define RTL838X_DMA_IF_RX_CUR			(0x9F20)
 #define RTL839X_DMA_IF_RX_CUR			(0x782c)
+#define RTL931X_DMA_IF_RX_CUR			(0x0880)
 
 #define RTL838X_DMY_REG31			(0x3b28)
 #define RTL838X_SDS_MODE_SEL			(0x0028)
@@ -75,15 +96,20 @@
 /* MAC handling */
 #define RTL838X_MAC_LINK_STS			(0xa188)
 #define RTL839X_MAC_LINK_STS			(0x0390)
+#define RTL931X_MAC_LINK_STS			(0x0ec0)
 #define RTL838X_MAC_LINK_SPD_STS		(0xa190)
 #define RTL839X_MAC_LINK_SPD_STS		(0x03a0)
+#define RTL931X_MAC_LINK_SPD_STS		(0x0ed0)
 #define RTL838X_MAC_LINK_DUP_STS		(0xa19c)
 #define RTL839X_MAC_LINK_DUP_STS		(0x03b0)
+#define RTL931X_MAC_LINK_DUP_STS		(0x0ef0)
 // TODO: RTL8390_MAC_LINK_MEDIA_STS_ADDR ???
 #define RTL838X_MAC_TX_PAUSE_STS		(0xa1a0)
 #define RTL839X_MAC_TX_PAUSE_STS		(0x03b8)
+#define RTL931X_MAC_TX_PAUSE_STS		(0x0ef8)
 #define RTL838X_MAC_RX_PAUSE_STS		(0xa1a4)
 #define RTL839X_MAC_RX_PAUSE_STS		(0x03c0)
+#define RTL931X_MAC_RX_PAUSE_STS		(0x0f00)
 #define RTL838X_EEE_TX_TIMER_GIGA_CTRL		(0xaa04)
 #define RTL838X_EEE_TX_TIMER_GELITE_CTRL	(0xaa08)
 #define RTL839X_MAC_GLB_CTRL			(0x02a8)
@@ -91,6 +117,7 @@
 
 #define RTL838X_L2_TBL_FLUSH_CTRL		(0x3370)
 #define RTL839X_L2_TBL_FLUSH_CTRL		(0x3ba0)
+#define RTL931X_L2_TBL_FLUSH_CTRL		(0xCD9C)
 
 /* MAC link state bits */
 #define FORCE_EN				(1 << 0)
@@ -100,11 +127,16 @@
 #define TX_PAUSE_EN				(1 << 6)
 #define RX_PAUSE_EN				(1 << 7)
 
-/* RTL839X L2 Notification DMA interface */
+/* L2 Notification DMA interface */
 #define RTL839X_DMA_IF_NBUF_BASE_DESC_ADDR_CTRL	(0x785C)
 #define RTL839X_L2_NOTIFICATION_CTRL		(0x7808)
+#define RTL931X_L2_NTFY_RING_BASE_ADDR		(0x09DC)
+#define RTL931X_L2_NTFY_RING_CUR_ADDR		(0x09E0)
+#define RTL839X_L2_NOTIFICATION_CTRL		(0x7808)
+#define RTL931X_L2_NTFY_CTRL			(0xCDC8)
 #define RTL838X_L2_CTRL_0			(0x3200)
 #define RTL839X_L2_CTRL_0			(0x3800)
+#define RTL931X_L2_CTRL				(0xC800)
 
 /* TRAPPING to CPU-PORT */
 #define RTL838X_SPCL_TRAP_IGMP_CTRL		(0x6984)
@@ -126,6 +158,11 @@ inline int rtl839x_mac_port_ctrl(int p)
 	return RTL839X_MAC_PORT_CTRL + (p << 7);
 }
 
+inline int rtl931x_mac_port_ctrl(int p)
+{
+	return RTL931X_MAC_PORT_CTRL + (p << 7);
+}
+
 static inline int rtl838x_mac_force_mode_ctrl(int p)
 {
 	return RTL838X_MAC_FORCE_MODE_CTRL + (p << 2);
@@ -134,6 +171,11 @@ static inline int rtl838x_mac_force_mode_ctrl(int p)
 static inline int rtl839x_mac_force_mode_ctrl(int p)
 {
 	return RTL839X_MAC_FORCE_MODE_CTRL + (p << 2);
+}
+
+static inline int rtl931x_mac_force_mode_ctrl(int p)
+{
+	return RTL931X_MAC_FORCE_MODE_CTRL + (p << 2);
 }
 
 inline int rtl838x_dma_rx_base(int i)
@@ -146,6 +188,11 @@ inline int rtl839x_dma_rx_base(int i)
 	return RTL839X_DMA_RX_BASE + (i << 2);
 }
 
+inline int rtl931x_dma_rx_base(int i)
+{
+	return RTL931X_DMA_RX_BASE + (i << 2);
+}
+
 inline int rtl838x_dma_tx_base(int i)
 {
 	return RTL838X_DMA_TX_BASE + (i << 2);
@@ -154,6 +201,11 @@ inline int rtl838x_dma_tx_base(int i)
 inline int rtl839x_dma_tx_base(int i)
 {
 	return RTL839X_DMA_TX_BASE + (i << 2);
+}
+
+inline int rtl931x_dma_tx_base(int i)
+{
+	return RTL931X_DMA_TX_BASE + (i << 2);
 }
 
 inline int rtl838x_dma_if_rx_ring_size(int i)
@@ -166,6 +218,11 @@ inline int rtl839x_dma_if_rx_ring_size(int i)
 	return RTL839X_DMA_IF_RX_RING_SIZE + ((i >> 3) << 2);
 }
 
+inline int rtl931x_dma_if_rx_ring_size(int i)
+{
+	return RTL931X_DMA_IF_RX_RING_SIZE + ((i / 3) << 2); // TODO: Change bit-meaning
+}
+
 inline int rtl838x_dma_if_rx_ring_cntr(int i)
 {
 	return RTL838X_DMA_IF_RX_RING_CNTR + ((i >> 3) << 2);
@@ -176,6 +233,10 @@ inline int rtl839x_dma_if_rx_ring_cntr(int i)
 	return RTL839X_DMA_IF_RX_RING_CNTR + ((i >> 3) << 2);
 }
 
+inline int rtl931x_dma_if_rx_ring_cntr(int i)
+{
+	return RTL931X_DMA_IF_RX_RING_CNTR + ((i / 3) << 2); // TODO: Changed bit-meaning
+}
 
 inline int rtl838x_dma_if_rx_cur(int i)
 {
@@ -187,24 +248,39 @@ inline int rtl839x_dma_if_rx_cur(int i)
 	return RTL839X_DMA_IF_RX_CUR + (i << 2);
 }
 
+inline int rtl931x_dma_if_rx_cur(int i)
+{
+	return RTL931X_DMA_IF_RX_CUR + (i << 2);
+}
+
 inline u32 rtl838x_get_mac_link_sts(int port)
 {
-	return (sw_r32(RTL838X_MAC_LINK_STS) & (1 << port));
+	return (sw_r32(RTL838X_MAC_LINK_STS) & BIT(port));
 }
 
 inline u32 rtl839x_get_mac_link_sts(int p)
 {
-	return (sw_r32(RTL839X_MAC_LINK_STS + ((p >> 5) << 2)) & (1 << p));
+	return (sw_r32(RTL839X_MAC_LINK_STS + ((p >> 5) << 2)) & BIT(p % 32));
+}
+
+inline u32 rtl931x_get_mac_link_sts(int p)
+{
+	return (sw_r32(RTL931X_MAC_LINK_STS + ((p >> 5) << 2)) & BIT(p % 32));
 }
 
 inline u32 rtl838x_get_mac_link_dup_sts(int port)
 {
-	return (sw_r32(RTL838X_MAC_LINK_DUP_STS) & (1 << port));
+	return (sw_r32(RTL838X_MAC_LINK_DUP_STS) & BIT(port));
 }
 
 inline u32 rtl839x_get_mac_link_dup_sts(int p)
 {
-	return (sw_r32(RTL839X_MAC_LINK_DUP_STS + ((p >> 5) << 2)) & (1 << p));
+	return (sw_r32(RTL839X_MAC_LINK_DUP_STS + ((p >> 5) << 2)) & BIT(p % 32));
+}
+
+inline u32 rtl931x_get_mac_link_dup_sts(int p)
+{
+	return (sw_r32(RTL931X_MAC_LINK_DUP_STS + ((p >> 5) << 2)) & BIT(p % 32));
 }
 
 inline u32 rtl838x_get_mac_link_spd_sts(int port)
@@ -225,6 +301,15 @@ inline u32 rtl839x_get_mac_link_spd_sts(int port)
 	return (speed & 0x3);
 }
 
+inline u32 rtl931x_get_mac_link_spd_sts(int port)
+{
+	int r = RTL931X_MAC_LINK_SPD_STS + ((port >> 3) << 2);
+	u32 speed = sw_r32(r);
+
+	speed >>= (port % 8) << 2;
+	return (speed & 0xf);
+}
+
 inline u32 rtl838x_get_mac_rx_pause_sts(int port)
 {
 	return (sw_r32(RTL838X_MAC_RX_PAUSE_STS) & (1 << port));
@@ -232,7 +317,12 @@ inline u32 rtl838x_get_mac_rx_pause_sts(int port)
 
 inline u32 rtl839x_get_mac_rx_pause_sts(int p)
 {
-	return (sw_r32(RTL839X_MAC_RX_PAUSE_STS + ((p >> 5) << 2)) & (1 << p));
+	return (sw_r32(RTL839X_MAC_RX_PAUSE_STS + ((p >> 5) << 2)) & BIT(p % 32));
+}
+
+inline u32 rtl931x_get_mac_rx_pause_sts(int p)
+{
+	return (sw_r32(RTL931X_MAC_RX_PAUSE_STS + ((p >> 5) << 2)) & BIT(p % 32));
 }
 
 inline u32 rtl838x_get_mac_tx_pause_sts(int port)
@@ -242,7 +332,12 @@ inline u32 rtl838x_get_mac_tx_pause_sts(int port)
 
 inline u32 rtl839x_get_mac_tx_pause_sts(int p)
 {
-	return (sw_r32(RTL839X_MAC_TX_PAUSE_STS + ((p >> 5) << 2)) & (1 << p));
+	return (sw_r32(RTL839X_MAC_TX_PAUSE_STS + ((p >> 5) << 2)) & BIT(p % 32));
+}
+
+inline u32 rtl931x_get_mac_tx_pause_sts(int p)
+{
+	return (sw_r32(RTL931X_MAC_TX_PAUSE_STS + ((p >> 5) << 2)) & BIT(p % 32));
 }
 
 inline u64 rtl839x_get_port_reg_be(int reg);

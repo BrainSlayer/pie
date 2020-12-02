@@ -189,6 +189,27 @@ static const struct rtl838x_reg rtl839x_reg = {
 	.l2_tbl_flush_ctrl = RTL839X_L2_TBL_FLUSH_CTRL,
 };
 
+static const struct rtl838x_reg rtl931x_reg = {
+	.mac_port_ctrl = rtl931x_mac_port_ctrl,
+//	.dma_if_intr_sts = RTL931X_DMA_IF_INTR_STS,
+//	.dma_if_intr_msk = RTL931X_DMA_IF_INTR_MSK,
+	.dma_if_ctrl = RTL931X_DMA_IF_CTRL,
+	.mac_force_mode_ctrl = rtl931x_mac_force_mode_ctrl,
+	.dma_rx_base = rtl931x_dma_rx_base,
+	.dma_tx_base = rtl931x_dma_tx_base,
+	.dma_if_rx_ring_size = rtl931x_dma_if_rx_ring_size,
+	.dma_if_rx_ring_cntr = rtl931x_dma_if_rx_ring_cntr,
+	.dma_if_rx_cur = rtl931x_dma_if_rx_cur,
+	.rst_glb_ctrl = RTL931X_RST_GLB_CTRL,
+	.get_mac_link_sts = rtl931x_get_mac_link_sts,
+	.get_mac_link_dup_sts = rtl931x_get_mac_link_dup_sts,
+	.get_mac_link_spd_sts = rtl931x_get_mac_link_spd_sts,
+	.get_mac_rx_pause_sts = rtl931x_get_mac_rx_pause_sts,
+	.get_mac_tx_pause_sts = rtl931x_get_mac_tx_pause_sts,
+//	.mac = RTL931X_MAC,
+	.l2_tbl_flush_ctrl = RTL931X_L2_TBL_FLUSH_CTRL,
+};
+
 extern int rtl838x_phy_init(struct rtl838x_eth_priv *priv);
 extern int rtl838x_read_sds_phy(int phy_addr, int phy_reg);
 extern int rtl839x_read_sds_phy(int phy_addr, int phy_reg);
@@ -376,6 +397,45 @@ static irqreturn_t rtl838x_net_irq(int irq, void *dev_id)
 	spin_unlock(&priv->lock);
 	return IRQ_HANDLED;
 }
+
+static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
+{
+	struct net_device *dev = dev_id;
+	struct rtl838x_eth_priv *priv = netdev_priv(dev);
+	u32 status_rx_r = sw_r32(RTL931X_DMA_IF_INTR_RX_RUNOUT_STS);
+	u32 status_rx = sw_r32(RTL931X_DMA_IF_INTR_RX_DONE_STS);
+	u32 status_tx = sw_r32(RTL931X_DMA_IF_INTR_TX_DONE_STS);
+
+	pr_info("In %s\n", rtl93xx_net_irq);
+	spin_lock(&priv->lock);
+
+	/*  Ignore TX interrupt */
+	if (status_tx) {
+		/* Clear ISR */
+		sw_w32(status_tx, RTL931X_DMA_IF_INTR_TX_DONE_STS);
+	}
+
+	/* RX interrupt */
+	if (status_rx) {
+		/* Disable RX interrupt */
+		sw_w32(0xffffffff, RTL931X_DMA_IF_INTR_RX_DONE_MSK);
+		sw_w32(0xffffffff, RTL931X_DMA_IF_INTR_RX_DONE_STS);
+		napi_schedule(&priv->napi);
+	}
+
+	/* RX buffer overrun */
+	if (status_rx_r) {
+		pr_info("RX buffer overrun: status %x, mask: %x\n",
+			 status_rx_r, sw_r32(RTL931X_DMA_IF_INTR_RX_RUNOUT_MSK));
+		sw_w32(status_rx_r, RTL931X_DMA_IF_INTR_RX_RUNOUT_STS);
+		rtl838x_rb_cleanup(priv);
+	}
+
+	spin_unlock(&priv->lock);
+	return IRQ_HANDLED;
+}
+
+
 
 static void rtl838x_hw_reset(struct rtl838x_eth_priv *priv)
 {

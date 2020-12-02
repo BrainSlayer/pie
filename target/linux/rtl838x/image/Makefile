@@ -7,8 +7,8 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
-KERNEL_LOADADDR = 0x80000000
-KERNEL_ENTRY = 0x80000400
+KERNEL_LOADADDR = 0x80220000
+KERNEL_ENTRY = 0x80220000
 
 define Device/Default
   PROFILES = Default
@@ -35,82 +35,39 @@ define Build/custom-uimage
 	mv $@.new $@
 endef
 
-define Device/allnet_all-sg8208m
-  SOC := rtl8382
-  IMAGE_SIZE := 7168k
-  DEVICE_VENDOR := ALLNET
-  DEVICE_MODEL := ALL-SG8208M
-  UIMAGE_MAGIC := 0x00000006
-  KERNEL := kernel-bin | append-dtb | gzip | custom-uimage 2.2.2.0
-  KERNEL_INITRAMFS := kernel-bin | append-dtb | gzip | custom-uimage 2.2.2.0
-  DEVICE_PACKAGES := ip-full ip-bridge kmod-gpio-button-hotplug tc
+define Build/relocate-kernel
+	rm -rf $@.relocate
+	$(CP) ../../generic/image/relocate $@.relocate
+	$(MAKE) -C $@.relocate KERNEL_ADDR=$(KERNEL_LOADADDR) CROSS_COMPILE=$(TARGET_CROSS)
+	( \
+		dd if=$@.relocate/loader.bin bs=32 conv=sync && \
+		perl -e '@s = stat("$@"); print pack("V", @s[7])' && \
+		cat $@ \
+	) > $@.new
+	mv $@.new $@
+	rm -rf $@.relocate
 endef
-TARGET_DEVICES += allnet_all-sg8208m
 
-define Device/d-link_dgs-1210-10p
-  SOC := rtl8382
-  IMAGE_SIZE := 13824k
-  DEVICE_VENDOR := D-Link
-  DEVICE_MODEL := DGS-1210-10P
-  DEVICE_PACKAGES := ip-full ip-bridge ethtool tc lua-rs232
-endef
-TARGET_DEVICES += d-link_dgs-1210-10p
+#define Device/zyxel_gs1900-48
+#  SOC := rtl8393
+#  IMAGE_SIZE := 6976k
+#  DEVICE_VENDOR := Zyxel
+#  DEVICE_MODEL := GS1900-48
+#  DEVICE_PACKAGES := ip-bridge ethtool
+#endef
+#TARGET_DEVICES += zyxel_gs1900-48
 
-define Device/d-link_dgs-1210-16
-  SOC := rtl8382
-  IMAGE_SIZE := 13824k
-  DEVICE_VENDOR := D-Link
-  DEVICE_MODEL := DGS-1210-16
-  DEVICE_PACKAGES := ip-full ip-bridge ethtool tc
-endef
-TARGET_DEVICES += d-link_dgs-1210-16
-
-define Device/inaba_aml2-17gp
-  SOC := rtl8382
-  IMAGE_SIZE := 13504k
-  DEVICE_VENDOR := INABA
-  DEVICE_MODEL := Abaniact AML2-17GP
-  DEVICE_PACKAGES := ip-bridge ethtool
-endef
-TARGET_DEVICES += inaba_aml2-17gp
-
-define Device/netgear_gs728tpv2
-  SOC := rtl8391
-  IMAGE_SIZE := 13824k
-  NETGEAR_KERNEL_MAGIC := 0x174e4742
-  KERNEL := kernel-bin | append-dtb | lzma -d20 | netgear-uImage lzma
-  KERNEL_INITRAMFS := kernel-bin | append-dtb | lzma -d20 | netgear-uImage lzma
-  DEVICE_VENDOR := Netgear
-  DEVICE_MODEL := GS728TPv2
-  DEVICE_PACKAGES := ip-full ip-bridge ethtool tc
-endef
-TARGET_DEVICES += netgear_gs728tpv2
-
-define Device/tp-link_t2500g-10ts
-  SOC := rtl8380
-  IMAGE_SIZE := 7936k
-  DEVICE_VENDOR := TP-Link
-  DEVICE_MODEL := T2500G-10TS
-  DEVICE_PACKAGES := ip-full ip-bridge ethtool
-endef
-TARGET_DEVICES += tp-link_t2500g-10ts
-
-define Device/zyxel_gs1900-10hp
-  SOC := rtl8380
-  IMAGE_SIZE := 6976k
+define Device/zyxel_xs1900-10
+#  KERNEL_LOADADDR = 0x80300000
+#  KERNEL_ENTRY = 0x80300000
+#  KERNEL := kernel-bin | append-dtb | uImage none
+#  KERNEL_INITRAMFS := kernel-bin | append-dtb | uImage none
+  SOC := rtl9313
+#  IMAGE_SIZE := 8000k
   DEVICE_VENDOR := Zyxel
-  DEVICE_MODEL := GS1900-10HP
+  DEVICE_MODEL := XS1900-10
   DEVICE_PACKAGES := ip-bridge ethtool
 endef
-TARGET_DEVICES += zyxel_gs1900-10hp
-
-define Device/zyxel_gs1900-48
-  SOC := rtl8393
-  IMAGE_SIZE := 6976k
-  DEVICE_VENDOR := Zyxel
-  DEVICE_MODEL := GS1900-48
-  DEVICE_PACKAGES := ip-bridge ethtool
-endef
-TARGET_DEVICES += zyxel_gs1900-48
+TARGET_DEVICES += zyxel_xs1900-10
 
 $(eval $(call BuildImage))

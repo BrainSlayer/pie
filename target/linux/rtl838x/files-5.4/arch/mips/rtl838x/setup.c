@@ -24,6 +24,7 @@
 #include <asm/time.h>		/* for mips_hpt_frequency */
 #include <asm/prom.h>
 #include <asm/smp-ops.h>
+#include <linux/delay.h>
 
 #include "mach-rtl838x.h"
 
@@ -44,6 +45,7 @@ static void rtl838x_restart(char *command)
 	u32 pll = sw_r32(RTL838X_PLL_CML_CTRL);
 	 /* SoC reset vector (in flash memory): on RTL839x platform preferred way to reset */
 	void (*f)(void) = (void *) 0xbfc00000;
+	u32 v;
 
 	pr_info("System restart.\n");
 	if (soc_info.family == RTL8390_FAMILY_ID) {
@@ -53,8 +55,15 @@ static void rtl838x_restart(char *command)
 		/* If this fails, halt the CPU */
 		while
 			(1);
+	} else if (soc_info.family == RTL9310_FAMILY_ID) {
+		sw_w32(1, RTL931X_RST_GLB_CTRL);
+		v = sw_r32(RTL931X_RST_GLB_CTRL);
+		sw_w32(0x101, RTL931X_RST_GLB_CTRL);
+		msleep(15);
+		sw_w32(v, RTL931X_RST_GLB_CTRL);
+		msleep(15);
+		sw_w32(0x101, RTL931X_RST_GLB_CTRL);
 	}
-
 	pr_info("PLL control register: %x, applying reset value %x\n",
 		pll, pll_reset_value);
 	sw_w32(3, RTL838X_INT_RW_CTRL);
@@ -88,10 +97,17 @@ static void __init rtl838x_setup(void)
 		pr_info("NO PCI device found\n");
 
 	/* Setup System LED. Bit 15 (14 for RTL8390) then allows to toggle it */
-	if (soc_info.family == RTL8380_FAMILY_ID)
+	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
 		sw_w32_mask(0, 3 << 16, RTL838X_LED_GLB_CTRL);
-	else
+		break;
+	case RTL8390_FAMILY_ID:
 		sw_w32_mask(0, 3 << 15, RTL839X_LED_GLB_CTRL);
+		break;
+	case RTL9310_FAMILY_ID:
+		sw_w32_mask(0, 3 << 12, RTL931X_LED_GLB_CTRL);
+		break;
+	}
 }
 
 void __init plat_mem_setup(void)
