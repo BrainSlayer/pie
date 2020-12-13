@@ -55,6 +55,10 @@ static void rtl838x_restart(char *command)
 		/* If this fails, halt the CPU */
 		while
 			(1);
+	} else if (soc_info.family == RTL9300_FAMILY_ID) {
+		sw_w32(0x1, RTL930X_RST_GLB_CTRL_0);
+		while
+			(1);
 	} else if (soc_info.family == RTL9310_FAMILY_ID) {
 		sw_w32(1, RTL931X_RST_GLB_CTRL);
 		v = sw_r32(RTL931X_RST_GLB_CTRL);
@@ -103,6 +107,12 @@ static void __init rtl838x_setup(void)
 		break;
 	case RTL8390_FAMILY_ID:
 		sw_w32_mask(0, 3 << 15, RTL839X_LED_GLB_CTRL);
+		break;
+	case RTL9300_FAMILY_ID:
+		if (soc_info.id == 0x9302)
+			sw_w32_mask(0, 3 << 13, RTL9302_LED_GLB_CTRL);
+		else
+			sw_w32_mask(0, 3 << 13, RTL930X_LED_GLB_CTRL);
 		break;
 	case RTL9310_FAMILY_ID:
 		sw_w32_mask(0, 3 << 12, RTL931X_LED_GLB_CTRL);

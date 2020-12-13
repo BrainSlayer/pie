@@ -94,24 +94,24 @@
 			reg = <0>;
 			compatible = "ethernet-phy-ieee802.3-c22";
 		};
-		phy1: ethernet-phy@1 {
-			reg = <1>;
+		phy10: ethernet-phy@1 {
+			reg = <10>;
 			compatible = "ethernet-phy-ieee802.3-c22";
 		};
-		phy2: ethernet-phy@2 {
-			reg = <2>;
+		phy18: ethernet-phy@2 {
+			reg = <18>;
 			compatible = "ethernet-phy-ieee802.3-c22";
 		};
-		phy3: ethernet-phy@3 {
-			reg = <3>;
+		phy26: ethernet-phy@3 {
+			reg = <26>;
 			compatible = "ethernet-phy-ieee802.3-c22";
 		};
-		phy4: ethernet-phy@4 {
-			reg = <4>;
+		phy34: ethernet-phy@4 {
+			reg = <34>;
 			compatible = "ethernet-phy-ieee802.3-c22";
 		};
-		phy5: ethernet-phy@5 {
-			reg = <5>;
+		phy45: ethernet-phy@5 {
+			reg = <45>;
 			compatible = "ethernet-phy-ieee802.3-c22";
 		};
 		phy6: ethernet-phy@6 {
@@ -149,34 +149,34 @@
 			phy-handle = <&phy0>;
 			phy-mode = "qsgmii";
 		};
-		port@1 {
-			reg = <1>;
+		port@10 {
+			reg = <10>;
 			label = "lan2";
-			phy-handle = <&phy1>;
+			phy-handle = <&phy10>;
 			phy-mode = "qsgmii";
 		};
-		port@2 {
-			reg = <2>;
+		port@18 {
+			reg = <18>;
 			label = "lan3";
-			phy-handle = <&phy2>;
+			phy-handle = <&phy18>;
 			phy-mode = "qsgmii";
 		};
-		port@3 {
-			reg = <3>;
+		port@26 {
+			reg = <26>;
 			label = "lan4";
-			phy-handle = <&phy3>;
+			phy-handle = <&phy26>;
 			phy-mode = "qsgmii";
 		};
-		port@4 {
-			reg = <4>;
+		port@34 {
+			reg = <34>;
 			label = "lan5";
-			phy-handle = <&phy4>;
+			phy-handle = <&phy34>;
 			phy-mode = "qsgmii";
 		};
-		port@5 {
-			reg = <5>;
+		port@45 {
+			reg = <45>;
 			label = "lan6";
-			phy-handle = <&phy5>;
+			phy-handle = <&phy45>;
 			phy-mode = "qsgmii";
 		};
 		port@6 {

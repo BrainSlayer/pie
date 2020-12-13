@@ -21,6 +21,7 @@
 
 #define RTL8380_VERSION_A 'A'
 #define RTL8390_VERSION_A 'A'
+#define RTL9310_VERSION_A 'A'
 #define RTL8380_VERSION_B 'B'
 
 extern struct rtl838x_soc_info soc_info;
@@ -93,16 +94,6 @@ inline u64 rtl839x_get_port_reg_le(int reg)
 	return v;
 }
 
-inline int rtl838x_stat_port_std_mib(int p)
-{
-	return RTL838X_STAT_PORT_STD_MIB + (p << 8);
-}
-
-inline int rtl839x_stat_port_std_mib(int p)
-{
-	return RTL839X_STAT_PORT_STD_MIB + (p << 8);
-}
-
 inline int rtl838x_port_iso_ctrl(int p)
 {
 	return RTL838X_PORT_ISO_CTRL(p);
@@ -111,6 +102,11 @@ inline int rtl838x_port_iso_ctrl(int p)
 inline int rtl839x_port_iso_ctrl(int p)
 {
 	return RTL839X_PORT_ISO_CTRL(p);
+}
+
+inline int rtl930x_port_iso_ctrl(int p)
+{
+	return RTL930X_PORT_ISO_CTRL(p);
 }
 
 inline void rtl838x_exec_tbl0_cmd(u32 cmd)
@@ -125,6 +121,18 @@ inline void rtl839x_exec_tbl0_cmd(u32 cmd)
 	do { } while (sw_r32(RTL839X_TBL_ACCESS_CTRL_0) & (1 << 16));
 }
 
+inline void rtl930x_exec_tbl0_cmd(u32 cmd)
+{
+	sw_w32(cmd, RTL930X_TBL_ACCESS_CTRL_0);
+	do { } while (sw_r32(RTL930X_TBL_ACCESS_CTRL_0) & (1 << 17));
+}
+
+inline void rtl931x_exec_tbl0_cmd(u32 cmd)
+{
+	sw_w32(cmd, RTL931X_TBL_ACCESS_CTRL_0);
+	do { } while (sw_r32(RTL931X_TBL_ACCESS_CTRL_0) & (1 << 20));
+}
+
 inline void rtl838x_exec_tbl1_cmd(u32 cmd)
 {
 	sw_w32(cmd, RTL838X_TBL_ACCESS_CTRL_1);
@@ -137,10 +145,34 @@ inline void rtl839x_exec_tbl1_cmd(u32 cmd)
 	do { } while (sw_r32(RTL839X_TBL_ACCESS_CTRL_1) & (1 << 15));
 }
 
+inline void rtl930x_exec_tbl1_cmd(u32 cmd)
+{
+	sw_w32(cmd, RTL930X_TBL_ACCESS_CTRL_1);
+	do { } while (sw_r32(RTL930X_TBL_ACCESS_CTRL_1) & (1 << 17));
+}
+
+inline void rtl931x_exec_tbl1_cmd(u32 cmd)
+{
+	sw_w32(cmd, RTL931X_TBL_ACCESS_CTRL_1);
+	do { } while (sw_r32(RTL931X_TBL_ACCESS_CTRL_1) & (1 << 17));
+}
+
 inline void rtl839x_exec_tbl2_cmd(u32 cmd)
 {
 	sw_w32(cmd, RTL839X_TBL_ACCESS_CTRL_2);
 	do { } while (sw_r32(RTL839X_TBL_ACCESS_CTRL_2) & (1 << 9));
+}
+
+inline void rtl930x_exec_tbl2_cmd(u32 cmd)
+{
+	sw_w32(cmd, RTL930X_TBL_ACCESS_CTRL_2);
+	do { } while (sw_r32(RTL930X_TBL_ACCESS_CTRL_2) & (1 << 15));
+}
+
+inline void rtl931x_exec_tbl2_cmd(u32 cmd)
+{
+	sw_w32(cmd, RTL931X_TBL_ACCESS_CTRL_2);
+	do { } while (sw_r32(RTL931X_TBL_ACCESS_CTRL_2) & (1 << 19));
 }
 
 inline int rtl838x_tbl_access_data_0(int i)
@@ -151,6 +183,16 @@ inline int rtl838x_tbl_access_data_0(int i)
 inline int rtl839x_tbl_access_data_0(int i)
 {
 	return RTL839X_TBL_ACCESS_DATA_0(i);
+}
+
+inline int rtl930x_tbl_access_data_0(int i)
+{
+	return RTL930X_TBL_ACCESS_DATA_0(i);
+}
+
+inline int rtl931x_tbl_access_data_0(int i)
+{
+	return RTL931X_TBL_ACCESS_DATA_0(i);
 }
 
 inline int rtl838x_vlan_profile(int profile)
@@ -371,6 +413,11 @@ static inline int rtl838x_mac_link_spd_sts(int p)
 static inline int rtl839x_mac_link_spd_sts(int p)
 {
 	return RTL839X_MAC_LINK_SPD_STS(p);
+}
+
+static inline int rtl930x_mac_link_spd_sts(int p)
+{
+	return RTL930X_MAC_LINK_SPD_STS(p);
 }
 
 static inline int rtl838x_mir_ctrl(int group)
@@ -606,7 +653,7 @@ static const struct rtl838x_reg rtl838x_reg = {
 	.get_port_reg_le = rtl838x_get_port_reg,
 	.stat_port_rst = RTL838X_STAT_PORT_RST,
 	.stat_rst = RTL838X_STAT_RST,
-	.stat_port_std_mib = rtl838x_stat_port_std_mib,
+	.stat_port_std_mib = RTL838X_STAT_PORT_STD_MIB,
 	.port_iso_ctrl = rtl838x_port_iso_ctrl,
 	.l2_ctrl_0 = RTL838X_L2_CTRL_0,
 	.l2_ctrl_1 = RTL838X_L2_CTRL_1,
@@ -653,7 +700,7 @@ static const struct rtl838x_reg rtl839x_reg = {
 	.get_port_reg_le = rtl839x_get_port_reg_le,
 	.stat_port_rst = RTL839X_STAT_PORT_RST,
 	.stat_rst = RTL839X_STAT_RST,
-	.stat_port_std_mib = rtl839x_stat_port_std_mib,
+	.stat_port_std_mib = RTL839X_STAT_PORT_STD_MIB,
 	.port_iso_ctrl = rtl839x_port_iso_ctrl,
 	.l2_ctrl_0 = RTL839X_L2_CTRL_0,
 	.l2_ctrl_1 = RTL839X_L2_CTRL_1,
@@ -667,6 +714,101 @@ static const struct rtl838x_reg rtl839x_reg = {
 	.isr_port_link_sts_chg = RTL839X_ISR_PORT_LINK_STS_CHG,
 	.imr_port_link_sts_chg = RTL839X_IMR_PORT_LINK_STS_CHG,
 	.imr_glb = RTL839X_IMR_GLB,
+	.vlan_tables_read = rtl839x_vlan_tables_read,
+	.vlan_set_tagged = rtl839x_vlan_set_tagged,
+	.vlan_set_untagged = rtl839x_vlan_set_untagged,
+	.mac_force_mode_ctrl = rtl839x_mac_force_mode_ctrl,
+	.mac_port_ctrl = rtl839x_mac_port_ctrl,
+	.l2_port_new_salrn = rtl839x_l2_port_new_salrn,
+	.l2_port_new_sa_fwd = rtl839x_l2_port_new_sa_fwd,
+	.mir_ctrl = rtl839x_mir_ctrl,
+	.mir_dpm = rtl839x_mir_dpm,
+	.mir_spm = rtl839x_mir_spm,
+	.mac_link_sts = RTL839X_MAC_LINK_STS,
+	.mac_link_dup_sts = RTL839X_MAC_LINK_DUP_STS,
+	.mac_link_spd_sts = rtl839x_mac_link_spd_sts,
+	.mac_rx_pause_sts = RTL839X_MAC_RX_PAUSE_STS,
+	.mac_tx_pause_sts = RTL839X_MAC_TX_PAUSE_STS,
+	.read_l2_entry_using_hash = rtl839x_read_l2_entry_using_hash,
+	.read_cam = rtl839x_read_cam,
+	.vlan_profile = rtl839x_vlan_profile,
+	.vlan_port_egr_filter = rtl839x_vlan_port_egr_filter,
+	.vlan_port_igr_filter = rtl839x_vlan_port_igr_filter,
+	.vlan_port_pb = rtl839x_vlan_port_pb,
+	.trk_mbr_ctr = rtl839x_trk_mbr_ctr,
+};
+
+static const struct rtl838x_reg rtl930x_reg = {
+	.mask_port_reg_be = rtl838x_mask_port_reg,
+	.set_port_reg_be = rtl838x_set_port_reg,
+	.get_port_reg_be = rtl838x_get_port_reg,
+	.mask_port_reg_le = rtl838x_mask_port_reg,
+	.set_port_reg_le = rtl838x_set_port_reg,
+	.get_port_reg_le = rtl838x_get_port_reg,
+	.stat_port_rst = RTL930X_STAT_PORT_RST,
+	.stat_rst = RTL930X_STAT_RST,
+	.stat_port_std_mib = RTL930X_STAT_PORT_MIB_CNTR,
+	.port_iso_ctrl = rtl930x_port_iso_ctrl,
+	.l2_ctrl_0 = RTL930X_L2_CTRL,
+	.l2_ctrl_1 = RTL930X_L2_AGE_CTRL,
+	.l2_port_aging_out = RTL930X_L2_PORT_AGE_CTRL,
+	/* .smi_poll_ctrl does not exist, maybe RTL9300_SMI_GLB_CTRL_ADDR with
+	 *	RTL9300_SMI_GLB_CTRL_SMI_POLL_SEL_23_0_MASK */
+	.l2_tbl_flush_ctrl = RTL930X_L2_TBL_FLUSH_CTRL,
+	.exec_tbl0_cmd = rtl930x_exec_tbl0_cmd,
+	.exec_tbl1_cmd = rtl930x_exec_tbl1_cmd,
+	.tbl_access_data_0 = rtl930x_tbl_access_data_0,
+	.isr_glb_src = RTL930X_ISR_GLB,
+	.isr_port_link_sts_chg = RTL930X_ISR_PORT_LINK_STS_CHG,
+	.imr_port_link_sts_chg = RTL930X_IMR_PORT_LINK_STS_CHG,
+	.imr_glb = RTL930X_IMR_GLB,
+	.vlan_tables_read = rtl839x_vlan_tables_read,
+	.vlan_set_tagged = rtl839x_vlan_set_tagged,
+	.vlan_set_untagged = rtl839x_vlan_set_untagged,
+	.mac_force_mode_ctrl = rtl839x_mac_force_mode_ctrl,
+	.mac_port_ctrl = rtl839x_mac_port_ctrl,
+	.l2_port_new_salrn = rtl839x_l2_port_new_salrn,
+	.l2_port_new_sa_fwd = rtl839x_l2_port_new_sa_fwd,
+	.mir_ctrl = rtl839x_mir_ctrl,
+	.mir_dpm = rtl839x_mir_dpm,
+	.mir_spm = rtl839x_mir_spm,
+	.mac_link_sts = RTL930X_MAC_LINK_STS,
+	.mac_link_dup_sts = RTL930X_MAC_LINK_DUP_STS,
+	.mac_link_spd_sts = rtl930x_mac_link_spd_sts,
+	.mac_rx_pause_sts = RTL930X_MAC_RX_PAUSE_STS,
+	.mac_tx_pause_sts = RTL930X_MAC_TX_PAUSE_STS,
+	.read_l2_entry_using_hash = rtl839x_read_l2_entry_using_hash,
+	.read_cam = rtl839x_read_cam,
+	.vlan_profile = rtl839x_vlan_profile,
+	.vlan_port_egr_filter = rtl839x_vlan_port_egr_filter,
+	.vlan_port_igr_filter = rtl839x_vlan_port_igr_filter,
+	.vlan_port_pb = rtl839x_vlan_port_pb,
+	.trk_mbr_ctr = rtl839x_trk_mbr_ctr,
+};
+
+static const struct rtl838x_reg rtl931x_reg = {
+	.mask_port_reg_be = rtl839x_mask_port_reg_be,
+	.set_port_reg_be = rtl839x_set_port_reg_be,
+	.get_port_reg_be = rtl839x_get_port_reg_be,
+	.mask_port_reg_le = rtl839x_mask_port_reg_le,
+	.set_port_reg_le = rtl839x_set_port_reg_le,
+	.get_port_reg_le = rtl839x_get_port_reg_le,
+	.stat_port_rst = RTL931X_STAT_PORT_RST,
+	.stat_rst = RTL931X_STAT_RST,
+	.stat_port_std_mib = 0,  // Not defined
+	.port_iso_ctrl = rtl839x_port_iso_ctrl,
+	.l2_ctrl_0 = RTL931X_L2_CTRL,
+	.l2_ctrl_1 = RTL931X_L2_AGE_CTRL,
+	.l2_port_aging_out = RTL931X_L2_PORT_AGE_CTRL,
+	// .smi_poll_ctrl does not exist
+	.l2_tbl_flush_ctrl = RTL931X_L2_TBL_FLUSH_CTRL,
+	.exec_tbl0_cmd = rtl931x_exec_tbl0_cmd,
+	.exec_tbl1_cmd = rtl931x_exec_tbl1_cmd,
+	.tbl_access_data_0 = rtl931x_tbl_access_data_0,
+	.isr_glb_src = RTL931X_ISR_GLB_SRC,
+	.isr_port_link_sts_chg = RTL931X_ISR_PORT_LINK_STS_CHG,
+	.imr_port_link_sts_chg = RTL931X_IMR_PORT_LINK_STS_CHG,
+	// imr_glb does not exist on RTL931X
 	.vlan_tables_read = rtl839x_vlan_tables_read,
 	.vlan_set_tagged = rtl839x_vlan_set_tagged,
 	.vlan_set_untagged = rtl839x_vlan_set_untagged,
@@ -779,6 +921,54 @@ static irqreturn_t rtl839x_switch_irq(int irq, void *dev_id)
 	for (i = 0; i < 52; i++) {
 		if (ports & BIT_ULL(i)) {
 			link = rtl839x_get_port_reg_le(RTL839X_MAC_LINK_STS);
+			if (link & BIT_ULL(i))
+				dsa_port_phylink_mac_change(ds, i, true);
+			else
+				dsa_port_phylink_mac_change(ds, i, false);
+		}
+	}
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t rtl930x_switch_irq(int irq, void *dev_id)
+{
+	struct dsa_switch *ds = dev_id;
+	u32 status = sw_r32(RTL930X_ISR_GLB);
+	u32 ports = sw_r32(RTL930X_ISR_PORT_LINK_STS_CHG);
+	u32 link;
+	int i;
+
+	/* Clear status */
+	sw_w32(ports, RTL930X_ISR_PORT_LINK_STS_CHG);
+	pr_info("RTL9300 Link change: status: %x, ports %x\n", status, ports);
+
+	for (i = 0; i < 28; i++) {
+		if (ports & (1 << i)) {
+			link = sw_r32(RTL930X_MAC_LINK_STS);
+			if (link & (1 << i))
+				dsa_port_phylink_mac_change(ds, i, true);
+			else
+				dsa_port_phylink_mac_change(ds, i, false);
+		}
+	}
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
+{
+	struct dsa_switch *ds = dev_id;
+	u32 status = sw_r32(RTL931X_ISR_GLB_SRC);
+	u64 ports = rtl839x_get_port_reg_le(RTL931X_ISR_PORT_LINK_STS_CHG);
+	u64 link;
+	int i;
+
+	/* Clear status */
+	rtl839x_set_port_reg_le(ports, RTL931X_ISR_PORT_LINK_STS_CHG);
+	pr_info("RTL9310 Link change: status: %x, ports %llx\n", status, ports);
+
+	for (i = 0; i < 56; i++) {
+		if (ports & BIT_ULL(i)) {
+			link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
 			if (link & BIT_ULL(i))
 				dsa_port_phylink_mac_change(ds, i, true);
 			else
@@ -911,9 +1101,9 @@ int rtl839x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 
 	mutex_lock(&smi_lock);
 	/* Clear both port registers */
-	sw_w32(0, RTL839X_PHYREG_PORT_CTRL(0));
-	sw_w32(0, RTL839X_PHYREG_PORT_CTRL(0) + 4);
-	sw_w32_mask(0, 1 << port, RTL839X_PHYREG_PORT_CTRL(port));
+	sw_w32(0, RTL839X_PHYREG_PORT_CTRL);
+	sw_w32(0, RTL839X_PHYREG_PORT_CTRL + 4);
+	sw_w32_mask(0, 1 << port, RTL839X_PHYREG_PORT_CTRL + (port % 32) * 4);
 
 	sw_w32_mask(0xffff0000, val << 16, RTL839X_PHYREG_DATA_CTRL);
 
@@ -929,6 +1119,41 @@ int rtl839x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 	} while (sw_r32(RTL839X_PHYREG_ACCESS_CTRL) & 0x1);
 
 	if (sw_r32(RTL839X_PHYREG_ACCESS_CTRL) & 0x2)
+		err = -EIO;
+
+	mutex_unlock(&smi_lock);
+	return err;
+}
+
+int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val)
+{
+	u32 v;
+	int err = 0;
+
+	val &= 0xffff;
+	if (port > 63 || page > 4095 || reg > 31)
+		return -ENOTSUPP;
+
+	mutex_lock(&smi_lock);
+	/* Clear both port registers */
+	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2);
+	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2 + 4);
+	sw_w32_mask(0, BIT(port), RTL931X_SMI_INDRT_ACCESS_CTRL_2+ (port % 32) * 4);
+
+	sw_w32_mask(0xffff0000, val << 16, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+
+	v = reg << 6 | page << 11 ;
+	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+
+	sw_w32(0x1ff, RTL931X_SMI_INDRT_ACCESS_CTRL_1);
+
+	v |= 1 << 3 | 1; /* Write operation and execute */
+	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+
+	do {
+	} while (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0) & 0x1);
+
+	if (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0) & 0x2)
 		err = -EIO;
 
 	mutex_unlock(&smi_lock);
@@ -979,6 +1204,7 @@ timeout:
 int rtl839x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 {
 	u32 v;
+	int err = 0;
 
 	if (port > 63 || page > 4095 || reg > 31)
 		return -ENOTSUPP;
@@ -996,27 +1222,103 @@ int rtl839x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 
 	do {
 	} while (sw_r32(RTL839X_PHYREG_ACCESS_CTRL) & 0x1);
-
+	if (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0) & 0x2) {
+		pr_err("%s: port %d, page: %d, reg: %x FAILED\n", __func__, port, page, reg);
+		err = -1;
+	}
 	*val = sw_r32(RTL839X_PHYREG_DATA_CTRL) & 0xffff;
-
+	
 	mutex_unlock(&smi_lock);
 	return 0;
 }
 
+int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
+{
+	u32 v;
+	int err = 0;
+
+	if (port > 63 || page > 4095 || reg > 31)
+		return -ENOTSUPP;
+
+	mutex_lock(&smi_lock);
+	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2);
+	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2 + 4);
+	sw_w32_mask(0, BIT(port), RTL931X_SMI_INDRT_ACCESS_CTRL_2 + (port % 32) * 4);
+
+	sw_w32_mask(0xffff0000, port << 16, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+	sw_w32(0x1ff, RTL931X_SMI_INDRT_ACCESS_CTRL_1);
+
+	v = reg << 6 | page << 11 | 1;
+	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+
+	do {
+	} while (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0) & 0x1);
+
+	*val = (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) & 0xffff);
+
+	pr_info("%s: port %d, page: %d, reg: %x, val: %x\n", __func__, port, page, reg, *val);
+	if (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0) & 0x2) {
+		pr_err("FAILED\n");
+//		err = -1;
+	}
+
+	mutex_unlock(&smi_lock);
+	return err;
+}
+/*
+int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
+{
+	u32 v;
+
+	if (port > 63 || page > 4095 || reg > 31)
+		return -ENOTSUPP;
+
+	mutex_lock(&smi_lock);
+
+	sw_w32_mask(0xffff, port, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+	v = reg << 6 | page << 11; // TODO: ACCESS Offset? Park page
+	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+
+	sw_w32(0x1ff, RTL931X_SMI_INDRT_ACCESS_CTRL_1);
+
+	v |= 1;
+	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+
+	do {
+	} while (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0) & 0x1);
+
+	*val = (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) & 0xffff0000) >> 16;
+
+	pr_info("%s: port %d, page: %d, reg: %x, val: %x\n", __func__, port, page, reg, *val);
+
+	mutex_unlock(&smi_lock);
+	return 0;
+}
+*/
 static int read_phy(u32 port, u32 page, u32 reg, u32 *val)
 {
-	if (soc_info.family == RTL8390_FAMILY_ID)
-		return rtl839x_read_phy(port, page, reg, val);
-	else
+	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
 		return rtl838x_read_phy(port, page, reg, val);
+	case RTL8390_FAMILY_ID:
+		return rtl839x_read_phy(port, page, reg, val);
+	case RTL9310_FAMILY_ID:
+		return rtl931x_read_phy(port, page, reg, val);
+	}
+	return -1;
 }
 
 static int write_phy(u32 port, u32 page, u32 reg, u32 val)
 {
-	if (soc_info.family == RTL8390_FAMILY_ID)
-		return rtl839x_write_phy(port, page, reg, val);
-	else
+	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
 		return rtl838x_write_phy(port, page, reg, val);
+	case RTL8390_FAMILY_ID:
+		return rtl839x_write_phy(port, page, reg, val);
+	case RTL9310_FAMILY_ID:
+		return rtl931x_write_phy(port, page, reg, val);
+	}
+	return -1;
 }
 
 /*
@@ -1202,11 +1504,24 @@ static void rtl838x_enable_phy_polling(struct rtl838x_switch_priv *priv)
 	/* PHY update complete */
 	if (priv->family_id == RTL8390_FAMILY_ID)
 		sw_w32_mask(0, 1 << 7, RTL839X_SMI_GLB_CTRL);
-	else
+	else if (priv->family_id == RTL8380_FAMILY_ID)
 		sw_w32_mask(0, 0x8000, RTL838X_SMI_GLB_CTRL);
+	// TODO: Figure out PHY polling enable
+	
 }
 
 void rtl839x_print_matrix(void)
+{
+	volatile u64 *ptr = RTL838X_SW_BASE + RTL839X_PORT_ISO_CTRL(0);
+	int i;
+
+	for (i = 0; i < 52; i += 4)
+		pr_info("> %16llx %16llx %16llx %16llx\n",
+			ptr[i + 0], ptr[i + 1], ptr[i + 2], ptr[i + 3]);
+	pr_info("CPU_PORT> %16llx\n", ptr[52]);
+}
+
+void rtl931x_print_matrix(void)
 {
 	volatile u64 *ptr = RTL838X_SW_BASE + RTL839X_PORT_ISO_CTRL(0);
 	int i;
@@ -1224,6 +1539,10 @@ void rtl838x_print_matrix(void)
 
 	if (soc_info.family == RTL8390_FAMILY_ID)
 		return rtl839x_print_matrix();
+
+	// TODO: Figure out polling regiser on RTL9310
+	if (soc_info.family == RTL9310_FAMILY_ID)
+		return;
 
 	for (i = 0; i < 28; i += 8)
 		pr_info("> %8x %8x %8x %8x %8x %8x %8x %8x\n",
@@ -1311,9 +1630,9 @@ static void rtl838x_get_ethtool_stats(struct dsa_switch *ds, int port,
 	for (i = 0; i < ARRAY_SIZE(rtl838x_mib); i++) {
 		mib = &rtl838x_mib[i];
 
-		data[i] = sw_r32(priv->r->stat_port_std_mib(port) + 252 - mib->offset);
+		data[i] = sw_r32(priv->r->stat_port_std_mib + (port << 8) + 252 - mib->offset);
 		if (mib->size == 2) {
-			high = sw_r32(priv->r->stat_port_std_mib(port) + 252 - mib->offset - 4);
+			high = sw_r32(priv->r->stat_port_std_mib + (port << 8 ) + 248 - mib->offset);
 			data[i] |= high << 32;
 		}
 	}
@@ -2938,15 +3257,17 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 
 	priv->family_id = soc_info.family;
 	priv->id = soc_info.id;
-	if (soc_info.family == RTL8380_FAMILY_ID) {
+	switch(soc_info.family) {
+	case RTL8380_FAMILY_ID:
 		priv->cpu_port = RTL838X_CPU_PORT;
 		priv->port_mask = 0x1f;
 		priv->r = &rtl838x_reg;
-		priv->ds->num_ports = 30;
+		priv->ds->num_ports = 29;
 		priv->fib_entries = 8192;
 		rtl8380_get_version(priv);
 		priv->n_lags = 8;
-	} else {
+		break;
+	case RTL8390_FAMILY_ID:
 		priv->cpu_port = RTL839X_CPU_PORT;
 		priv->port_mask = 0x3f;
 		priv->r = &rtl839x_reg;
@@ -2954,6 +3275,25 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 		priv->fib_entries = 16384;
 		rtl8390_get_version(priv);
 		priv->n_lags = 16;
+		break;
+	case RTL9300_FAMILY_ID:
+		priv->cpu_port = RTL930X_CPU_PORT;
+		priv->port_mask = 0x1f;
+		priv->r = &rtl930x_reg;
+		priv->ds->num_ports = 29;
+		priv->fib_entries = 16384;
+		priv->version = RTL8390_VERSION_A;
+		priv->n_lags = 16;
+		break;
+	case RTL9310_FAMILY_ID:
+		priv->cpu_port = RTL931X_CPU_PORT;
+		priv->port_mask = 0x3f;
+		priv->r = &rtl931x_reg;
+		priv->ds->num_ports = 57;
+		priv->fib_entries = 16384;
+		priv->version = RTL8390_VERSION_A;
+		priv->n_lags = 16;
+		break;
 	}
 	pr_info("Chip version %c\n", priv->version);
 
@@ -2978,20 +3318,28 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 	priv->r->set_port_reg_le(irq_mask, priv->r->imr_port_link_sts_chg);
 
 	priv->link_state_irq = 20;
-	if (priv->family_id == RTL8380_FAMILY_ID) {
+	switch (priv->family_id) {
+	case RTL8380_FAMILY_ID:
 		err = request_irq(priv->link_state_irq, rtl838x_switch_irq,
 				IRQF_SHARED, "rtl838x-link-state", priv->ds);
-	} else {
+		break;
+	case RTL8390_FAMILY_ID:
 		err = request_irq(priv->link_state_irq, rtl839x_switch_irq,
 				IRQF_SHARED, "rtl839x-link-state", priv->ds);
+		break;
+	case RTL9310_FAMILY_ID:
+		err = request_irq(priv->link_state_irq, rtl931x_switch_irq,
+				IRQF_SHARED, "rtl931x-link-state", priv->ds);
+		break;
 	}
 	if (err) {
 		dev_err(dev, "Error setting up switch interrupt.\n");
 		/* Need to free allocated switch here */
 	}
 
-	/* Enable interrupts for switch */
-	sw_w32(0x1, priv->r->imr_glb);
+	/* Enable interrupts for switch TODO: Figure out how to enable IRQ on 93XX */
+	if (soc_info.family != RTL9310_FAMILY_ID)
+		sw_w32(0x1, priv->r->imr_glb);
 
 	rtl838x_get_l2aging(priv);
 

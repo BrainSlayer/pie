@@ -91,6 +91,7 @@ asmlinkage void plat_irq_dispatch(void)
 
 	pending =  read_c0_cause();
 
+	pr_info("In %s\n", __func__);
 	if (pending & CAUSEF_IP7) {
 		c0_compare_interrupt(7, NULL);
 	} else if (pending & CAUSEF_IP6) {
@@ -183,16 +184,26 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 	}
 
 	/* Set up interrupt routing scheme */
-	icu_w32(IRR0_SETTING, IRR0);
-	if (soc_info.family == RTL8380_FAMILY_ID)
-		icu_w32(IRR1_SETTING_RTL838X, IRR1);
-	else
-		icu_w32(IRR1_SETTING_RTL839X, IRR1);
-	icu_w32(IRR2_SETTING, IRR2);
-	icu_w32(IRR3_SETTING, IRR3);
+	if (soc_info.family == RTL9300_FAMILY_ID) {
+		pr_info("Setting up RTL9300 IRQ\n");
+		icu_w32(0x12010004, IRR0);
+		icu_w32(0x30000000, IRR1);
+		icu_w32(0x401111, IRR2);
+		icu_w32(0x50400000, IRR3);
+		icu_w32(0x40000080, GIMR);
+		
+	} else {
+		icu_w32(IRR0_SETTING, IRR0);
+		if (soc_info.family == RTL8380_FAMILY_ID)
+			icu_w32(IRR1_SETTING_RTL838X, IRR1);
+		else
+			icu_w32(IRR1_SETTING_RTL839X, IRR1);
+		icu_w32(IRR2_SETTING, IRR2);
+		icu_w32(IRR3_SETTING, IRR3);
+		/* Enable timer0 and uart0 interrupts */
+		icu_w32(TC0_IE | UART0_IE, GIMR);
+	}
 
-	/* Enable timer0 and uart0 interrupts */
-	icu_w32(TC0_IE | UART0_IE, GIMR);
 	return 0;
 }
 

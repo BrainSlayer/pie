@@ -52,19 +52,28 @@ struct rtl838x_phy_priv {
 };
 
 static int read_phy(u32 port, u32 page, u32 reg, u32 *val)
-{
-	if (soc_info.family == RTL8390_FAMILY_ID)
-		return rtl839x_read_phy(port, page, reg, val);
-	else
+{	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
 		return rtl838x_read_phy(port, page, reg, val);
+	case RTL8390_FAMILY_ID:
+		return rtl839x_read_phy(port, page, reg, val);
+	case RTL9310_FAMILY_ID:
+		return rtl931x_read_phy(port, page, reg, val);
+	}
+	return -1;
 }
 
 static int write_phy(u32 port, u32 page, u32 reg, u32 val)
 {
-	if (soc_info.family == RTL8390_FAMILY_ID)
-		return rtl839x_write_phy(port, page, reg, val);
-	else
+	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
 		return rtl838x_write_phy(port, page, reg, val);
+	case RTL8390_FAMILY_ID:
+		return rtl839x_write_phy(port, page, reg, val);
+	case RTL9310_FAMILY_ID:
+		return rtl931x_write_phy(port, page, reg, val);
+	}
+	return -1;
 }
 
 static void rtl8380_int_phy_on_off(int mac, bool on)
