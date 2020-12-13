@@ -7,8 +7,8 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
-KERNEL_LOADADDR = 0x80220000
-KERNEL_ENTRY = 0x80220000
+KERNEL_LOADADDR = 0x80000000
+KERNEL_ENTRY = 0x8000400
 
 define Device/Default
   PROFILES = Default
