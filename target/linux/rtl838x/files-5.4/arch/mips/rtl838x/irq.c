@@ -16,6 +16,7 @@
 #include <linux/of_address.h>
 #include <linux/spinlock.h>
 
+#include <asm/setup.h>
 #include <asm/irq_cpu.h>
 #include <asm/mipsregs.h>
 #include <mach-rtl838x.h>
@@ -35,6 +36,7 @@ static void rtl838x_ictl_enable_irq(struct irq_data *i)
 {
 	unsigned long flags;
 
+	pr_info("Enabling IRQ %d\n", i->irq);
 	raw_spin_lock_irqsave(&irq_lock, flags);
 	icu_w32_mask(0, 1 << i->irq, GIMR);
 	raw_spin_unlock_irqrestore(&irq_lock, flags);
@@ -84,6 +86,41 @@ static struct irq_chip rtl838x_ictl_irq = {
  *  GPIO_ABCD      23        IP5
  *  SWCORE         20        IP4
  */
+
+static void rtl83xx_irqdispatch_2(void)
+{			
+		pr_info("IRQ 2\n");
+		do_IRQ(2);
+}
+
+static void rtl83xx_irqdispatch_3(void)
+{			
+		pr_info("IRQ 3\n");
+		do_IRQ(3);
+}
+
+static void rtl83xx_irqdispatch_4(void)
+{			
+		pr_info("IRQ 4\n");
+		do_IRQ(4);
+}
+static void rtl83xx_irqdispatch_5(void)
+{			
+		pr_info("IRQ 5\n");
+		do_IRQ(5);
+}
+
+static void rtl83xx_irqdispatch_6(void)
+{			
+		pr_info("IRQ 6\n");
+		do_IRQ(6);
+}
+
+static void rtl83xx_irqdispatch_7(void)
+{			
+		pr_info("IRQ 7\n");
+		do_IRQ(7);
+}
 
 asmlinkage void plat_irq_dispatch(void)
 {
@@ -140,6 +177,7 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 	int i;
 	struct irq_domain *domain;
 	struct resource res;
+	u32 status;
 
 	pr_info("Found Interrupt controller: %s (%s)\n", node->name, node->full_name);
 	if (of_address_to_resource(node, 0, &res))
@@ -151,6 +189,9 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 	soc_info.icu_base = ioremap(res.start, resource_size(&res));
 	pr_info("ICU Memory: %08x\n", (u32)soc_info.icu_base);
 
+	pr_info("cpu_has_vint %d\n", cpu_has_vint);
+	pr_info("cpu_has_veic %d\n", cpu_has_veic);
+	
 	mips_cpu_irq_init();
 
 	domain = irq_domain_add_simple(node, 32, 0, &irq_domain_ops, NULL);
@@ -162,36 +203,61 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 					 &rtl838x_ictl_irq, handle_level_irq);
 	}
 
-	if (request_irq(RTL838X_ICTL1_IRQ, no_action, IRQF_NO_THREAD,
-			"IRQ cascade 1", NULL)) {
-		pr_err("request_irq() cascade 1 for irq %d failed\n", RTL838X_ICTL1_IRQ);
-	}
-	if (request_irq(RTL838X_ICTL2_IRQ, no_action, IRQF_NO_THREAD,
-			"IRQ cascade 2", NULL)) {
-		pr_err("request_irq() cascade 2 for irq %d failed\n", RTL838X_ICTL2_IRQ);
-	}
-	if (request_irq(RTL838X_ICTL3_IRQ, no_action, IRQF_NO_THREAD,
-			"IRQ cascade 3", NULL)) {
-		pr_err("request_irq() cascade 3 for irq %d failed\n", RTL838X_ICTL3_IRQ);
-	}
-	if (request_irq(RTL838X_ICTL4_IRQ, no_action, IRQF_NO_THREAD,
-			"IRQ cascade 4", NULL)) {
-		pr_err("request_irq() cascade 4 for irq %d failed\n", RTL838X_ICTL4_IRQ);
-	}
-	if (request_irq(RTL838X_ICTL5_IRQ, no_action, IRQF_NO_THREAD,
-			"IRQ cascade 5", NULL)) {
-		pr_err("request_irq() cascade 5 for irq %d failed\n", RTL838X_ICTL5_IRQ);
+	if (!cpu_has_vint) {
+		if (request_irq(RTL838X_ICTL1_IRQ, no_action, IRQF_NO_THREAD,
+				"IRQ cascade 1", NULL)) {
+			pr_err("request_irq() cascade 1 for irq %d failed\n", RTL838X_ICTL1_IRQ);
+		}
+		if (request_irq(RTL838X_ICTL2_IRQ, no_action, IRQF_NO_THREAD,
+				"IRQ cascade 2", NULL)) {
+			pr_err("request_irq() cascade 2 for irq %d failed\n", RTL838X_ICTL2_IRQ);
+		}
+		if (request_irq(RTL838X_ICTL3_IRQ, no_action, IRQF_NO_THREAD,
+				"IRQ cascade 3", NULL)) {
+			pr_err("request_irq() cascade 3 for irq %d failed\n", RTL838X_ICTL3_IRQ);
+		}
+		if (request_irq(RTL838X_ICTL4_IRQ, no_action, IRQF_NO_THREAD,
+				"IRQ cascade 4", NULL)) {
+			pr_err("request_irq() cascade 4 for irq %d failed\n", RTL838X_ICTL4_IRQ);
+		}
+		if (request_irq(RTL838X_ICTL5_IRQ, no_action, IRQF_NO_THREAD,
+				"IRQ cascade 5", NULL)) {
+			pr_err("request_irq() cascade 5 for irq %d failed\n", RTL838X_ICTL5_IRQ);
+		}
+	} else {
+		pr_info("Setting up Vectored Interrupt\n");
+		set_vi_handler(2, rtl83xx_irqdispatch_2);
+		set_vi_handler(3, rtl83xx_irqdispatch_3);
+		set_vi_handler(4, rtl83xx_irqdispatch_4);
+		set_vi_handler(5, rtl83xx_irqdispatch_5);
+		set_vi_handler(6, rtl83xx_irqdispatch_6);
+		set_vi_handler(7, rtl83xx_irqdispatch_7);
 	}
 
-	/* Set up interrupt routing scheme */
+	status = read_c0_status();
+	pr_info("C0 Status: %08x, cause %08x\n", read_c0_status(), read_c0_cause());
+	status &= ~BIT(2); /*Clear ERL (Error Level) bit*/
+	status &= ~BIT(1); /*Clear EXL (Exception Level) bit*/
+	status &= ~BIT(15);  /*Clear IM7 bit*/
+	pr_info("C0 Status: %08x, cause %08x\n", read_c0_status(), read_c0_cause());
+	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo0(), read_c0_watchhi0());
+	write_c0_status(status);
+
+	change_c0_status(ST0_IM, STATUSF_IP0 | STATUSF_IP1| STATUSF_IP2 | STATUSF_IP3
+				| STATUSF_IP4 | STATUSF_IP5 | STATUSF_IP6 | STATUSF_IP7);
+
+	pr_info("C0 Status: %08x, cause %08x\n", read_c0_status(), read_c0_cause());
+	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo0(), read_c0_watchhi0());
+
+	// Set up interrupt routing scheme
 	if (soc_info.family == RTL9300_FAMILY_ID) {
 		pr_info("Setting up RTL9300 IRQ\n");
 		icu_w32(0x12010004, IRR0);
 		icu_w32(0x30000000, IRR1);
-		icu_w32(0x401111, IRR2);
+		icu_w32(0x00401111, IRR2);
 		icu_w32(0x50400000, IRR3);
 		icu_w32(0x40000080, GIMR);
-		
+		icu_w32(0xffffffff, GIMR);
 	} else {
 		icu_w32(IRR0_SETTING, IRR0);
 		if (soc_info.family == RTL8380_FAMILY_ID)

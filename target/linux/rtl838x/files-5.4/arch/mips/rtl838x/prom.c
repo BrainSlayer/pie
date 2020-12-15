@@ -116,6 +116,12 @@ void __init prom_init(void)
 	uint32_t model;
 
 	pr_info("%s called\n", __func__);
+	pr_info("C0 Status: %08x, cause %08x\n", read_c0_status(), read_c0_cause());
+	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo0(), read_c0_watchhi0());
+	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo1(), read_c0_watchhi1());
+	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo2(), read_c0_watchhi2());
+	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo3(), read_c0_watchhi3());
+
 	soc_info.sw_base = RTL838X_SW_BASE;
 
 	model = sw_r32(RTL838X_MODEL_NAME_INFO);
@@ -175,7 +181,38 @@ void __init prom_init(void)
 		soc_info.family = RTL9300_FAMILY_ID;
 		break;
 	case 0x9302:
-		soc_info.name = "RTL9302";
+		soc_info.rev = sw_r32(RTL93XX_MODEL_NAME_INFO) & 0xf;
+		switch (sw_r32(RTL93XX_MODEL_NAME_INFO) & 0xfffffff0) {
+		case 0x93020810:
+			soc_info.name = "RTL9302A 12x2.5G";
+			break;
+		case 0x93021010:
+			soc_info.name = "RTL9302B 8x2.5G";
+			break;
+		case 0x93021810:
+			soc_info.name = "RTL9302C 16x2.5G";
+			break;
+		case 0x93022010:
+			soc_info.name = "RTL9302D 24x2.5G";
+			break;
+		case 0x93020800:
+			soc_info.name = "RTL9302A";
+			break;
+		case 0x93021000:
+			soc_info.name = "RTL9302B";
+			break;
+		case 0x93021800:
+			soc_info.name = "RTL9302C";
+			break;
+		case 0x93022000:
+			soc_info.name = "RTL9302D";
+			break;
+		case 0x93023001:
+			soc_info.name = "RTL9302F";
+			break;
+		default:
+			soc_info.name = "RTL9302";
+		}
 		soc_info.family = RTL9300_FAMILY_ID;
 		break;
 	case 0x9313:
@@ -187,5 +224,7 @@ void __init prom_init(void)
 		soc_info.family = 0;
 	}
 	pr_info("SoC Type: %s\n", get_system_type());
+	if (soc_info.rev)
+		pr_info("SoC Revision %d\n", soc_info.rev); 
 	prom_init_cmdline();
 }

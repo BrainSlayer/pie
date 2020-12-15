@@ -26,6 +26,9 @@
 #include <asm/smp-ops.h>
 #include <linux/delay.h>
 
+#include <asm/cevt-r4k.h>
+#include <linux/irq.h>
+
 #include "mach-rtl838x.h"
 
 extern int rtl838x_serial_init(void);
@@ -194,7 +197,7 @@ void __init plat_time_init(void)
 		if (of_property_read_u32(np, "frequency", &freq) < 0)
 			pr_err("No 'frequency' property in DT, using default.");
 		else
-			pr_info("CPU frequency from device tree: %d", freq);
+			pr_info("CPU frequency from device tree: %d Hz", freq);
 		of_node_put(np);
 	}
 
@@ -205,9 +208,12 @@ void __init plat_time_init(void)
 
 	pr_info("CPU Clock: %ld MHz\n", clk->rate / 1000000);
 	mips_hpt_frequency = freq / 2;
+	cp0_compare_irq = 7;
 
-	pll_reset_value = sw_r32(RTL838X_PLL_CML_CTRL);
-	pr_info("PLL control register: %x\n", pll_reset_value);
+	if (soc_info.family == RTL8380_FAMILY_ID) {
+		pll_reset_value = sw_r32(RTL838X_PLL_CML_CTRL);
+		pr_info("PLL control register: %x\n", pll_reset_value);
+	}
 
 	/* With the info from the command line and cpu-freq we can setup the console */
 	rtl838x_serial_init();
