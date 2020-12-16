@@ -108,6 +108,12 @@
 				 (NIC_RS    << 0)    \
 				)
 
+#define IRR0_SETTING_RTL9300	((UART1_RS  << 28) | \
+				 (UART0_RS      << 24) | \
+				 (USB_H2_RS     << 16) | \
+				 (NIC_RS        << 0)    \
+				)
+
 #define IRR1			(0x0c)
 #define IRR1_SETTING_RTL838X	((GPIO_ABCD_RS << 28) | \
 				 (GPIO_EFGH_RS << 24) | \
@@ -117,18 +123,31 @@
 #define IRR1_SETTING_RTL839X	((GPIO_ABCD_RS << 28) | \
 				 (SWCORE_RS    << 16)   \
 				)
+#define IRR1_SETTING_RTL9300	((SWCORE_RS << 28))
 
 #define IRR2			(0x10)
 #define IRR2_SETTING		0
+#define IRR2_SETTING_RTL9300	((TC1_RS << 0) | \
+				 (TC2_RS << 4) | \
+				 (TC3_RS << 8) | \
+				 (TC4_RS << 12) | \
+				 (GPIO_ABCD_RS << 20) \
+				)
 
 #define IRR3			(0x14)
 #define IRR3_SETTING		0
+#define IRR3_SETTING_RTL9300	((TC0_RS << 28) | \
+				 (WDT_IP1_RS << 20) \
+				)
 
 /* Interrupt Routing Selection */
 #define UART0_RS		2
 #define UART1_RS		1
 #define TC0_RS			5
 #define TC1_RS			1
+#define TC2_RS			1
+#define TC3_RS			1
+#define TC4_RS			1
 #define OCPTO_RS		1
 #define HLXTO_RS		1
 #define SLXTO_RS		1
@@ -139,6 +158,7 @@
 #define	SWCORE_RS		3
 #define WDT_IP1_RS		4
 #define WDT_IP2_RS		5
+#define USB_H2_RS		1
 
 /* Interrupt IRQ Assignments */
 #define UART0_IRQ		31
@@ -156,7 +176,24 @@
 #define WDT_IP1_IRQ		19
 #define WDT_IP2_IRQ		18
 
+/* 9300 Mapping index*/
+#define RTL9300_UART1_IRQ	31
+#define RTL9300_UART0_IRQ	30
+#define RTL9300_USB_H2_IRQ	28
+#define RTL9300_NIC_IRQ		24
+#define RTL9300_SWCORE_IRQ	23
+#define RTL9300_GPIO_ABC_IRQ	13
+#define RTL9300_TC4_IRQ		11
+#define RTL9300_TC3_IRQ		10
+#define RTL9300_TC2_IRQ		9
+#define RTL9300_TC1_IRQ		8
+#define RTL9300_TC0_IRQ		7
+#define RTL9300_WDT_IP1_IRQ	5
+
+
 #define SYSTEM_FREQ		175000000
+#define SYSTEM_FREQ_RTL9300	175000000
+
 #define RTL838X_UART0_BASE	((volatile void *)(0xb8002000UL))
 #define RTL838X_UART0_BAUD	38400  /* ex. 19200 or 38400 or 57600 or 115200 */
 #define RTL838X_UART0_FREQ	(SYSTEM_FREQ - RTL838X_UART0_BAUD * 24)
@@ -238,34 +275,38 @@
  *  Timer/counter for 8390/80/28 TC & MP chip
  */
 #define RTL838X_TIMER0_BASE	((volatile void *)(0xb8003100UL))
-#define RTL93XX_TIMER0_BASE	((volatile void *)(0xb8003200UL))
 #define RTL838X_TIMER0_IRQ	RTL838X_TC0_EXT_IRQ
 
-#define RTL83XX_TC1DATA		(RTL838X_TIMER0_BASE + 0x04)
+#define RTL83XX_TC1DATA		(0x04)
 #define RTL83XX_TCD_OFFSET	8
-#define RTL83XX_TC0CNT		(RTL838X_TIMER0_BASE + 0x08)
-#define RTL83XX_TC1CNT		(RTL838X_TIMER0_BASE + 0x0C)
-#define RTL83XX_TCCNR		(RTL838X_TIMER0_BASE + 0x10)
+#define RTL83XX_TC0CNT		(0x08)
+#define RTL83XX_TC1CNT		(0x0C)
+#define RTL83XX_TCCNR		(0x10)
 #define RTL83XX_TC0EN		(1 << 31)
 #define RTL83XX_TC0MODE_TIMER	(1 << 30)
 #define RTL83XX_TC1EN		(1 << 29)
 #define RTL83XX_TC1MODE_TIMER	(1 << 28)
-#define RTL83XX_TCIR		(RTL838X_TIMER0_BASE + 0x14)
+#define RTL83XX_TCIR		(0x14)
 #define RTL83XX_TC0IE		(1 << 31)
 #define RTL83XX_TC1IE		(1 << 30)
 #define RTL83XX_TC0IP		(1 << 29)
 #define RTL83XX_TC1IP		(1 << 28)
-#define RTL83XX_CDBR		(RTL838X_TIMER0_BASE + 0x18)
+#define RTL83XX_CDBR		(0x18)
 #define RTL83XX_DIVF_OFFSET	16
-#define RTL83XX_WDTCNR		(RTL838X_TIMER0_BASE + 0x1C)
+#define RTL83XX_WDTCNR		(0x1C)
 
-#define RTL93XX_TC1DATA		(RTL93XX_TIMER0_BASE + 0x04)
-#define RTL93XX_TC0CNT		(RTL93XX_TIMER0_BASE + 0x08)
-#define RTL93XX_TC1CNT		(RTL93XX_TIMER0_BASE + 0x0C)
-#define RTL93XX_TCCNR		(RTL93XX_TIMER0_BASE + 0x10)
-#define RTL93XX_TCIR		(RTL93XX_TIMER0_BASE + 0x14)
-#define RTL93XX_CDBR		(RTL93XX_TIMER0_BASE + 0x18)
-#define RTL93XX_WDTCNR		(RTL93XX_TIMER0_BASE + 0x1C)
+/*
+ *  Timer/counter for 93XX chips
+ */
+#define RTL93XX_TIMER0_BASE	((volatile void *)(0xb8003200UL))
+#define RTL93XX_TC_MAX		4
+
+#define RTL93XX_TC0DATA		(0x00)
+#define RTL93XX_TC0CNT		(0x04)
+#define RTL93XX_TC0CTL		(0x08)
+#define RTL93XX_TC0INT		(0x0C)
+#define RTL93XX_TCCNR		(0x10)
+#define RTL93XX_WDTCNR		(0x50)
 
 #define DIVISOR_RTL8390		55
 #define DIVISOR_RTL9300		55
@@ -463,6 +504,7 @@ struct rtl838x_soc_info {
 	unsigned char *compatible;
 	volatile void *sw_base;
 	volatile void *icu_base;
+	volatile void *timer_base;
 };
 
 void rtl838x_soc_detect(struct rtl838x_soc_info *i);

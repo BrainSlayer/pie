@@ -117,10 +117,6 @@ void __init prom_init(void)
 
 	pr_info("%s called\n", __func__);
 	pr_info("C0 Status: %08x, cause %08x\n", read_c0_status(), read_c0_cause());
-	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo0(), read_c0_watchhi0());
-	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo1(), read_c0_watchhi1());
-	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo2(), read_c0_watchhi2());
-	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo3(), read_c0_watchhi3());
 
 	soc_info.sw_base = RTL838X_SW_BASE;
 
@@ -225,6 +221,12 @@ void __init prom_init(void)
 	}
 	pr_info("SoC Type: %s\n", get_system_type());
 	if (soc_info.rev)
-		pr_info("SoC Revision %d\n", soc_info.rev); 
+		pr_info("SoC Revision %d\n", soc_info.rev);
+
+	if (soc_info.family == RTL9300_FAMILY_ID || soc_info.family == RTL9310_FAMILY_ID)
+		soc_info.timer_base = RTL93XX_TIMER0_BASE;
+	else
+		soc_info.timer_base = RTL838X_TIMER0_BASE;
+
 	prom_init_cmdline();
 }

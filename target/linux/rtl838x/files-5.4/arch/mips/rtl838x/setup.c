@@ -32,6 +32,7 @@
 #include "mach-rtl838x.h"
 
 extern int rtl838x_serial_init(void);
+extern void rtl9300_timer_init(void);
 extern struct rtl838x_soc_info soc_info;
 
 struct clk {
@@ -209,6 +210,8 @@ void __init plat_time_init(void)
 	pr_info("CPU Clock: %ld MHz\n", clk->rate / 1000000);
 	mips_hpt_frequency = freq / 2;
 	cp0_compare_irq = 7;
+	if (soc_info.family == RTL9300_FAMILY_ID)
+		rtl9300_timer_init();
 
 	if (soc_info.family == RTL8380_FAMILY_ID) {
 		pll_reset_value = sw_r32(RTL838X_PLL_CML_CTRL);

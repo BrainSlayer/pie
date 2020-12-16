@@ -85,6 +85,14 @@ static struct irq_chip rtl838x_ictl_irq = {
  *  NIC            24        IP5
  *  GPIO_ABCD      23        IP5
  *  SWCORE         20        IP4
+ *  WDT_IP1        19        IP5
+ *  WDT_IP2        18        IP5
+ *  USB_H2         17        IP2
+ * 
+ * RTL9300 Interrupt Scheme
+ *  UART0          31        IP3
+ *  UART1          30        IP2
+ *  RTL9300_TC0_IRQ 7        IP6
  */
 
 static void rtl83xx_irqdispatch_2(void)
@@ -111,9 +119,8 @@ static void rtl83xx_irqdispatch_5(void)
 }
 
 static void rtl83xx_irqdispatch_6(void)
-{			
-		pr_info("IRQ 6\n");
-		do_IRQ(6);
+{
+		do_IRQ(RTL9300_TC0_IRQ);
 }
 
 static void rtl83xx_irqdispatch_7(void)
@@ -130,7 +137,8 @@ asmlinkage void plat_irq_dispatch(void)
 
 	pr_info("In %s\n", __func__);
 	if (pending & CAUSEF_IP7) {
-		c0_compare_interrupt(7, NULL);
+		spurious_interrupt();
+		//c0_compare_interrupt(7, NULL);
 	} else if (pending & CAUSEF_IP6) {
 		do_IRQ(TC0_IRQ);
 	} else if (pending & CAUSEF_IP5) {
@@ -177,7 +185,6 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 	int i;
 	struct irq_domain *domain;
 	struct resource res;
-	u32 status;
 
 	pr_info("Found Interrupt controller: %s (%s)\n", node->name, node->full_name);
 	if (of_address_to_resource(node, 0, &res))
@@ -188,7 +195,6 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 
 	soc_info.icu_base = ioremap(res.start, resource_size(&res));
 	pr_info("ICU Memory: %08x\n", (u32)soc_info.icu_base);
-
 	pr_info("cpu_has_vint %d\n", cpu_has_vint);
 	pr_info("cpu_has_veic %d\n", cpu_has_veic);
 	
@@ -234,30 +240,17 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 		set_vi_handler(7, rtl83xx_irqdispatch_7);
 	}
 
-	status = read_c0_status();
-	pr_info("C0 Status: %08x, cause %08x\n", read_c0_status(), read_c0_cause());
-	status &= ~BIT(2); /*Clear ERL (Error Level) bit*/
-	status &= ~BIT(1); /*Clear EXL (Exception Level) bit*/
-	status &= ~BIT(15);  /*Clear IM7 bit*/
-	pr_info("C0 Status: %08x, cause %08x\n", read_c0_status(), read_c0_cause());
-	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo0(), read_c0_watchhi0());
-	write_c0_status(status);
-
 	change_c0_status(ST0_IM, STATUSF_IP0 | STATUSF_IP1| STATUSF_IP2 | STATUSF_IP3
 				| STATUSF_IP4 | STATUSF_IP5 | STATUSF_IP6 | STATUSF_IP7);
-
-	pr_info("C0 Status: %08x, cause %08x\n", read_c0_status(), read_c0_cause());
-	pr_info("Watch LO %016lx,  HI %08x\n", read_c0_watchlo0(), read_c0_watchhi0());
 
 	// Set up interrupt routing scheme
 	if (soc_info.family == RTL9300_FAMILY_ID) {
 		pr_info("Setting up RTL9300 IRQ\n");
-		icu_w32(0x12010004, IRR0);
-		icu_w32(0x30000000, IRR1);
-		icu_w32(0x00401111, IRR2);
-		icu_w32(0x50400000, IRR3);
-		icu_w32(0x40000080, GIMR);
-		icu_w32(0xffffffff, GIMR);
+		icu_w32(IRR0_SETTING_RTL9300, IRR0);
+		icu_w32(IRR1_SETTING_RTL9300, IRR1);
+		icu_w32(IRR2_SETTING_RTL9300, IRR2);
+		icu_w32(IRR3_SETTING_RTL9300, IRR3);
+		icu_w32(UART0_IE | BIT(RTL9300_TC0_IRQ), GIMR);
 	} else {
 		icu_w32(IRR0_SETTING, IRR0);
 		if (soc_info.family == RTL8380_FAMILY_ID)

@@ -10,7 +10,7 @@
  platforms += sgi-ip27
 --- a/arch/mips/Kconfig
 +++ b/arch/mips/Kconfig
-@@ -630,6 +630,29 @@ config RALINK
+@@ -630,6 +630,28 @@ config RALINK
  	select ARCH_HAS_RESET_CONTROLLER
  	select RESET_CONTROLLER
  
@@ -19,7 +19,6 @@
 +	select DMA_NONCOHERENT
 +	select IRQ_MIPS_CPU
 +	select CSRC_R4K
-+	select CEVT_R4K
 +	select SYS_HAS_CPU_MIPS32_R1
 +	select SYS_HAS_CPU_MIPS32_R2
 +	select SYS_SUPPORTS_BIG_ENDIAN
