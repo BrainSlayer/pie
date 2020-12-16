@@ -36,7 +36,7 @@ static void rtl838x_ictl_enable_irq(struct irq_data *i)
 {
 	unsigned long flags;
 
-	pr_info("Enabling IRQ %d\n", i->irq);
+//	pr_info("Enabling IRQ %d\n", i->irq);
 	raw_spin_lock_irqsave(&irq_lock, flags);
 	icu_w32_mask(0, 1 << i->irq, GIMR);
 	raw_spin_unlock_irqrestore(&irq_lock, flags);
@@ -135,12 +135,18 @@ asmlinkage void plat_irq_dispatch(void)
 
 	pending =  read_c0_cause();
 
-	pr_info("In %s\n", __func__);
+//	pr_info("In %s\n", __func__);
 	if (pending & CAUSEF_IP7) {
+#ifdef CONFIG_CEVT_R4K
+		c0_compare_interrupt(7, NULL);
+#else
 		spurious_interrupt();
-		//c0_compare_interrupt(7, NULL);
+#endif
 	} else if (pending & CAUSEF_IP6) {
-		do_IRQ(TC0_IRQ);
+		if (soc_info.family == RTL9300_FAMILY_ID)
+			do_IRQ(RTL9300_TC0_IRQ);
+		else
+			do_IRQ(TC0_IRQ);
 	} else if (pending & CAUSEF_IP5) {
 		ext_int = icu_r32(GIMR) & icu_r32(GISR);
 		if (ext_int & NIC_IP)
@@ -154,7 +160,10 @@ asmlinkage void plat_irq_dispatch(void)
 	} else if (pending & CAUSEF_IP4) {
 		do_IRQ(SWCORE_IRQ);
 	} else if (pending & CAUSEF_IP3) {
-		do_IRQ(UART0_IRQ);
+		if (soc_info.family == RTL9300_FAMILY_ID)
+			do_IRQ(RTL9300_UART0_IRQ);
+		else
+			do_IRQ(UART0_IRQ);
 	} else if (pending & CAUSEF_IP2) {
 		ext_int = icu_r32(GIMR) & icu_r32(GISR);
 		if (ext_int & TC1_IP)
@@ -238,10 +247,11 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 		set_vi_handler(5, rtl83xx_irqdispatch_5);
 		set_vi_handler(6, rtl83xx_irqdispatch_6);
 		set_vi_handler(7, rtl83xx_irqdispatch_7);
-	}
-
+		
 	change_c0_status(ST0_IM, STATUSF_IP0 | STATUSF_IP1| STATUSF_IP2 | STATUSF_IP3
 				| STATUSF_IP4 | STATUSF_IP5 | STATUSF_IP6 | STATUSF_IP7);
+
+	}
 
 	// Set up interrupt routing scheme
 	if (soc_info.family == RTL9300_FAMILY_ID) {
@@ -250,7 +260,7 @@ int __init icu_of_init(struct device_node *node, struct device_node *parent)
 		icu_w32(IRR1_SETTING_RTL9300, IRR1);
 		icu_w32(IRR2_SETTING_RTL9300, IRR2);
 		icu_w32(IRR3_SETTING_RTL9300, IRR3);
-		icu_w32(UART0_IE | BIT(RTL9300_TC0_IRQ), GIMR);
+		icu_w32(BIT(RTL9300_UART0_IRQ) | BIT(RTL9300_TC0_IRQ), GIMR);
 	} else {
 		icu_w32(IRR0_SETTING, IRR0);
 		if (soc_info.family == RTL8380_FAMILY_ID)

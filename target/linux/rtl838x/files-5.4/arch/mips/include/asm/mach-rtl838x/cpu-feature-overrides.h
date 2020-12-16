@@ -11,7 +11,7 @@
 #ifndef __ASM_MACH_RTL838X_CPU_FEATURE_OVERRIDES_H
 #define __ASM_MACH_RTL838X_CPU_FEATURE_OVERRIDES_H
 
-#define cpu_has_vint		1
+// #define cpu_has_vint		1
 // #define cpu_has_veic		1
 
 #endif /* __ASM_MACH_RTL838X_CPU_FEATURE_OVERRIDES_H */
