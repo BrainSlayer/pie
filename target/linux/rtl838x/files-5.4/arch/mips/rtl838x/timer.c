@@ -123,6 +123,6 @@ void __init rtl9300_timer_init(void)
 	}
 
 	rtl93xx_clockevent_init();
-	// We only enable Timer 0, other timers are enabled by their CPUs
+	// We only enable Timer 0 interrupt, other IRQs are enabled by their CPUs
 	timer_w32(BIT(20), RTL93XX_TC0INT);
 }
