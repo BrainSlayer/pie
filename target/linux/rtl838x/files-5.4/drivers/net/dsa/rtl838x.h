@@ -10,11 +10,12 @@
  */
 #define RTL838X_MAC_PORT_CTRL(port)		(0xd560 + (((port) << 7)))
 #define RTL839X_MAC_PORT_CTRL(port)		(0x8004 + (((port) << 7)))
-#define RTL930X_MAC_PORT_CTRL(port)		(0x3200 + (((port) << 6)))
+#define RTL930X_MAC_PORT_CTRL(port)		(0x3260 + (((port) << 6)))
+#define RTL930X_MAC_L2_PORT_CTRL(port)		(0x3268 + (((port) << 6)))
 #define RTL838X_RST_GLB_CTRL_0			(0x003c)
 #define RTL838X_MAC_FORCE_MODE_CTRL		(0xa104)
 #define RTL839X_MAC_FORCE_MODE_CTRL		(0x02bc)
-#define RTL930X_MAC_FORCE_MODE_CTRL		(0xc20c)
+#define RTL930X_MAC_FORCE_MODE_CTRL		(0xCA1C)
 
 #define RTL838X_DMY_REG31			(0x3b28)
 #define RTL838X_SDS_MODE_SEL			(0x0028)
@@ -27,22 +28,21 @@
 #define RTL838X_SDS5_EXT_REG6			(0xf18c)
 #define RTL838X_PORT_ISO_CTRL(port)		(0x4100 + ((port) << 2))
 #define RTL839X_PORT_ISO_CTRL(port)		(0x1400 + ((port) << 3))
-#define RTL930X_PORT_ISO_CTRL(port)		(0xA080 + ((port) << 2))
 #define RTL8380_SDS4_FIB_REG0			(0xF800)
 #define RTL838X_STAT_PORT_STD_MIB		(0x1200)
 #define RTL839X_STAT_PORT_STD_MIB		(0xC000)
-#define RTL930X_STAT_PORT_MIB_CNTR		(0x0604)
+#define RTL930X_STAT_PORT_MIB_CNTR		(0x0664)
 #define RTL838X_STAT_RST			(0x3100)
 #define RTL839X_STAT_RST			(0xF504)
-#define RTL930X_STAT_RST			(0x31E0)
+#define RTL930X_STAT_RST			(0x3240)
 #define RTL931X_STAT_RST			(0x7ef4)
 #define RTL838X_STAT_PORT_RST			(0x3104)
 #define RTL839X_STAT_PORT_RST			(0xF508)
-#define RTL930X_STAT_PORT_RST			(0x31E4)
+#define RTL930X_STAT_PORT_RST			(0x3244)
 #define RTL931X_STAT_PORT_RST			(0x7ef8)
 #define RTL838X_STAT_CTRL			(0x3108)
 #define RTL839X_STAT_CTRL			(0x04cc)
-#define RTL930X_STAT_CTRL			(0x31E8)
+#define RTL930X_STAT_CTRL			(0x3248)
 #define RTL931X_STAT_CTRL			(0x5720)
 
 /* Registers of the internal Serdes of the 8390 */
@@ -76,11 +76,16 @@
 #define RTL838X_VLAN_PORT_IGR_FLTR(port)	(0x3A7C + (((port >> 4) << 2)))
 #define RTL838X_VLAN_PORT_IGR_FLTR_0		(0x3A7C)
 #define RTL838X_VLAN_PORT_IGR_FLTR_1		(0x3A7C + 4)
+
 #define RTL839X_VLAN_PROFILE(idx)		(0x25C0 + (((idx) << 3)))
 #define RTL839X_VLAN_CTRL			(0x26D4)
 #define RTL839X_VLAN_PORT_PB_VLAN(port)		(0x26D8 + (((port) << 2)))
 #define RTL839X_VLAN_PORT_IGR_FLTR(port)	(0x27B4 + (((port >> 4) << 2)))
 #define RTL839X_VLAN_PORT_EGR_FLTR(port)	(0x27C4 + (((port >> 5) << 2)))
+
+#define RTL930X_VLAN_PROFILE_SET(idx)		(0x9c60 + (((idx) * 20)))
+
+#define RTL931X_VLAN_PROFILE_SET(idx)		(0x9800 + (((idx) * 28)))
 
 /* Table access registers */
 #define RTL838X_TBL_ACCESS_CTRL_0		(0x6914)
@@ -95,12 +100,12 @@
 #define RTL839X_TBL_ACCESS_CTRL_2		(0x611C)
 #define RTL839X_TBL_ACCESS_DATA_2(i)		(0x6120 + (((i) << 2)))
 
-#define RTL930X_TBL_ACCESS_CTRL_0		(0xAB14)
-#define RTL930X_TBL_ACCESS_DATA_0(idx)		(0xAB18 + ((idx) << 2))
-#define RTL930X_TBL_ACCESS_CTRL_1		(0xAB80)
-#define RTL930X_TBL_ACCESS_DATA_1(idx)		(0xAB84 + ((idx) << 2))
-#define RTL930X_TBL_ACCESS_CTRL_2		(0xC604)
-#define RTL930X_TBL_ACCESS_DATA_2(i)		(0xC608 + (((i) << 2)))
+#define RTL930X_TBL_ACCESS_CTRL_0		(0xB340)
+#define RTL930X_TBL_ACCESS_DATA_0(idx)		(0xB344 + ((idx) << 2))
+#define RTL930X_TBL_ACCESS_CTRL_1		(0xB3A0)
+#define RTL930X_TBL_ACCESS_DATA_1(idx)		(0xB3A4 + ((idx) << 2))
+#define RTL930X_TBL_ACCESS_CTRL_2		(0xCE04)
+#define RTL930X_TBL_ACCESS_DATA_2(i)		(0xCE08 + (((i) << 2)))
 
 #define RTL931X_TBL_ACCESS_CTRL_0		(0x8500)
 #define RTL931X_TBL_ACCESS_DATA_0(idx)		(0x8508 + ((idx) << 2))
@@ -118,23 +123,23 @@
 /* MAC handling */
 #define RTL838X_MAC_LINK_STS			(0xa188)
 #define RTL839X_MAC_LINK_STS			(0x0390)
-#define RTL930X_MAC_LINK_STS			(0xC2D8)
+#define RTL930X_MAC_LINK_STS			(0xCB10)
 #define RTL931X_MAC_LINK_STS			(0x0EC0)
 #define RTL838X_MAC_LINK_SPD_STS(p)		(0xa190 + (((p >> 4) << 2)))
 #define RTL839X_MAC_LINK_SPD_STS(p)		(0x03a0 + (((p >> 4) << 2)))
-#define RTL930X_MAC_LINK_SPD_STS(p)		(0xc2e0 + (((p >> 3) << 2)))
+#define RTL930X_MAC_LINK_SPD_STS(p)		(0xCB18 + (((p >> 3) << 2)))
 #define RTL931X_MAC_LINK_SPD_STS(p)		(0x0ED0 + (((p >> 3) << 2)))
 #define RTL838X_MAC_LINK_DUP_STS		(0xa19c)
 #define RTL839X_MAC_LINK_DUP_STS		(0x03b0)
-#define RTL930X_MAC_LINK_DUP_STS		(0xc2f0)
+#define RTL930X_MAC_LINK_DUP_STS		(0xCB28)
 #define RTL931X_MAC_LINK_DUP_STS		(0x0EF0)
 #define RTL838X_MAC_TX_PAUSE_STS		(0xa1a0)
 #define RTL839X_MAC_TX_PAUSE_STS		(0x03b8)
-#define RTL930X_MAC_TX_PAUSE_STS		(0xC2F4)
+#define RTL930X_MAC_TX_PAUSE_STS		(0xCB2C)
 #define RTL931X_MAC_TX_PAUSE_STS		(0x0EF8)
 #define RTL838X_MAC_RX_PAUSE_STS		(0xa1a4)
 #define RTL839X_MAC_RX_PAUSE_STS		(0x03c0)
-#define RTL930X_MAC_RX_PAUSE_STS		(0xC2F8)
+#define RTL930X_MAC_RX_PAUSE_STS		(0xCB30)
 #define RTL931X_MAC_RX_PAUSE_STS		(0x0F00)
 #define RTL838X_EEE_TX_TIMER_GIGA_CTRL		(0xaa04)
 #define RTL838X_EEE_TX_TIMER_GELITE_CTRL	(0xaa08)
@@ -158,26 +163,26 @@
 /* L2 functionality */
 #define RTL838X_L2_CTRL_0			(0x3200)
 #define RTL839X_L2_CTRL_0			(0x3800)
-#define RTL930X_L2_CTRL				(0xab00)
+#define RTL930X_L2_CTRL				(0x8FD8)
 #define RTL931X_L2_CTRL				(0xC800)
 #define RTL838X_L2_CTRL_1			(0x3204)
 #define RTL839X_L2_CTRL_1			(0x3804)
-#define RTL930X_L2_AGE_CTRL			(0x8C78)
+#define RTL930X_L2_AGE_CTRL			(0x8FDC)
 #define RTL931X_L2_AGE_CTRL			(0xC804)
 #define RTL838X_L2_PORT_AGING_OUT		(0x3358)
 #define RTL839X_L2_PORT_AGING_OUT		(0x3b74)
-#define	RTL930X_L2_PORT_AGE_CTRL		(0x8C7C)
+#define	RTL930X_L2_PORT_AGE_CTRL		(0x8FE0)
 #define	RTL931X_L2_PORT_AGE_CTRL		(0xc808)
 #define RTL838X_TBL_ACCESS_L2_CTRL		(0x6900)
 #define RTL839X_TBL_ACCESS_L2_CTRL		(0x1180)
-#define RTL930X_TBL_ACCESS_L2_CTRL		(0xAB00)
-#define RTL930X_TBL_ACCESS_L2_METHOD_CTRL	(0xAB04)
+#define RTL930X_TBL_ACCESS_L2_CTRL		(0xB320)
+#define RTL930X_TBL_ACCESS_L2_METHOD_CTRL	(0xB324)
 #define RTL838X_TBL_ACCESS_L2_DATA(idx)		(0x6908 + ((idx) << 2))
 #define RTL839X_TBL_ACCESS_L2_DATA(idx)		(0x1184 + ((idx) << 2))
 #define RTL930X_TBL_ACCESS_L2_DATA(idx)		(0xab08 + ((idx) << 2))
 #define RTL838X_L2_TBL_FLUSH_CTRL		(0x3370)
 #define RTL839X_L2_TBL_FLUSH_CTRL		(0x3ba0)
-#define RTL930X_L2_TBL_FLUSH_CTRL		(0x8ECC)
+#define RTL930X_L2_TBL_FLUSH_CTRL		(0x9404)
 #define RTL931X_L2_TBL_FLUSH_CTRL		(0xCD9C)
 #define RTL838X_L2_PORT_NEW_SALRN(p)		(0x328c + (((p >> 4) << 2)))
 #define RTL839X_L2_PORT_NEW_SALRN(p)		(0x38F0 + (((p >> 4) << 2)))
@@ -185,6 +190,8 @@
 #define RTL839X_L2_PORT_NEW_SA_FWD(p)		(0x3900 + (((p >> 4) << 2)))
 #define RTL838X_L2_PORT_SALRN(p)		(0x328c + (((p >> 4) << 2)))
 #define RTL839X_L2_PORT_SALRN(p)		(0x38F0 + (((p >> 4) << 2)))
+
+#define RTL930X_ST_CTRL				(0x8798)
 
 /* Port Mirroring */
 #define RTL838X_MIR_CTRL(grp)			(0x5D00 + (((grp) << 2)))
@@ -345,6 +352,9 @@ struct rtl838x_reg {
 	void (*vlan_tables_read)(u32 vlan, struct rtl838x_vlan_info *info);
 	void (*vlan_set_tagged)(u32 vlan, struct rtl838x_vlan_info *info);
 	void (*vlan_set_untagged)(u32 vlan, u64 portmask);
+	void (*vlan_profile_dump)(int index);
+	void (*stp_get)(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[]);
+	void (*stp_set)(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[]);
 	int  (*mac_force_mode_ctrl)(int port);
 	int  (*mac_port_ctrl)(int port);
 	int  (*l2_port_new_salrn)(int port);
@@ -381,6 +391,8 @@ struct rtl838x_switch_priv {
 	const struct rtl838x_reg *r;
 	u8 cpu_port;
 	u8 port_mask;
+	u8 port_width;
+	u64 irq_mask;
 	u32 fib_entries;
 	struct dentry *dbgfs_dir;
 	int n_lags;

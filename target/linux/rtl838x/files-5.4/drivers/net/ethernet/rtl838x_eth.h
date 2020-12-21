@@ -8,8 +8,8 @@
  */
 #define RTL838X_MAC_PORT_CTRL			(0xd560)
 #define RTL839X_MAC_PORT_CTRL			(0x8004)
-#define RTL930X_MAC_L2_PORT_CTRL		(0x3208)
-#define RTL930X_MAC_PORT_CTRL			(0x3200)
+#define RTL930X_MAC_L2_PORT_CTRL		(0x3268)
+#define RTL930X_MAC_PORT_CTRL			(0x3260)
 #define RTL931X_MAC_L2_PORT_CTRL		(0x6000)
 #define RTL931X_MAC_PORT_CTRL			(0x6004)
 
@@ -22,25 +22,15 @@
 #define RTL839X_DMA_IF_INTR_STS			(0x7868)
 #define RTL839X_DMA_IF_INTR_MSK			(0x7864)
 
-#define RTL930X_DMA_IF_CTRL			(0xD728) 
-#define RTL930X_DMA_IF_INTR_RX_RUNOUT_STS	(0xD71C)
-#define RTL930X_DMA_IF_INTR_RX_DONE_STS		(0xD720)
-#define RTL930X_DMA_IF_INTR_TX_DONE_STS		(0xD724)
-#define RTL930X_DMA_IF_INTR_RX_RUNOUT_MSK	(0xD710)
-#define RTL930X_DMA_IF_INTR_RX_DONE_MSK		(0xD714)
-#define RTL930X_DMA_IF_INTR_TX_DONE_MSK		(0xD718)
-#define RTL930X_L2_NTFY_IF_INTR_MSK		(0xD74C)
-#define RTL930X_L2_NTFY_IF_INTR_STS		(0xD750)
-
-#define RTL9302_DMA_IF_CTRL			(0xe028)
-#define RTL9302_DMA_IF_INTR_RX_RUNOUT_STS	(0xe01C)
-#define RTL9302_DMA_IF_INTR_RX_DONE_STS		(0xe020)
-#define RTL9302_DMA_IF_INTR_TX_DONE_STS		(0xe024)
-#define RTL9302_DMA_IF_INTR_RX_RUNOUT_MSK	(0xe010)
-#define RTL9302_DMA_IF_INTR_RX_DONE_MSK		(0xe014)
-#define RTL9302_DMA_IF_INTR_TX_DONE_MSK		(0xe018)
-#define RTL9302_L2_NTFY_IF_INTR_MSK		(0xe04C)
-#define RTL9302_L2_NTFY_IF_INTR_STS		(0xe050)
+#define RTL930X_DMA_IF_CTRL			(0xe028)
+#define RTL930X_DMA_IF_INTR_RX_RUNOUT_STS	(0xe01C)
+#define RTL930X_DMA_IF_INTR_RX_DONE_STS		(0xe020)
+#define RTL930X_DMA_IF_INTR_TX_DONE_STS		(0xe024)
+#define RTL930X_DMA_IF_INTR_RX_RUNOUT_MSK	(0xe010)
+#define RTL930X_DMA_IF_INTR_RX_DONE_MSK		(0xe014)
+#define RTL930X_DMA_IF_INTR_TX_DONE_MSK		(0xe018)
+#define RTL930X_L2_NTFY_IF_INTR_MSK		(0xe04C)
+#define RTL930X_L2_NTFY_IF_INTR_STS		(0xe050)
 
 /* TODO: RTL931X_DMA_IF_CTRL has different bits meanings */
 #define RTL931X_DMA_IF_CTRL			(0x0928) 
@@ -53,11 +43,9 @@
 #define RTL931X_L2_NTFY_IF_INTR_MSK		(0x09E4)
 #define RTL931X_L2_NTFY_IF_INTR_STS		(0x09E8)
 
-#define RTL838X_RST_GLB_CTRL_0			(0x003c)
 #define RTL838X_MAC_FORCE_MODE_CTRL		(0xa104)
 #define RTL839X_MAC_FORCE_MODE_CTRL		(0x02bc)
-#define RTL9302_MAC_FORCE_MODE_CTRL		(0xCA1C)  /* Guessed */
-#define RTL930X_MAC_FORCE_MODE_CTRL		(0xC20C)
+#define RTL930X_MAC_FORCE_MODE_CTRL		(0xCA1C)
 #define RTL931X_MAC_FORCE_MODE_CTRL		(0x0ddc)
 
 /* MAC address settings */
@@ -65,38 +53,35 @@
 #define RTL839X_MAC				(0x02b4)
 #define RTL838X_MAC_ALE				(0x6b04)
 #define RTL838X_MAC2				(0xa320)
-#define RTL930X_MAC_L2_ADDR_CTRL		(0xBEE8)
+#define RTL930X_MAC_L2_ADDR_CTRL		(0xC714)
 #define RTL931X_MAC_L2_ADDR_CTRL		(0x135c)
 
 #define RTL838X_DMA_RX_BASE			(0x9f00)
 #define RTL839X_DMA_RX_BASE			(0x780c)
-#define RTL9302_DMA_RX_BASE			(0xdf00)
-#define RTL930X_DMA_RX_BASE			(0xd600)
+#define RTL930X_DMA_RX_BASE			(0xdf00)
 #define RTL931X_DMA_RX_BASE			(0x0800)
 
 #define RTL838X_DMA_TX_BASE			(0x9f40)
 #define RTL839X_DMA_TX_BASE			(0x784c)
-#define RTL930X_DMA_TX_BASE			(0xd700)
-#define RTL9302_DMA_TX_BASE			(0xe000)
+#define RTL930X_DMA_TX_BASE			(0xe000)
 #define RTL931X_DMA_TX_BASE			(0x0900)
 
 #define RTL838X_DMA_IF_RX_RING_SIZE		(0xB7E4)
 #define RTL839X_DMA_IF_RX_RING_SIZE		(0x6038)
-#define RTL9302_DMA_IF_RX_RING_SIZE		(0x7a00) // BUG
-#define RTL930X_DMA_IF_RX_RING_SIZE		(0x7a00)
+#define RTL930X_DMA_IF_RX_RING_SIZE		(0x7C60)
 #define RTL931X_DMA_IF_RX_RING_SIZE		(0x2080)
 
 #define RTL838X_DMA_IF_RX_RING_CNTR		(0xB7E8)
 #define RTL839X_DMA_IF_RX_RING_CNTR		(0x603c)
-#define RTL9302_DMA_IF_RX_RING_CNTR		(0x7A2C) // BUG
-#define RTL930X_DMA_IF_RX_RING_CNTR		(0x7A2C)
+#define RTL930X_DMA_IF_RX_RING_CNTR		(0x7C8C)
 #define RTL931X_DMA_IF_RX_RING_CNTR		(0x20AC)
 
 #define RTL838X_DMA_IF_RX_CUR			(0x9F20)
 #define RTL839X_DMA_IF_RX_CUR			(0x782c)
-#define RTL930X_DMA_IF_RX_CUR			(0xd680)
-#define RTL9302_DMA_IF_RX_CUR			(0xdf80)
+#define RTL930X_DMA_IF_RX_CUR			(0xdf80)
 #define RTL931X_DMA_IF_RX_CUR			(0x0880)
+
+#define RTL930X_DMA_IF_TX_CUR_DESC_ADDR_CTRL	(0xE008)
 
 #define RTL838X_DMY_REG31			(0x3b28)
 #define RTL838X_SDS_MODE_SEL			(0x0028)
@@ -108,58 +93,44 @@
 #define RTL838X_SDS5_EXT_REG6			(0xf18c)
 
 /* Registers of the internal Serdes of the 8380 */
-#define MAPLE_SDS4_REG0r			RTL838X_SDS4_REG28
-#define MAPLE_SDS5_REG0r			(RTL838X_SDS4_REG28 + 0x100)
-#define MAPLE_SDS4_REG3r			RTL838X_SDS4_DUMMY0
-#define MAPLE_SDS5_REG3r			(RTL838X_SDS4_REG28 + 0x100)
 #define MAPLE_SDS4_FIB_REG0r			(RTL838X_SDS4_REG28 + 0x880)
 #define MAPLE_SDS5_FIB_REG0r			(RTL838X_SDS4_REG28 + 0x980)
 
-/* VLAN registers */
-#define RTL838X_VLAN_PROFILE(idx)		(0x3A88 + ((idx) << 2))
-#define RTL838X_VLAN_PORT_EGR_FLTR		(0x3A84)
-#define RTL838X_VLAN_PORT_PB_VLAN(port)		(0x3C00 + ((port) << 2))
-#define RTL838X_VLAN_PORT_IGR_FLTR_0		(0x3A7C)
-#define RTL838X_VLAN_PORT_IGR_FLTR_1		(0x3A7C + 4)
-#define RTL838X_TBL_ACCESS_CTRL_0		(0x6914)
-#define RTL838X_TBL_ACCESS_DATA_0(idx)		(0x6918 + ((idx) << 2))
-#define RTL838X_TBL_ACCESS_CTRL_1		(0xA4C8)
-#define RTL838X_TBL_ACCESS_DATA_1(idx)		(0xA4CC + ((idx) << 2))
+/* L2 features */
 #define RTL839X_TBL_ACCESS_L2_CTRL		(0x1180)
 #define RTL839X_TBL_ACCESS_L2_DATA(idx)		(0x1184 + ((idx) << 2))
+#define RTL838X_TBL_ACCESS_CTRL_0		(0x6914)
+#define RTL838X_TBL_ACCESS_DATA_0(idx)		(0x6918 + ((idx) << 2))
+
 /* MAC handling */
 #define RTL838X_MAC_LINK_STS			(0xa188)
 #define RTL839X_MAC_LINK_STS			(0x0390)
-#define RTL9302_MAC_LINK_STS			(0xC2D8) // BUG
-#define RTL930X_MAC_LINK_STS			(0xC2D8)
+#define RTL930X_MAC_LINK_STS			(0xCB10)
 #define RTL931X_MAC_LINK_STS			(0x0ec0)
 
 #define RTL838X_MAC_LINK_SPD_STS		(0xa190)
 #define RTL839X_MAC_LINK_SPD_STS		(0x03a0)
-#define RTL9302_MAC_LINK_SPD_STS		(0xC2E0) // BUG
-#define RTL930X_MAC_LINK_SPD_STS		(0xC2E0)
+#define RTL930X_MAC_LINK_SPD_STS		(0xCB18)
 #define RTL931X_MAC_LINK_SPD_STS		(0x0ed0)
 
 #define RTL838X_MAC_LINK_DUP_STS		(0xa19c)
 #define RTL839X_MAC_LINK_DUP_STS		(0x03b0)
-#define RTL9302_MAC_LINK_DUP_STS		(0xC2F0)  // BUG
-#define RTL930X_MAC_LINK_DUP_STS		(0xC2F0)
+#define RTL930X_MAC_LINK_DUP_STS		(0xCB28)
 #define RTL931X_MAC_LINK_DUP_STS		(0x0ef0)
 
 // TODO: RTL8390_MAC_LINK_MEDIA_STS_ADDR ???
 
 #define RTL838X_MAC_TX_PAUSE_STS		(0xa1a0)
 #define RTL839X_MAC_TX_PAUSE_STS		(0x03b8)
-#define RTL9302_MAC_TX_PAUSE_STS		(0xC2F4)  // BUG
-#define RTL930X_MAC_TX_PAUSE_STS		(0xC2F4)
+#define RTL930X_MAC_TX_PAUSE_STS		(0xCB2C)
 #define RTL931X_MAC_TX_PAUSE_STS		(0x0ef8)
 
 #define RTL838X_MAC_RX_PAUSE_STS		(0xa1a4)
-#define RTL839X_MAC_RX_PAUSE_STS		(0x03c0)
-#define RTL9302_MAC_RX_PAUSE_STS		(0xC2F8)  // BUG
+#define RTL839X_MAC_RX_PAUSE_STS		(0xCB30)
 #define RTL930X_MAC_RX_PAUSE_STS		(0xC2F8)
 #define RTL931X_MAC_RX_PAUSE_STS		(0x0f00)
 
+#define RTL930X_L2_UNKN_UC_FLD_PMSK		(0x9064)
 
 #define RTL838X_EEE_TX_TIMER_GIGA_CTRL		(0xaa04)
 #define RTL838X_EEE_TX_TIMER_GELITE_CTRL	(0xaa08)
@@ -168,6 +139,7 @@
 
 #define RTL838X_L2_TBL_FLUSH_CTRL		(0x3370)
 #define RTL839X_L2_TBL_FLUSH_CTRL		(0x3ba0)
+#define RTL930X_L2_TBL_FLUSH_CTRL		(0x9404)
 #define RTL931X_L2_TBL_FLUSH_CTRL		(0xCD9C)
 
 /* MAC link state bits */
@@ -216,7 +188,7 @@ inline int rtl839x_mac_port_ctrl(int p)
 
 inline int rtl930x_mac_port_ctrl(int p)
 {
-	return RTL930X_MAC_L2_PORT_CTRL + (p << 7);
+	return RTL930X_MAC_L2_PORT_CTRL + (p << 6);
 }
 
 inline int rtl931x_mac_port_ctrl(int p)
@@ -232,11 +204,6 @@ static inline int rtl838x_mac_force_mode_ctrl(int p)
 static inline int rtl839x_mac_force_mode_ctrl(int p)
 {
 	return RTL839X_MAC_FORCE_MODE_CTRL + (p << 2);
-}
-
-static inline int rtl9302_mac_force_mode_ctrl(int p)
-{
-	return RTL9302_MAC_FORCE_MODE_CTRL + (p << 2);
 }
 
 static inline int rtl930x_mac_force_mode_ctrl(int p)
@@ -259,11 +226,6 @@ inline int rtl839x_dma_rx_base(int i)
 	return RTL839X_DMA_RX_BASE + (i << 2);
 }
 
-inline int rtl9302_dma_rx_base(int i)
-{
-	return RTL9302_DMA_RX_BASE + (i << 2);
-}
-
 inline int rtl930x_dma_rx_base(int i)
 {
 	return RTL930X_DMA_RX_BASE + (i << 2);
@@ -282,11 +244,6 @@ inline int rtl838x_dma_tx_base(int i)
 inline int rtl839x_dma_tx_base(int i)
 {
 	return RTL839X_DMA_TX_BASE + (i << 2);
-}
-
-inline int rtl9302_dma_tx_base(int i)
-{
-	return RTL9302_DMA_TX_BASE + (i << 2);
 }
 
 inline int rtl930x_dma_tx_base(int i)
@@ -309,11 +266,6 @@ inline int rtl839x_dma_if_rx_ring_size(int i)
 	return RTL839X_DMA_IF_RX_RING_SIZE + ((i >> 3) << 2);
 }
 
-inline int rtl9302_dma_if_rx_ring_size(int i)
-{
-	return RTL9302_DMA_IF_RX_RING_SIZE + ((i / 3) << 2);
-}
-
 inline int rtl930x_dma_if_rx_ring_size(int i)
 {
 	return RTL930X_DMA_IF_RX_RING_SIZE + ((i / 3) << 2);
@@ -321,7 +273,7 @@ inline int rtl930x_dma_if_rx_ring_size(int i)
 
 inline int rtl931x_dma_if_rx_ring_size(int i)
 {
-	return RTL931X_DMA_IF_RX_RING_SIZE + ((i / 3) << 2); // TODO: Change bit-meaning
+	return RTL931X_DMA_IF_RX_RING_SIZE + ((i / 3) << 2);
 }
 
 inline int rtl838x_dma_if_rx_ring_cntr(int i)
@@ -334,11 +286,6 @@ inline int rtl839x_dma_if_rx_ring_cntr(int i)
 	return RTL839X_DMA_IF_RX_RING_CNTR + ((i >> 3) << 2);
 }
 
-inline int rtl9302_dma_if_rx_ring_cntr(int i)
-{
-	return RTL9302_DMA_IF_RX_RING_CNTR + ((i / 3) << 2);
-}
-
 inline int rtl930x_dma_if_rx_ring_cntr(int i)
 {
 	return RTL930X_DMA_IF_RX_RING_CNTR + ((i / 3) << 2);
@@ -346,7 +293,7 @@ inline int rtl930x_dma_if_rx_ring_cntr(int i)
 
 inline int rtl931x_dma_if_rx_ring_cntr(int i)
 {
-	return RTL931X_DMA_IF_RX_RING_CNTR + ((i / 3) << 2); // TODO: Changed bit-meaning
+	return RTL931X_DMA_IF_RX_RING_CNTR + ((i / 3) << 2);
 }
 
 inline int rtl838x_dma_if_rx_cur(int i)
@@ -357,11 +304,6 @@ inline int rtl838x_dma_if_rx_cur(int i)
 inline int rtl839x_dma_if_rx_cur(int i)
 {
 	return RTL839X_DMA_IF_RX_CUR + (i << 2);
-}
-
-inline int rtl9302_dma_if_rx_cur(int i)
-{
-	return RTL9302_DMA_IF_RX_CUR + (i << 2);
 }
 
 inline int rtl930x_dma_if_rx_cur(int i)
@@ -384,10 +326,6 @@ inline u32 rtl839x_get_mac_link_sts(int p)
 	return (sw_r32(RTL839X_MAC_LINK_STS + ((p >> 5) << 2)) & BIT(p % 32));
 }
 
-inline u32 rtl9302_get_mac_link_sts(int port)
-{
-	return (sw_r32(RTL9302_MAC_LINK_STS) & BIT(port));
-}
 
 inline u32 rtl930x_get_mac_link_sts(int port)
 {
@@ -407,11 +345,6 @@ inline u32 rtl838x_get_mac_link_dup_sts(int port)
 inline u32 rtl839x_get_mac_link_dup_sts(int p)
 {
 	return (sw_r32(RTL839X_MAC_LINK_DUP_STS + ((p >> 5) << 2)) & BIT(p % 32));
-}
-
-inline u32 rtl9302_get_mac_link_dup_sts(int port)
-{
-	return (sw_r32(RTL9302_MAC_LINK_DUP_STS) & BIT(port));
 }
 
 inline u32 rtl930x_get_mac_link_dup_sts(int port)
@@ -442,14 +375,6 @@ inline u32 rtl839x_get_mac_link_spd_sts(int port)
 	return (speed & 0x3);
 }
 
-inline u32 rtl9302_get_mac_link_spd_sts(int port)
-{
-	int r = RTL9302_MAC_LINK_SPD_STS + ((port / 10) << 2);
-	u32 speed = sw_r32(r);
-
-	speed >>= (port % 10) * 3;
-	return (speed & 0x7);
-}
 
 inline u32 rtl930x_get_mac_link_spd_sts(int port)
 {
@@ -479,10 +404,6 @@ inline u32 rtl839x_get_mac_rx_pause_sts(int p)
 	return (sw_r32(RTL839X_MAC_RX_PAUSE_STS + ((p >> 5) << 2)) & BIT(p % 32));
 }
 
-inline u32 rtl9302_get_mac_rx_pause_sts(int port)
-{
-	return (sw_r32(RTL9302_MAC_RX_PAUSE_STS) & (1 << port));
-}
 
 inline u32 rtl930x_get_mac_rx_pause_sts(int port)
 {
@@ -504,11 +425,6 @@ inline u32 rtl839x_get_mac_tx_pause_sts(int p)
 	return (sw_r32(RTL839X_MAC_TX_PAUSE_STS + ((p >> 5) << 2)) & BIT(p % 32));
 }
 
-inline u32 rtl9302_get_mac_tx_pause_sts(int port)
-{
-	return (sw_r32(RTL9302_MAC_TX_PAUSE_STS) & (1 << port));
-}
-
 inline u32 rtl930x_get_mac_tx_pause_sts(int port)
 {
 	return (sw_r32(RTL930X_MAC_TX_PAUSE_STS) & (1 << port));
@@ -523,6 +439,7 @@ inline u64 rtl839x_get_port_reg_be(int reg);
 inline void rtl839x_set_port_reg_be(u64 set, int reg);
 
 struct rtl838x_reg {
+	irqreturn_t (*net_irq)(int irq, void *dev_id);
 	int (*mac_port_ctrl)(int port);
 	int dma_if_intr_sts;
 	int dma_if_intr_msk;
@@ -535,7 +452,7 @@ struct rtl838x_reg {
 	int dma_if_intr_tx_done_msk;
 	int l2_ntfy_if_intr_sts;
 	int l2_ntfy_if_intr_msk;
-	
+
 	int dma_if_ctrl;
 	int  (*mac_force_mode_ctrl)(int port);
 	int  (*dma_rx_base)(int ring);
@@ -557,9 +474,10 @@ int rtl838x_write_phy(u32 port, u32 page, u32 reg, u32 val);
 int rtl838x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 int rtl839x_write_phy(u32 port, u32 page, u32 reg, u32 val);
 int rtl839x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
+int rtl930x_write_phy(u32 port, u32 page, u32 reg, u32 val);
+int rtl930x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val);
 int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
-
 
 extern int rtl8380_sds_power(int mac, int val);
 

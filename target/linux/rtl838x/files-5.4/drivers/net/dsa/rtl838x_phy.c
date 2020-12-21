@@ -21,6 +21,7 @@
 #define PHY_ID_RTL8214C		0x001cc942
 #define PHY_ID_RTL8214FC	0x001cc981
 #define PHY_ID_RTL8218B_E	0x001cc981
+#define PHY_ID_RTL8218D		0x001cc983
 #define PHY_ID_RTL8218B_I	0x001cca40
 #define PHY_ID_RTL8390_GENERIC	0x001ccab0
 #define PHY_ID_RTL8393_I	0x001c8393
@@ -1298,6 +1299,27 @@ static int rtl8218b_int_phy_probe(struct phy_device *phydev)
 	return 0;
 }
 
+static int rtl8218d_phy_probe(struct phy_device *phydev)
+{
+	struct device *dev = &phydev->mdio.dev;
+	struct rtl838x_phy_priv *priv;
+	int addr = phydev->mdio.addr;
+	
+	pr_info("%s: id: %d\n", __func__, addr);
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->name = "RTL8218D";
+
+	/* All base addresses of the PHYs start at multiples of 8 */
+	if (!(addr % 8)) {
+		/* Configuration must be done whil patching still possible */
+// TODO:		return configure_rtl8218d(phydev);
+	}
+	return 0;
+}
+
 static int rtl838x_serdes_probe(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
@@ -1405,6 +1427,15 @@ static struct phy_driver rtl838x_phy_driver[] = {
 		.write_mmd	= rtl8380_rtl8218b_write_mmd,
 		.set_eee	= rtl8380_rtl8218b_set_eee,
 		.get_eee	= rtl8380_rtl8218b_get_eee_u_boot,
+	},
+	{
+		PHY_ID_MATCH_MODEL(PHY_ID_RTL8218D),
+		.name		= "REALTEK RTL8218D",
+		.features	= PHY_GBIT_FEATURES,
+		.probe		= rtl8218d_phy_probe,
+		.suspend	= genphy_suspend,
+		.resume		= genphy_resume,
+		.set_loopback	= genphy_loopback,
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8218B_I),

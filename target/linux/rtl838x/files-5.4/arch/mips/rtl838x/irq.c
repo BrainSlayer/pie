@@ -36,7 +36,6 @@ static void rtl838x_ictl_enable_irq(struct irq_data *i)
 {
 	unsigned long flags;
 
-//	pr_info("Enabling IRQ %d\n", i->irq);
 	raw_spin_lock_irqsave(&irq_lock, flags);
 	icu_w32_mask(0, 1 << i->irq, GIMR);
 	raw_spin_unlock_irqrestore(&irq_lock, flags);
@@ -90,9 +89,10 @@ static struct irq_chip rtl838x_ictl_irq = {
  *  USB_H2         17        IP2
  * 
  * RTL9300 Interrupt Scheme
- *  UART0          31        IP3
- *  UART1          30        IP2
- *  RTL9300_TC0_IRQ 7        IP6
+ *  UART0          30        IP3
+ *  UART1          31        IP2
+ *  TC0_IRQ         7        IP6
+ *  SWCORE_IRQ	   23
  */
 
 static void rtl83xx_irqdispatch_2(void)
@@ -158,7 +158,10 @@ asmlinkage void plat_irq_dispatch(void)
 		else
 			spurious_interrupt();
 	} else if (pending & CAUSEF_IP4) {
-		do_IRQ(SWCORE_IRQ);
+		if (soc_info.family == RTL9300_FAMILY_ID)
+			do_IRQ(RTL9300_SWCORE_IRQ);
+		else
+			do_IRQ(SWCORE_IRQ);
 	} else if (pending & CAUSEF_IP3) {
 		if (soc_info.family == RTL9300_FAMILY_ID)
 			do_IRQ(RTL9300_UART0_IRQ);
