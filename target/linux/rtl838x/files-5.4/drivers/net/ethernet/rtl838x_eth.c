@@ -107,14 +107,6 @@ inline void rtl838x_create_tx_header(struct p_hdr *h, int dest_port)
 		h->cpu_tag[3] = 0x0000;
 		h->cpu_tag[4] = (1 << dest_port) >> 16;
 		h->cpu_tag[5] = (1 << dest_port) & 0xffff;
-	} else {
-		// TODO: Use generic memset
-		h->cpu_tag[0] = 0;
-		h->cpu_tag[1] = 0;
-		h->cpu_tag[2] = 0;
-		h->cpu_tag[3] = 0;
-		h->cpu_tag[4] = 0;
-		h->cpu_tag[5] = 0;
 	}
 }
 
@@ -127,30 +119,19 @@ inline void rtl839x_create_tx_header(struct p_hdr *h, int dest_port)
 		h->cpu_tag[3] = (1 << (dest_port - 32)) & 0xffff;
 		h->cpu_tag[4] = (1 << dest_port) >> 16;
 		h->cpu_tag[5] = (1 << dest_port) & 0xffff;
-	} else {
-		h->cpu_tag[0] = 0;
-		h->cpu_tag[1] = 0;
-		h->cpu_tag[2] = 0;
-		h->cpu_tag[3] = 0;
-		h->cpu_tag[4] = 0;
-		h->cpu_tag[5] = 0;
 	}
 }
 
-// TODO: Fix tag format
 inline void rtl93xx_create_tx_header(struct p_hdr *h, int dest_port)
 {
-	// 00008000 00000000 00000000 00000000 00000000 00000001 00000000 0000003f 00000000 00000000
-	h->cpu_tag[0] = 0;
+	h->cpu_tag[0] = 0x8000;
 	h->cpu_tag[1] = 0;
 	h->cpu_tag[2] = 0;
 	h->cpu_tag[3] = 0;
 	h->cpu_tag[4] = 0;
 	h->cpu_tag[5] = 0;
 	h->cpu_tag[6] = 0;
-	h->cpu_tag[7] = 0;
-	h->cpu_tag[8] = 0;
-	h->cpu_tag[9] = 0;
+	h->cpu_tag[7] = 0xffff;
 }
 
 extern void rtl838x_fdb_sync(struct work_struct *work);
@@ -198,12 +179,12 @@ static void rtl838x_rb_cleanup(struct rtl838x_eth_priv *priv)
 		do {
 			if ((ring->rx_r[r][ring->c_rx[r]] & 0x1))
 				break;
-			// BUG: do proper setup
 			h = &ring->rx_header[r][ring->c_rx[r]];
+			memset(h, 0, sizeof(struct p_hdr));
 			h->buf = (u8 *)KSEG1ADDR(ring->rx_space
-					+ r * ring->c_rx[r] * RING_BUFFER);
+					+ r * RXRINGLEN * RING_BUFFER
+					+ ring->c_rx[r] * RING_BUFFER);
 			h->size = RING_BUFFER;
-			h->len = 0;
 			/* make sure the header is visible to the ASIC */
 			mb();
 
@@ -233,7 +214,7 @@ void rtl9300_dump(void)
 		sw_r32(RTL930X_MAC_L2_PORT_CTRL + 0), sw_r32(RTL930X_MAC_L2_PORT_CTRL + 64),
 		sw_r32(RTL930X_MAC_L2_PORT_CTRL + 128), sw_r32(RTL930X_MAC_L2_PORT_CTRL + 192),
 		sw_r32(RTL930X_MAC_L2_PORT_CTRL + 28 * 64));
-	
+	pr_info("Current: RX-ptr: %08x\n", sw_r32(0xDF80));
 }
 
 struct fdb_update_work {
@@ -553,7 +534,7 @@ static void rtl838x_hw_reset(struct rtl838x_eth_priv *priv)
 
 	/* Reset NIC  */
 	if (priv->family_id == RTL9300_FAMILY_ID || priv->family_id == RTL9310_FAMILY_ID)
-		sw_w32(0xc, priv->r->rst_glb_ctrl);
+		sw_w32(0x4, priv->r->rst_glb_ctrl);
 	else
 		sw_w32(0x8, priv->r->rst_glb_ctrl);
 
@@ -710,8 +691,8 @@ static void rtl838x_setup_ring_buffer(struct ring_b *ring)
 
 	for (i = 0; i < RXRINGS; i++) {
 		for (j = 0; j < RXRINGLEN; j++) {
-			memset(&h, 0, sizeof(h));
 			h = &ring->rx_header[i][j];
+			memset(h, 0, sizeof(struct p_hdr));
 			h->buf = (u8 *)KSEG1ADDR(ring->rx_space
 					+ i * RXRINGLEN * RING_BUFFER
 					+ j * RING_BUFFER);
@@ -724,12 +705,11 @@ static void rtl838x_setup_ring_buffer(struct ring_b *ring)
 
 	for (i = 0; i < TXRINGS; i++) {
 		for (j = 0; j < TXRINGLEN; j++) {
-			memset(&h, 0, sizeof(h));
 			h = &ring->tx_header[i][j];
+			memset(h, 0, sizeof(struct p_hdr));
 			h->buf = (u8 *)KSEG1ADDR(ring->tx_space 
 					+ i * TXRINGLEN * RING_BUFFER
 					+ j * RING_BUFFER);
-			pr_info("ring %d, entry: %d, buffer: %08x\n", i, j, (u32)(h->buf));
 			h->size = RING_BUFFER;
 			ring->tx_r[i][j] = KSEG1ADDR(&ring->tx_header[i][j]);
 		}
@@ -796,14 +776,22 @@ static int rtl838x_eth_open(struct net_device *ndev)
 		/* Trap IGMP traffic to CPU-Port */
 		sw_w32(0x3, RTL838X_SPCL_TRAP_IGMP_CTRL);
 		/* Flush learned FDB entries on link down of a port */
-		sw_w32_mask(0, 1 << 7, RTL838X_L2_CTRL_0);
+		sw_w32_mask(0, BIT(7), RTL838X_L2_CTRL_0);
 		break;
 	case RTL8390_FAMILY_ID:
 		rtl839x_hw_en_rxtx(priv);
 		sw_w32(0x3, RTL839X_SPCL_TRAP_IGMP_CTRL);
-		sw_w32_mask(0, 1 << 7, RTL839X_L2_CTRL_0);
+		/* Flush learned FDB entries on link down of a port */
+		sw_w32_mask(0, BIT(7), RTL839X_L2_CTRL_0);
 		break;
 	case RTL9300_FAMILY_ID: /* fallthrough */
+		rtl93xx_hw_en_rxtx(priv);
+		/* Flush learned FDB entries on link down of a port */
+		sw_w32_mask(0, BIT(7), RTL930X_L2_CTRL);
+		sw_w32_mask(BIT(28), 0, RTL930X_L2_PORT_SABLK_CTRL);
+		sw_w32_mask(BIT(28), 0, RTL930X_L2_PORT_DABLK_CTRL);
+		break;
+
 	case RTL9310_FAMILY_ID:
 		rtl93xx_hw_en_rxtx(priv);
 		
@@ -849,7 +837,7 @@ static void rtl838x_hw_stop(struct rtl838x_eth_priv *priv)
 		sw_w32(force_mac, priv->r->mac_force_mode_ctrl(priv->cpu_port));
 	else
 		sw_w32_mask(0x3, 0, priv->r->mac_force_mode_ctrl(priv->cpu_port));
-	mdelay(1000); // BUG: 100
+	mdelay(1000); // BUG: Must be 100
 
 	pr_info("X2\n");
 	/* Disable traffic */
@@ -889,25 +877,6 @@ static int rtl838x_eth_stop(struct net_device *ndev)
 	spin_lock_irqsave(&priv->lock, flags);
 	phylink_stop(priv->phylink);
 	pr_info("A\n");
-
-	sw_w32(0xffffffff, 0xb344); sw_w32(0xffffffff, 0xb348); sw_w32(0x00034000, 0xb340);
-	do { } while (sw_r32(0xb340) & 0x00020000);
-	sw_w32(0x00024000, 0xb340);
-	do { } while (sw_r32(0xb340) & 0x00020000);
-	pr_info("RETURNING: %08x %08x\n", sw_r32(0xb344), sw_r32(0xb348));
-
-	sw_w32(0x00000000, 0xb344); sw_w32(0x00000000, 0xb348); sw_w32(0x00034000, 0xb340);
-	do { } while (sw_r32(0xb340) & 0x00020000);
-	sw_w32(0x00024000, 0xb340);
-	do { } while (sw_r32(0xb340) & 0x00020000);
-	pr_info("RETURNING 2: %08x %08x\n", sw_r32(0xb344), sw_r32(0xb348));
-
-	sw_w32(0xffffffff, 0xb344); sw_w32(0xffffffff, 0xb348); sw_w32(0x00034000, 0xb340);
-	do { } while (sw_r32(0xb340) & 0x00020000);
-	sw_w32(0x00024000, 0xb340);
-	do { } while (sw_r32(0xb340) & 0x00020000);
-	pr_info("RETURNING 3: %08x %08x\n", sw_r32(0xb344), sw_r32(0xb348));
-
 	rtl838x_hw_stop(priv);
 	pr_info("B\n");
 	free_irq(ndev->irq, ndev);
@@ -1087,6 +1056,7 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 	u32	*last;
 	struct p_hdr *h;
 	bool dsa = netdev_uses_dsa(dev);
+	u16 h1, reason;
 
 	spin_lock_irqsave(&priv->lock, flags);
 	last = (u32 *)KSEG1ADDR(sw_r32(priv->r->dma_if_rx_cur(r)));
@@ -1147,18 +1117,26 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 			skb_data = skb_put(skb, len);
 			/* Make sure data is visible */
 			mb();
-			memcpy(skb->data, (u8 *)KSEG1ADDR(data), len);
+			memcpy(skb->data, data, len);
 			/* Overwrite CRC with cpu_tag */
 			if (dsa) {
 				skb->data[len-4] = 0x80;
-				skb->data[len-3] = h->cpu_tag[priv->tag_offset] & priv->port_mask;
+				h1 = h->cpu_tag[priv->tag_offset];
+				if (priv->tag_offset)  // Works also on RTL9310
+					skb->data[len-3] = h1 & priv->port_mask;
+				else
+					skb->data[len-3] = (h1 >> 8) & priv->port_mask;
 				skb->data[len-2] = 0x10;
 				skb->data[len-1] = 0x00;
-				pr_info("Port: %d\n", skb->data[len-3]);
-				pr_info(">>> %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x\n",
+				pr_info("Port: %d, offset %d in O: %04x\n", skb->data[len-3],
+					priv->tag_offset, h->cpu_tag[priv->tag_offset]);
+				pr_info(">>> %04x %04x %04x %04x %04x %04x %04x %04x %04x %04x\n",
 					h->cpu_tag[0], h->cpu_tag[1], h->cpu_tag[2], h->cpu_tag[3],
 					h->cpu_tag[4], h->cpu_tag[5], h->cpu_tag[6], h->cpu_tag[7],
 					h->cpu_tag[8], h->cpu_tag[9]);
+				
+				reason = h->cpu_tag[7] & 0x3f;
+				pr_info("Reason %d\n", reason);
 			}
 
 			skb->protocol = eth_type_trans(skb, dev);
@@ -1172,13 +1150,10 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 			dev->stats.rx_dropped++;
 		}
 
-		// BUG: Should we re-assign the buffer?????
-		// Need to clean the entire structure and then re-assign (properly!);
-		h->buf = (u8 *)KSEG1ADDR(ring->rx_space
-				+ r * ring->c_rx[r] * RING_BUFFER);
+		/* Reset header structure */
+		memset(h, 0, sizeof(struct p_hdr));
+		h->buf = data;
 		h->size = RING_BUFFER;
-		h->len = 0;
-		memset(&h->cpu_tag, 0, sizeof(h->cpu_tag));
 
 		ring->rx_r[r][ring->c_rx[r]]
 			= KSEG1ADDR(h) | 0x1 | (ring->c_rx[r] == (RXRINGLEN-1) ? WRAP : 0x1);
@@ -1393,12 +1368,15 @@ static int rtl8390_init_mac(struct rtl838x_eth_priv *priv)
 	return 0;
 }
 
+static int rtl9300_init_mac(struct rtl838x_eth_priv *priv)
+{
+	// We will need to set-up EEE and the egress-rate limitation
+	return 0;
+}
+
 static int rtl8380_init_mac(struct rtl838x_eth_priv *priv)
 {
 	int i;
-
-	if (priv->family_id == 0x8390)
-		return rtl8390_init_mac(priv);
 
 	pr_info("%s\n", __func__);
 	/* fix timer for EEE */
@@ -1786,24 +1764,28 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 		priv->r = &rtl838x_reg;
 		priv->port_mask = 0x1f;
 		priv->tag_offset = 1;
+		rtl8380_init_mac(priv);
 		break;
 	case RTL8390_FAMILY_ID:
 		priv->cpu_port = RTL839X_CPU_PORT;
 		priv->r = &rtl839x_reg;
 		priv->port_mask = 0x3f;
 		priv->tag_offset = 1;
+		rtl8390_init_mac(priv);
 		break;
 	case RTL9300_FAMILY_ID:
 		priv->cpu_port = RTL930X_CPU_PORT;
 		priv->r = &rtl930x_reg;
 		priv->port_mask = 0x1f;
 		priv->tag_offset = 0;
+		rtl9300_init_mac(priv);
 		break;
 	case RTL9310_FAMILY_ID:
 		priv->cpu_port = RTL931X_CPU_PORT;
 		priv->r = &rtl931x_reg;
 		priv->port_mask = 0x3f;
 		priv->tag_offset = 0;
+		rtl9300_init_mac(priv);
 		break;
 	}
 
@@ -1818,6 +1800,9 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 		memcpy(dev->dev_addr, mac, ETH_ALEN);
 		rtl838x_set_mac_hw(dev, (u8 *)mac);
 	} else {
+		pr_info("Setting DEVICE MAC\n");
+		sw_w32(0x0000bccf, RTL930X_MAC_L2_ADDR_CTRL);
+		sw_w32(0x4fbe0b91, RTL930X_MAC_L2_ADDR_CTRL + 4);
 		dev->dev_addr[0] = (sw_r32(priv->r->mac) >> 8) & 0xff;
 		dev->dev_addr[1] = sw_r32(priv->r->mac) & 0xff;
 		dev->dev_addr[2] = (sw_r32(priv->r->mac + 4) >> 24) & 0xff;

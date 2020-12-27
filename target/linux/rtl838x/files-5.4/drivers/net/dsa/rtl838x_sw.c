@@ -32,6 +32,156 @@ DEFINE_MUTEX(smi_lock);
 
 extern void rtl8380_sds_rst(int mac);
 
+struct table_reg {
+	u16 addr;
+	u16 data;
+	u8  max_data;
+	u8 c_bit;
+	u8 t_bit;
+	u8 rmode;
+	u8 tbl;
+	struct mutex lock;
+};
+
+#define TBL_DESC(_addr, _data, _max_data, _c_bit, _t_bit, _rmode) \
+		{  .addr = _addr, .data = _data, .max_data = _max_data, .c_bit = _c_bit, \
+		    .t_bit = _t_bit, .rmode = _rmode \
+		}
+
+static struct table_reg rtl838x_tbl_regs[] = {
+	TBL_DESC(0x6900, 0x6908, 3, 15, 13, 1),		// RTL8380_TBL_L2
+	TBL_DESC(0x6914, 0x6918, 18, 14, 12, 1),	// RTL8380_TBL_0
+	TBL_DESC(0xA4C8, 0xA4CC, 6, 14, 12, 1),		// RTL8380_TBL_1
+
+	TBL_DESC(0x1180, 0x1184, 3, 16, 14, 0),		// RTL8390_TBL_L2
+	TBL_DESC(0x1190, 0x1194, 17, 15, 12, 0),	// RTL8390_TBL_0
+	TBL_DESC(0x6B80, 0x6B84, 4, 14, 12, 0),		// RTL8390_TBL_1
+	TBL_DESC(0x611C, 0x6120, 9, 8, 6, 0),		// RTL8390_TBL_2
+
+	TBL_DESC(0xB320, 0xB334, 3, 18, 16, 0),		// RTL9300_TBL_L2
+	TBL_DESC(0xB340, 0xB344, 19, 16, 12, 0),	// RTL9300_TBL_0
+	TBL_DESC(0xB3A0, 0xB3A4, 20, 16, 13, 0),	// RTL9300_TBL_1
+	TBL_DESC(0xCE04, 0xCE08, 6, 14, 12, 0),		// RTL9300_TBL_2
+	TBL_DESC(0xD600, 0xD604, 30, 7, 6, 0),		// RTL9300_TBL_HSB
+	TBL_DESC(0x7880, 0x7884, 22, 9, 8, 0),		// RTL9300_TBL_HSA
+
+	TBL_DESC(0x8500, 0x8508, 8, 19, 15, 0),		// RTL9310_TBL_0
+	TBL_DESC(0x40C0, 0x40C4, 22, 16, 14, 0),	// RTL9310_TBL_1
+	TBL_DESC(0x8528, 0x852C, 6, 18, 14, 0),		// RTL9310_TBL_2
+	TBL_DESC(0x0200, 0x0204, 9, 15, 12, 0),		// RTL9310_TBL_3
+	TBL_DESC(0x20dc, 0x20e0, 29, 7, 6, 0),		// RTL9310_TBL_4
+	TBL_DESC(0x7e1c, 0x7e20, 53, 8, 6, 0),		// RTL9310_TBL_5
+};
+
+typedef enum {
+	RTL8380_TBL_L2 = 0,
+	RTL8380_TBL_0,
+	RTL8380_TBL_1,
+	RTL8390_TBL_L2,
+	RTL8390_TBL_0,
+	RTL8390_TBL_1,
+	RTL8390_TBL_2,
+	RTL9300_TBL_L2,
+	RTL9300_TBL_0,
+	RTL9300_TBL_1,
+	RTL9300_TBL_2,
+	RTL9300_TBL_HSB,
+	RTL9300_TBL_HSA,
+	RTL9310_TBL_0,
+	RTL9310_TBL_1,
+	RTL9310_TBL_2,
+	RTL9310_TBL_3,
+	RTL9310_TBL_4,
+	RTL9310_TBL_5,
+	RTL_TBL_END
+} rtl838x_tbl_reg_t;
+
+
+void rtl_table_init(void)
+{
+	int i;
+
+	for (i = 0; i < RTL_TBL_END; i++)
+		mutex_init(&rtl838x_tbl_regs[i].lock);
+}
+
+/*
+ * Request access to table t in table access register r
+ * Returns a handle to a lock for that table
+ */
+struct table_reg *rtl_table_get(rtl838x_tbl_reg_t r, int t)
+{
+	if (r >= RTL_TBL_END)
+		return NULL;
+
+	if (t >= BIT(rtl838x_tbl_regs[r].c_bit-rtl838x_tbl_regs[r].t_bit))
+		return NULL;
+
+	mutex_lock(&rtl838x_tbl_regs[r].lock);
+	rtl838x_tbl_regs[r].tbl = t;
+
+	return &rtl838x_tbl_regs[r];
+}
+
+/*
+ * Release a table r, unlock the corresponding lock
+ */
+void rtl_table_release(struct table_reg *r)
+{
+	if (!r)
+		return;
+
+	mutex_unlock(&r->lock);
+}
+
+/*
+ * Reads table index idx into the data registers of the table
+ */
+void rtl_table_read(struct table_reg *r, int idx)
+{
+	u32 cmd = r->rmode ? BIT(r->c_bit) : 0;
+
+	cmd |= BIT(r->c_bit + 1) | (r->tbl << r->t_bit) | (idx & (BIT(r->t_bit) - 1));
+	sw_w32(cmd, r->addr);
+	pr_debug("Writing %08x to %x for read\n", cmd, r->addr);
+	do { } while (sw_r32(r->addr) & BIT(r->c_bit + 1));
+}
+
+/*
+ * Writes the content of the table data registers into the table at index idx
+ */
+void rtl_table_write(struct table_reg *r, int idx)
+{
+	u32 cmd = r->rmode ? 0 : BIT(r->c_bit);
+
+	cmd |= BIT(r->c_bit + 1) | (r->tbl << r->t_bit) | (idx & (BIT(r->t_bit) - 1));
+	pr_debug("Writing %08x to %x for write, value %08x\n",
+		cmd, r->addr, sw_r32(0xb344));
+	sw_w32(cmd, r->addr);
+	do { } while (sw_r32(r->addr) & BIT(r->c_bit + 1));
+}
+
+/*
+ * Returns the address of the ith data register of table register r
+ * the address is relative to the beginning of the Switch-IO block at 0xbb000000
+ */
+inline u16 rtl_table_data(struct table_reg *r, int i)
+{
+	if (i >= r->max_data)
+		i = r->max_data -1;
+	return r->data + i * 4;
+}
+
+inline u32 rtl_table_data_r(struct table_reg *r, int i)
+{
+	return sw_r32(rtl_table_data(r, i));
+}
+
+inline void rtl_table_data_w(struct table_reg *r, u32 v, int i)
+{
+	sw_w32(v, rtl_table_data(r, i));
+}
+
 #define MIB_DESC(_size, _offset, _name) {.size = _size, .offset = _offset, .name = _name}
 struct rtl838x_mib_desc {
 	unsigned int size;
@@ -192,46 +342,6 @@ inline int rtl931x_tbl_access_data_0(int i)
 	return RTL931X_TBL_ACCESS_DATA_0(i);
 }
 
-inline int rtl838x_vlan_profile(int profile)
-{
-	return RTL838X_VLAN_PROFILE(profile);
-}
-
-inline int rtl839x_vlan_profile(int profile)
-{
-	return RTL839X_VLAN_PROFILE(profile);
-}
-
-inline int rtl838x_vlan_port_egr_filter(int port)
-{
-	return RTL838X_VLAN_PORT_EGR_FLTR;
-}
-
-inline int rtl839x_vlan_port_egr_filter(int port)
-{
-	return RTL839X_VLAN_PORT_EGR_FLTR(port);
-}
-
-inline int rtl838x_vlan_port_igr_filter(int port)
-{
-	return RTL838X_VLAN_PORT_IGR_FLTR(port);
-}
-
-inline int rtl839x_vlan_port_igr_filter(int port)
-{
-	return RTL839X_VLAN_PORT_IGR_FLTR(port);
-}
-
-inline int rtl838x_vlan_port_pb(int port)
-{
-	return RTL838X_VLAN_PORT_PB_VLAN(port);
-}
-
-inline int rtl839x_vlan_port_pb(int port)
-{
-	return RTL839X_VLAN_PORT_PB_VLAN(port);
-}
-
 inline static int rtl838x_trk_mbr_ctr(int group)
 {
 	return RTL838X_TRK_MBR_CTR + (group << 2);
@@ -263,8 +373,8 @@ static void rtl839x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	w = sw_r32(RTL839X_TBL_ACCESS_DATA_0(2));
 
 	info->profile_id = w >> 30 | ((u & 1) << 2);
-	info->hash_mc = !!(u & 2);
-	info->hash_uc = !!(u & 4);
+	info->hash_mc_fid = !!(u & 2);
+	info->hash_uc_fid = !!(u & 4);
 	info->fid = (u >> 3) & 0xff;
 
 	cmd = 1 << 15 /* Execute cmd */
@@ -290,10 +400,9 @@ static void rtl838x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	info->tagged_ports = sw_r32(RTL838X_TBL_ACCESS_DATA_0(0));
 	v = sw_r32(RTL838X_TBL_ACCESS_DATA_0(1));
 	info->profile_id = v & 0x7;
-	info->hash_mc = !!(v & 0x8);
-	info->hash_uc = !!(v & 0x10);
+	info->hash_mc_fid = !!(v & 0x8);
+	info->hash_uc_fid = !!(v & 0x10);
 	info->fid = (v >> 5) & 0x3f;
-
 
 	cmd = 1 << 15 /* Execute cmd */
 		| 1 << 14 /* Read */
@@ -302,6 +411,34 @@ static void rtl838x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	rtl838x_exec_tbl1_cmd(cmd);
 	info->untagged_ports = sw_r32(RTL838X_TBL_ACCESS_DATA_1(0));
 }
+
+static void rtl930x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
+{
+	u64 v;
+	u32 w;
+	// Read VLAN table (0) via register 0
+	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 0);
+
+	rtl_table_read(r, vlan);
+	v = sw_r32(rtl_table_data(r, 0));
+	w = sw_r32(rtl_table_data(r, 1));
+	rtl_table_release(r);
+
+	info->tagged_ports = v >> 3;
+	info->profile_id = (w >> 24) & 7;
+	info->hash_mc_fid = !!(w & BIT(27));
+	info->hash_uc_fid = !!(w & BIT(28));
+	info->fid = ((v & 0x7) << 3) | ((w >> 29) & 0x7);
+
+	// Read UNTAG table via register 2
+	r = rtl_table_get(RTL9300_TBL_2, 0);
+	rtl_table_read(r, vlan);
+	v = sw_r32(rtl_table_data(r, 0));
+	rtl_table_release(r);
+
+	info->untagged_ports = v >> 3;
+}
+
 
 static void rtl839x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
 {
@@ -313,14 +450,35 @@ static void rtl839x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
 	u64 v = info->tagged_ports << 11;
 
 	v |= info->profile_id >> 2;
-	v |= info->hash_mc ? 2 : 0;
-	v |= info->hash_uc ? 4 : 0;
+	v |= info->hash_mc_fid ? 2 : 0;
+	v |= info->hash_uc_fid ? 4 : 0;
 	v |= ((u32)info->fid) << 3;
 	rtl839x_set_port_reg_be(v, RTL839X_TBL_ACCESS_DATA_0(0));
 
 	w = info->profile_id;
 	sw_w32(w << 30, RTL839X_TBL_ACCESS_DATA_0(2));
 	rtl839x_exec_tbl0_cmd(cmd);
+}
+
+static void rtl930x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
+{
+	u32 v, w;
+	// Access VLAN table (0) via register 0
+	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 0);
+
+	v = info->tagged_ports << 3;
+	v |= ((u32)info->fid) >> 3;
+
+	w = ((u32)info->fid) << 29;
+	w |= info->hash_mc_fid ? BIT(27) : 0;
+	w |= info->hash_uc_fid ? BIT(28) : 0;
+	w |= info->profile_id << 24;
+
+	sw_w32(v, rtl_table_data(r, 0));
+	sw_w32(w, rtl_table_data(r, 1));
+
+	rtl_table_write(r, vlan);
+	rtl_table_release(r);
 }
 
 void rtl838x_vlan_profile_dump(int index)
@@ -403,12 +561,22 @@ static void rtl838x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
 	sw_w32(info->tagged_ports, RTL838X_TBL_ACCESS_DATA_0(0));
 
 	v = info->profile_id;
-	v |= info->hash_mc ? 0x8 : 0;
-	v |= info->hash_uc ? 0x10 : 0;
+	v |= info->hash_mc_fid ? 0x8 : 0;
+	v |= info->hash_uc_fid ? 0x10 : 0;
 	v |= ((u32)info->fid) << 5;
 
 	sw_w32(v, RTL838X_TBL_ACCESS_DATA_0(1));
 	rtl838x_exec_tbl0_cmd(cmd);
+}
+
+static void rtl838x_vlan_set_untagged(u32 vlan, u64 portmask)
+{
+	u32 cmd = 1 << 15 /* Execute cmd */
+		| 0 << 14 /* Write */
+		| 0 << 12 /* Table type 0b00 */
+		| (vlan & 0xfff);
+	sw_w32(portmask & 0x1fffffff, RTL838X_TBL_ACCESS_DATA_1(0));
+	rtl838x_exec_tbl1_cmd(cmd);
 }
 
 static void rtl839x_vlan_set_untagged(u32 vlan, u64 portmask)
@@ -421,14 +589,13 @@ static void rtl839x_vlan_set_untagged(u32 vlan, u64 portmask)
 	rtl839x_exec_tbl1_cmd(cmd);
 }
 
-static void rtl838x_vlan_set_untagged(u32 vlan, u64 portmask)
+static void rtl930x_vlan_set_untagged(u32 vlan, u64 portmask)
 {
-	u32 cmd = 1 << 15 /* Execute cmd */
-		| 0 << 14 /* Write */
-		| 0 << 12 /* Table type 0b00 */
-		| (vlan & 0xfff);
-	sw_w32(portmask & 0x1fffffff, RTL838X_TBL_ACCESS_DATA_1(0));
-	rtl838x_exec_tbl1_cmd(cmd);
+	struct table_reg *r = rtl_table_get(RTL9300_TBL_2, 0);
+
+	sw_w32(portmask << 3, rtl_table_data(r, 0));
+	rtl_table_write(r, vlan);
+	rtl_table_release(r);
 }
 
 static void rtl838x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
@@ -468,7 +635,7 @@ static void rtl930x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port
 
 	for (i = 0; i < 2; i++)
 		port_state[i] = sw_r32(RTL930X_TBL_ACCESS_DATA_0(i));
-//	pr_info("MSTI: %d STATE: %08x, %08x\n", msti, port_state[0], port_state[1]);
+	pr_info("MSTI: %d STATE: %08x, %08x\n", msti, port_state[0], port_state[1]);
 }
 
 static void rtl931x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
@@ -670,30 +837,13 @@ static u64 rtl838x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl83
 	return entry;
 }
 
-static u64 rtl839x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl838x_l2_entry *e)
-{
-	u64 entry;
-	u32 r[3];
-
-	/* Search in SRAM, with hash and at position in hash bucket (0-3) */
-	u32 idx = (0 << 14) | (hash << 2) | position;
-
-	u32 cmd = 1 << 17 /* Execute cmd */
-		| 0 << 16 /* Read */
-		| 0 << 14 /* Table type 0b00 */
-		| (idx & 0x3fff);
-
-	sw_w32(cmd, RTL839X_TBL_ACCESS_L2_CTRL);
-	do { }  while (sw_r32(RTL839X_TBL_ACCESS_L2_CTRL) & (1 << 17));
-	r[0] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(0));
-	r[1] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(1));
-	r[2] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(2));
-
+static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
+{	
 	/* Table contains different entry types, we need to identify the right one:
 	 * Check for MC entries, first
 	 */
-	e->is_ip_mc = !!(r[2] & (1 << 31));
-	e->is_ipv6_mc = !!(r[2] & (1 << 30));
+	e->is_ip_mc = !!(r[2] & BIT(31));
+	e->is_ipv6_mc = !!(r[2] & BIT(30));
 	e->type = L2_INVALID;
 	if (!e->is_ip_mc) {
 		e->mac[0] = (r[0] >> 12);
@@ -735,8 +885,96 @@ static u64 rtl839x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl83
 		e->valid = true;
 		e->type = IP6_MULTICAST;
 	}
+}
+
+static u64 rtl839x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl838x_l2_entry *e)
+{
+	u64 entry;
+	u32 r[3];
+
+	/* Search in SRAM, with hash and at position in hash bucket (0-3) */
+	u32 idx = (0 << 14) | (hash << 2) | position;
+
+	u32 cmd = 1 << 17 /* Execute cmd */
+		| 0 << 16 /* Read */
+		| 0 << 14 /* Table type 0b00 */
+		| (idx & 0x3fff);
+
+	sw_w32(cmd, RTL839X_TBL_ACCESS_L2_CTRL);
+	do { }  while (sw_r32(RTL839X_TBL_ACCESS_L2_CTRL) & (1 << 17));
+	r[0] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(0));
+	r[1] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(1));
+	r[2] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(2));
+
+	rtl839x_fill_l2_entry(r, e);
 
 	entry = (((u64) r[0]) << 12) | ((r[1] & 0xfffffff0) << 12) | ((r[2] >> 4) & 0xfff);
+	return entry;
+}
+
+static void rtl930x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
+{
+	e->valid = !!(r[2] & BIT(31));
+	if (!e->valid)
+		return;
+
+	// TODO: Is there not a function to copy directly MAC memory?
+	e->mac[0] = (r[0] >> 24);
+	e->mac[1] = (r[0] >> 16);
+	e->mac[2] = (r[0] >> 8);
+	e->mac[3] = r[0];
+	e->mac[4] = (r[1] >> 24);
+	e->mac[5] = (r[1] >> 16);
+
+	/* Is it a unicast entry? check multicast bit */
+	if (!(e->mac[0] & 1)) {
+		e->type = L2_UNICAST;
+		e->is_static = !!(r[2] & BIT(14));
+		e->vid = r[2] & 0xfff;
+		e->rvid = r[1] & 0xfff;
+		e->port = (r[2] >> 20) & 0x3ff;
+		// Check for trunk port
+		if (r[2] & BIT(30)) {
+			e->stackDev = (e->port >> 9) & 1;
+			e->trunk = e->port & 0x3f;
+		} else {
+			e->stackDev = (e->port >> 6) & 0xf;
+			e->port = e->port & 0x3f;
+		}
+
+		e->block_da = !!(r[2] & BIT(15));
+		e->block_sa = !!(r[2] & BIT(16));
+		e->suspended = !!(r[2] & BIT(13));
+		e->next_hop = !!(r[2] & BIT(12));
+		e->age = (r[2] >> 17) & 3;
+		e->valid = true;
+
+	} else {
+		e->valid = true;
+		e->type = L2_MULTICAST;
+		e->mc_portmask_index = (r[2]>>6) & 0xfff;
+	}
+}
+
+static u64 rtl930x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl838x_l2_entry *e)
+{
+	u64 entry;
+	u32 r[3];
+	struct table_reg *q = rtl_table_get(RTL9300_TBL_L2, 0);
+	u32 idx = (0 << 14) | (hash << 2) | position;
+	int i;
+
+	rtl_table_read(q, idx);
+	for (i= 0; i < 3; i++)
+		r[i] = sw_r32(rtl_table_data(q, i));
+
+	rtl_table_release(q);
+
+	rtl930x_fill_l2_entry(r, e);
+	if (!e->valid)
+		return 0;
+
+	entry = ((u64)r[0] << 32) | (r[1] & 0xffff0000) | e->vid;
 	return entry;
 }
 
@@ -792,25 +1030,36 @@ static u64 rtl839x_read_cam(int idx, struct rtl838x_l2_entry *e)
 	r[1] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(1));
 	r[2] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(2));
 
-	e->mac[0] = (r[0] >> 12);
-	e->mac[1] = (r[0] >> 4);
-	e->mac[2] = ((r[1] >> 28) | (r[0] << 4));
-	e->mac[3] = (r[1] >> 20);
-	e->mac[4] = (r[1] >> 12);
-	e->mac[5] = (r[1] >> 4);
-	e->is_static = !!((r[2] >> 18) & 1);
-	e->vid = (r[2] >> 4) & 0xfff;
-	e->rvid = (r[0] >> 20) & 0xfff;
-	e->port = (r[2] >> 24) & 0x3f;
 
-	e->valid = true;
-	if (!(r[2] & 0x10fd0000)) /* Check for invalid entry */
-		e->valid = false;
-
+	rtl839x_fill_l2_entry(r, e);
 	if (e->valid)
 		pr_info("Found in CAM: R1 %x R2 %x R3 %x\n", r[0], r[1], r[2]);
+	else
+		return 0;
 
 	entry = (((u64) r[0]) << 12) | ((r[1] & 0xfffffff0) << 12) | ((r[2] >> 4) & 0xfff);
+	return entry;
+}
+
+static u64 rtl930x_read_cam(int idx, struct rtl838x_l2_entry *e)
+{
+	u64 entry;
+	u32 r[3];
+	struct table_reg *q = rtl_table_get(RTL9300_TBL_L2, 1);
+	int i;
+
+	rtl_table_read(q, idx);
+	for (i= 0; i < 3; i++)
+		r[i] = sw_r32(rtl_table_data(q, i));
+
+	rtl_table_release(q);
+
+	rtl930x_fill_l2_entry(r, e);
+	if (!e->valid)
+		return 0;
+
+	entry = ((u64)r[0] << 32) | (r[1] & 0xffff0000) | e->vid;
+
 	return entry;
 }
 
@@ -821,6 +1070,87 @@ static void rtl839x_read_scheduling_table(int port)
 		| 0 << 6 /* Table type 0b00 */
 		| (port & 0x3f);
 	rtl839x_exec_tbl2_cmd(cmd);
+}
+
+u64 rtl930x_traffic_get(int source)
+{
+	u32 v;
+	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 6);
+
+	rtl_table_read(r, source);
+	v = sw_r32(rtl_table_data(r, 0));
+	rtl_table_release(r);
+	return v >> 3;
+}
+
+void rtl930x_traffic_set(int source, u64 dest_matrix)
+{
+	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 6);
+
+	sw_w32((dest_matrix << 3), rtl_table_data(r, 0));
+	sw_w32(0xfffffff8, rtl_table_data(r, 0)); // BUG: Fix function
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+void rtl930x_traffic_enable(int source, int dest)
+{
+	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 6);
+	rtl_table_read(r, source);
+	sw_w32_mask(BIT(dest + 3), 0, rtl_table_data(r, 0));
+	sw_w32(0xfffffff8, rtl_table_data(r, 0)); // BUG
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+void rtl930x_traffic_disable(int source, int dest)
+{
+	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 6);
+	rtl_table_read(r, source);
+	sw_w32_mask(0, BIT(dest + 3), rtl_table_data(r, 0));
+	sw_w32(0xfffffff8, rtl_table_data(r, 0)); // BUG
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+u64 rtl838x_traffic_get(int source)
+{
+	return rtl838x_get_port_reg(rtl838x_port_iso_ctrl(source));
+}
+
+void rtl838x_traffic_set(int source, u64 dest_matrix)
+{
+	rtl838x_set_port_reg(dest_matrix, rtl838x_port_iso_ctrl(source));
+}
+
+void rtl838x_traffic_enable(int source, int dest)
+{
+	rtl838x_mask_port_reg(BIT(dest), 0, rtl838x_port_iso_ctrl(source));
+}
+
+void rtl838x_traffic_disable(int source, int dest)
+{
+	rtl838x_mask_port_reg(BIT(dest), 0, rtl838x_port_iso_ctrl(source));
+}
+
+u64 rtl839x_traffic_get(int source)
+{
+	return rtl839x_get_port_reg_be(rtl839x_port_iso_ctrl(source));
+}
+
+void rtl839x_traffic_set(int source, u64 dest_matrix)
+{
+	rtl839x_set_port_reg_be(dest_matrix, rtl839x_port_iso_ctrl(source));
+}
+
+void rtl839x_traffic_enable(int source, int dest)
+{
+	rtl839x_mask_port_reg_be(0, BIT_ULL(dest), rtl839x_port_iso_ctrl(source));
+}
+
+void rtl839x_traffic_disable(int source, int dest)
+{
+	rtl839x_mask_port_reg_be(0, BIT(dest), rtl839x_port_iso_ctrl(source));
 }
 
 static const struct rtl838x_reg rtl838x_reg = {
@@ -834,6 +1164,10 @@ static const struct rtl838x_reg rtl838x_reg = {
 	.stat_rst = RTL838X_STAT_RST,
 	.stat_port_std_mib = RTL838X_STAT_PORT_STD_MIB,
 	.port_iso_ctrl = rtl838x_port_iso_ctrl,
+	.traffic_enable = rtl838x_traffic_enable,
+	.traffic_disable = rtl838x_traffic_disable,
+	.traffic_get = rtl838x_traffic_get,
+	.traffic_set = rtl838x_traffic_set,
 	.l2_ctrl_0 = RTL838X_L2_CTRL_0,
 	.l2_ctrl_1 = RTL838X_L2_CTRL_1,
 	.l2_port_aging_out = RTL838X_L2_PORT_AGING_OUT,
@@ -866,10 +1200,10 @@ static const struct rtl838x_reg rtl838x_reg = {
 	.mac_tx_pause_sts = RTL838X_MAC_TX_PAUSE_STS,
 	.read_l2_entry_using_hash = rtl838x_read_l2_entry_using_hash,
 	.read_cam = rtl838x_read_cam,
-	.vlan_profile = rtl838x_vlan_profile,
-	.vlan_port_egr_filter = rtl838x_vlan_port_egr_filter,
-	.vlan_port_igr_filter = rtl838x_vlan_port_igr_filter,
-	.vlan_port_pb = rtl838x_vlan_port_pb,
+	.vlan_port_egr_filter = RTL838X_VLAN_PORT_EGR_FLTR,
+	.vlan_port_igr_filter = RTL838X_VLAN_PORT_IGR_FLTR(0),
+	.vlan_port_pb = RTL838X_VLAN_PORT_PB_VLAN,
+	.vlan_port_tag_sts_ctrl = RTL838X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl838x_trk_mbr_ctr,
 };
 
@@ -884,6 +1218,10 @@ static const struct rtl838x_reg rtl839x_reg = {
 	.stat_rst = RTL839X_STAT_RST,
 	.stat_port_std_mib = RTL839X_STAT_PORT_STD_MIB,
 	.port_iso_ctrl = rtl839x_port_iso_ctrl,
+	.traffic_enable = rtl839x_traffic_enable,
+	.traffic_disable = rtl839x_traffic_disable,
+	.traffic_get = rtl839x_traffic_get,
+	.traffic_set = rtl839x_traffic_set,
 	.l2_ctrl_0 = RTL839X_L2_CTRL_0,
 	.l2_ctrl_1 = RTL839X_L2_CTRL_1,
 	.l2_port_aging_out = RTL839X_L2_PORT_AGING_OUT,
@@ -916,10 +1254,10 @@ static const struct rtl838x_reg rtl839x_reg = {
 	.mac_tx_pause_sts = RTL839X_MAC_TX_PAUSE_STS,
 	.read_l2_entry_using_hash = rtl839x_read_l2_entry_using_hash,
 	.read_cam = rtl839x_read_cam,
-	.vlan_profile = rtl839x_vlan_profile,
-	.vlan_port_egr_filter = rtl839x_vlan_port_egr_filter,
-	.vlan_port_igr_filter = rtl839x_vlan_port_igr_filter,
-	.vlan_port_pb = rtl839x_vlan_port_pb,
+	.vlan_port_egr_filter = RTL839X_VLAN_PORT_EGR_FLTR(0),
+	.vlan_port_igr_filter = RTL839X_VLAN_PORT_IGR_FLTR(0),
+	.vlan_port_pb = RTL839X_VLAN_PORT_PB_VLAN,
+	.vlan_port_tag_sts_ctrl = RTL839X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl839x_trk_mbr_ctr,
 };
 
@@ -933,6 +1271,10 @@ static const struct rtl838x_reg rtl930x_reg = {
 	.stat_port_rst = RTL930X_STAT_PORT_RST,
 	.stat_rst = RTL930X_STAT_RST,
 	.stat_port_std_mib = RTL930X_STAT_PORT_MIB_CNTR,
+	.traffic_enable = rtl930x_traffic_enable,
+	.traffic_disable = rtl930x_traffic_disable,
+	.traffic_get = rtl930x_traffic_get,
+	.traffic_set = rtl930x_traffic_set,
 	.l2_ctrl_0 = RTL930X_L2_CTRL,
 	.l2_ctrl_1 = RTL930X_L2_AGE_CTRL,
 	.l2_port_aging_out = RTL930X_L2_PORT_AGE_CTRL,
@@ -945,9 +1287,9 @@ static const struct rtl838x_reg rtl930x_reg = {
 	.isr_port_link_sts_chg = RTL930X_ISR_PORT_LINK_STS_CHG,
 	.imr_port_link_sts_chg = RTL930X_IMR_PORT_LINK_STS_CHG,
 	.imr_glb = RTL930X_IMR_GLB,
-	.vlan_tables_read = rtl839x_vlan_tables_read,
-	.vlan_set_tagged = rtl839x_vlan_set_tagged,
-	.vlan_set_untagged = rtl839x_vlan_set_untagged,
+	.vlan_tables_read = rtl930x_vlan_tables_read,
+	.vlan_set_tagged = rtl930x_vlan_set_tagged,
+	.vlan_set_untagged = rtl930x_vlan_set_untagged,
 	.vlan_profile_dump = rtl930x_vlan_profile_dump,
 	.stp_get = rtl930x_stp_get,
 	.stp_set = rtl930x_stp_set,
@@ -963,12 +1305,12 @@ static const struct rtl838x_reg rtl930x_reg = {
 	.mac_link_spd_sts = rtl930x_mac_link_spd_sts,
 	.mac_rx_pause_sts = RTL930X_MAC_RX_PAUSE_STS,
 	.mac_tx_pause_sts = RTL930X_MAC_TX_PAUSE_STS,
-	.read_l2_entry_using_hash = rtl839x_read_l2_entry_using_hash,
-	.read_cam = rtl839x_read_cam,
-	.vlan_profile = rtl839x_vlan_profile,
-	.vlan_port_egr_filter = rtl839x_vlan_port_egr_filter,
-	.vlan_port_igr_filter = rtl839x_vlan_port_igr_filter,
-	.vlan_port_pb = rtl839x_vlan_port_pb,
+	.read_l2_entry_using_hash = rtl930x_read_l2_entry_using_hash,
+	.read_cam = rtl930x_read_cam,
+	.vlan_port_egr_filter = RTL930X_VLAN_PORT_EGR_FLTR,
+	.vlan_port_igr_filter = RTL930X_VLAN_PORT_IGR_FLTR(0),
+	.vlan_port_pb = RTL930X_VLAN_PORT_PB_VLAN,
+	.vlan_port_tag_sts_ctrl = RTL930X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl839x_trk_mbr_ctr,
 };
 
@@ -1014,10 +1356,10 @@ static const struct rtl838x_reg rtl931x_reg = {
 	.mac_tx_pause_sts = RTL839X_MAC_TX_PAUSE_STS,
 	.read_l2_entry_using_hash = rtl839x_read_l2_entry_using_hash,
 	.read_cam = rtl839x_read_cam,
-	.vlan_profile = rtl839x_vlan_profile,
-	.vlan_port_egr_filter = rtl839x_vlan_port_egr_filter,
-	.vlan_port_igr_filter = rtl839x_vlan_port_igr_filter,
-	.vlan_port_pb = rtl839x_vlan_port_pb,
+	.vlan_port_egr_filter = RTL931X_VLAN_PORT_EGR_FLTR(0),
+	.vlan_port_igr_filter = RTL931X_VLAN_PORT_IGR_FLTR(0),
+//	.vlan_port_pb = does not exist
+	.vlan_port_tag_sts_ctrl = RTL931X_VLAN_PORT_TAG_CTRL,
 	.trk_mbr_ctr = rtl839x_trk_mbr_ctr,
 };
 
@@ -1118,6 +1460,28 @@ static irqreturn_t rtl839x_switch_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+void rtl930x_print_matrix(void);
+
+void rtl9300_dump_debug(void)
+{
+	int i;
+	u16 r = RTL930X_STAT_PRVTE_DROP_COUNTER0;
+
+	for (i = 0; i < 10; i ++) {
+		pr_info("# %d %08x %08x %08x %08x %08x %08x %08x %08x\n", i * 8,
+			sw_r32(r), sw_r32(r + 4), sw_r32(r + 8), sw_r32(r + 12),
+			sw_r32(r + 16), sw_r32(r + 20), sw_r32(r + 24), sw_r32(r + 28));
+		r += 32;
+	}
+	pr_info("# %08x %08x %08x %08x %08x\n",
+		sw_r32(r), sw_r32(r + 4), sw_r32(r + 8), sw_r32(r + 12), sw_r32(r + 16));
+	rtl930x_print_matrix();
+	pr_info("RTL930X_L2_PORT_SABLK_CTRL: %08x, RTL930X_L2_PORT_DABLK_CTRL %08x\n",
+		sw_r32(RTL930X_L2_PORT_SABLK_CTRL), sw_r32(RTL930X_L2_PORT_DABLK_CTRL)
+		
+	);
+}
+
 static irqreturn_t rtl930x_switch_irq(int irq, void *dev_id)
 {
 	struct dsa_switch *ds = dev_id;
@@ -1141,6 +1505,8 @@ static irqreturn_t rtl930x_switch_irq(int irq, void *dev_id)
 				dsa_port_phylink_mac_change(ds, i, false);
 		}
 	}
+	rtl9300_dump_debug();
+
 	return IRQ_HANDLED;
 }
 
@@ -1743,23 +2109,16 @@ void rtl838x_print_matrix(void)
 	pr_info("CPU_PORT> %8x\n", ptr[28]);
 }
 
-void rtl930x_print_matrix(struct rtl838x_switch_priv *priv)
+void rtl930x_print_matrix(void)
 {
 	int i;
-	u32 v, cmd;
+	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 6);
 
 	for (i = 0; i < 29; i++) {
-		mutex_lock(&priv->reg_mutex);
-		cmd = 1 << 17 /* Execute cmd */
-			| 0 << 16 /* Read */
-			| 6 << 13 /* Table type 0b000 */
-			| (i & 0x1fff);
-			rtl839x_exec_tbl0_cmd(cmd);
-
-		v = sw_r32(RTL930X_TBL_ACCESS_DATA_0(0));
-		pr_info("> %08x\n", v);
-		mutex_unlock(&priv->reg_mutex);
+		rtl_table_read(r, i);
+		pr_info("> %08x\n", sw_r32(rtl_table_data(r, 0)));
 	}
+	rtl_table_release(r);
 }
 
 void rtl931x_print_matrix(void)
@@ -1787,6 +2146,42 @@ static void rtl838x_init_stats(struct rtl838x_switch_priv *priv)
 	sw_w32_mask(0, 1, priv->r->stat_rst);
 
 	mutex_unlock(&priv->reg_mutex);
+}
+
+
+
+static int rtl930x_setup(struct dsa_switch *ds)
+{
+	int i;
+	struct rtl838x_switch_priv *priv = ds->priv;
+	u32 port_bitmap = BIT(priv->cpu_port);
+
+	pr_info("%s called\n", __func__);
+
+	// Enable CSTI STP mode
+	sw_w32(1, RTL930X_ST_CTRL);
+
+	/* Disable MAC polling the PHY so that we can start configuration */
+	sw_w32(0, RTL930X_SMI_POLL_CTRL);
+
+	// Disable all ports except CPU port
+	for (i = 0; i < ds->num_ports; i++)
+		priv->ports[i].enable = false;
+	priv->ports[priv->cpu_port].enable = true;
+
+	for (i = 0; i < priv->cpu_port; i++) {
+		if (priv->ports[i].phy) {
+			rtl930x_traffic_set(i, BIT(priv->cpu_port) | BIT(i));
+			port_bitmap |= 1ULL << i;
+		}
+	}
+	rtl930x_traffic_set(priv->cpu_port, port_bitmap);
+	
+	rtl930x_print_matrix();
+
+	rtl838x_enable_phy_polling(priv);
+
+	return 0;
 }
 
 static int rtl838x_setup(struct dsa_switch *ds)
@@ -1819,12 +2214,11 @@ static int rtl838x_setup(struct dsa_switch *ds)
 		priv->r->set_port_reg_be(port_bitmap, priv->r->port_iso_ctrl(priv->cpu_port));
 	}
 	
-	if (soc_info.family == RTL9300_FAMILY_ID)
-		rtl930x_print_matrix(priv);
-	else
-		rtl838x_print_matrix();
+	
+	rtl838x_print_matrix();
 
 	rtl838x_init_stats(priv);
+	ds->configure_vlan_while_not_filtering = true;
 
 	/* Enable MAC Polling PHY again */
 	rtl838x_enable_phy_polling(priv);
@@ -1916,7 +2310,8 @@ static int rtl838x_set_l2aging(struct dsa_switch *ds, u32 t)
 		else
 			t = (t * 5 + 2) / 3;
 	}
-	sw_w32(t, priv->r->l2_ctrl_1);
+	
+// BUG:	sw_w32(t, priv->r->l2_ctrl_1);
 	return 0;
 }
 
@@ -2012,12 +2407,62 @@ static u32 rtl839x_hash(struct rtl838x_switch_priv *priv, u64 seed)
 	return h;
 }
 
+/*
+ * Calculate both the block 0 and the block 1 hash, and return in
+ * lower and higher word of the return value since only 12 bit of
+ * the hash are significant
+ */
+static u32 rtl930x_hash(struct rtl838x_switch_priv *priv, u64 seed)
+{
+	u32 k0, k1, h1, h2, h;
+
+	k0 = (u32) (((seed >> 55) & 0x1f) ^ ((seed >> 44) & 0x7ff)
+		^ ((seed >> 33) & 0x7ff) ^ ((seed >> 22) & 0x7ff)
+		^ ((seed >> 11) & 0x7ff) ^ (seed & 0x7ff));
+	
+	h1 = (seed >> 11) & 0x7ff;
+	h1 = ((h1 & 0x1f) << 6) | ((h1 >> 5) & 0x3f);
+
+	h2 = (seed >> 33) & 0x7ff;
+	h2 = ((h2 & 0x3f) << 5)| ((h2 >> 6) & 0x3f);
+
+	k1 = (u32) (((seed << 55) & 0x1f) ^ ((seed >> 44) & 0x7ff) ^ h2
+		    ^ ((seed >> 22) & 0x7ff) ^ h1
+		    ^ (seed & 0x7ff));
+
+	// Algorithm choice for block 0
+	if (sw_r32(RTL930X_L2_CTRL) & BIT(0))
+		h = k1;
+	else
+		h = k0;
+
+	/* Algorithm choice for block 1
+	 * Since k0 and k1 are < 2048, adding 2048 will offset the hash into the second
+	 * half of hash-space
+	 * 2048 is in fact the hash-table size 16384 divided by 4 hashes per bucket
+	 * divided by 2 to divide the hash space in 2
+	 */
+	if (sw_r32(RTL930X_L2_CTRL) & BIT(1))
+		h |= (k1 + 2048) << 16;
+	else
+		h |= (k0 + 2048) << 16;
+
+	return h;
+}
+
 static u64 rtl838x_hash_key(struct rtl838x_switch_priv *priv, u64 mac, u32 vid)
 {
-	if (priv->family_id == RTL8380_FAMILY_ID)
+	switch (priv->family_id) {
+	case RTL8380_FAMILY_ID:
 		return rtl838x_hash(priv, mac << 12 | vid);
-	else
+	case RTL8390_FAMILY_ID:
 		return rtl839x_hash(priv, mac << 12 | vid);
+	case RTL9300_FAMILY_ID:
+		return rtl930x_hash(priv, ((u64)vid) << 48 | mac);
+	default:
+		pr_err("Hash not implemented\n");
+	}
+	return 0;
 }
 
 static void rtl838x_write_cam(int idx, u32 *r)
@@ -2077,8 +2522,12 @@ int rtl838x_port_get_stp_state(struct rtl838x_switch_priv *priv, int port)
 	int pos = port;
 	int n = priv->port_width << 1;
 
-	/* CPU PORT can only be configured on RTL838x */
-	if (port >= priv->cpu_port || port > 51)
+	/* Ports above CPU port can never be configured */
+	if (port > priv->cpu_port)
+		return -1;
+
+	/* Only devices where the cpu-port is 28 can be configured for that port */
+	if (port == priv->cpu_port && port != 28)
 		return -1;
 
 	mutex_lock(&priv->reg_mutex);
@@ -2124,7 +2573,8 @@ static int rtl838x_port_fdb_dump(struct dsa_switch *ds, int port,
 			mac = ether_addr_to_u64(&e.mac[0]);
 			pkey = rtl838x_hash(priv, mac << 12 | fid);
 			fid = (pkey & 0x3ff) | (fid & ~0x3ff);
-			pr_info("-> mac %016llx, fid: %d\n", mac, fid);
+			pr_info("-> index: %d mac: %016llx, vlan: %d fid: %d\n",
+				i, mac, e.vid, fid);
 			cb(e.mac, e.vid, e.is_static, data);
 		}
 	}
@@ -2259,11 +2709,12 @@ void rtl838x_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int n = priv->port_width << 1;
 
-	pr_info("%s: port %d state %2x\n", __func__, port, state);
-	sw_w32(1, RTL930X_ST_CTRL);
+	/* Ports above CPU port can never be configured */
+	if (port > priv->cpu_port)
+		return;
 
-	/* CPU PORT can only be configured on RTL838x */
-	if (port >= priv->cpu_port || port > 51)
+	/* Only devices where the cpu-port is 28 can be configured for that port */
+	if (port == priv->cpu_port && port != 28)
 		return;
 
 	mutex_lock(&priv->reg_mutex);
@@ -2281,7 +2732,6 @@ void rtl838x_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 	index = n - (pos >> 4) - 1;
 	bit = (pos << 1) % 32;
 
-	pr_info("N %d, index: %d, bit %d\n", n, index, bit);
 	priv->r->stp_get(priv, msti, port_state);
 
 	pr_info("Current state, port %d: %d\n", port, (port_state[index] >> bit) & 3);
@@ -2467,17 +2917,24 @@ static int rtl838x_vlan_filtering(struct dsa_switch *ds, int port,
 	mutex_lock(&priv->reg_mutex);
 
 	if (vlan_filtering) {
-		/* Enable ingress and egress filtering */
+		/* Enable ingress and egress filtering
+		 * The VLAN_PORT_IGR_FILTER register uses 2 bits for each port to define
+		 * the filter action:
+		 * 0: Always Forward
+		 * 1: Drop packet
+		 * 2: Trap packet to CPU port
+		 * The Egress filter used 1 bit per state (0: DISABLED, 1: ENABLED)
+		 */
 		if (port != priv->cpu_port)
 			sw_w32_mask(0b10 << ((port % 16) << 1), 0b01 << ((port % 16) << 1),
-				    priv->r->vlan_port_igr_filter(port));
-		sw_w32_mask(0, 1 << (port % 32), priv->r->vlan_port_egr_filter(port));
+				    priv->r->vlan_port_igr_filter + ((port >> 5) << 2));
+		sw_w32_mask(0, BIT(port % 32), priv->r->vlan_port_egr_filter + ((port >> 4) << 2));
 	} else {
 		/* Disable ingress and egress filtering */
 		if (port != priv->cpu_port)
 			sw_w32_mask(0b11 << ((port % 16) << 1), 0,
-				    priv->r->vlan_port_igr_filter(port));
-		sw_w32_mask(1 << (port % 32), 0, priv->r->vlan_port_egr_filter(port));
+				    priv->r->vlan_port_igr_filter + ((port >> 5) << 2));
+		sw_w32_mask(BIT(port % 32), 0, priv->r->vlan_port_egr_filter + ((port >> 4) << 2));
 	}
 
 	/* Do we need to do something to the CPU-Port, too? */
@@ -2501,7 +2958,7 @@ static int rtl838x_vlan_prepare(struct dsa_switch *ds, int port,
 
 	pr_info("Tagged ports %llx, untag %llx, prof %x, MC# %d, UC# %d, FID %x\n",
 		info.tagged_ports, info.untagged_ports, info.profile_id,
-		info.hash_mc, info.hash_uc, info.fid);
+		info.hash_mc_fid, info.hash_uc_fid, info.fid);
 
 	mutex_unlock(&priv->reg_mutex);
 	return 0;
@@ -2513,15 +2970,9 @@ static void rtl838x_vlan_add(struct dsa_switch *ds, int port,
 	struct rtl838x_vlan_info info;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int v;
-	u64 portmask;
 
 	pr_info("%s port %d, vid_end %d, vid_end %d, flags %x\n", __func__,
 		port, vlan->vid_begin, vlan->vid_end, vlan->flags);
-
-	if(priv->family_id >= RTL9300_FAMILY_ID) {
-		pr_info("VLAN not supported\n");
-		return;
-	}
 
 	if (vlan->vid_begin > 4095 || vlan->vid_end > 4095) {
 		dev_err(priv->dev, "VLAN out of range: %d - %d",
@@ -2534,26 +2985,36 @@ static void rtl838x_vlan_add(struct dsa_switch *ds, int port,
 	if (vlan->flags & BRIDGE_VLAN_INFO_PVID) {
 		for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
 			/* Set both inner and outer PVID of the port */
-			sw_w32((v << 16) | v << 2, priv->r->vlan_port_pb(port));
+			sw_w32((v << 16) | v << 2, priv->r->vlan_port_pb + (port << 2));
+			priv->ports[port].pvid = vlan->vid_end;
 		}
 	}
 
-	if (vlan->flags & BRIDGE_VLAN_INFO_UNTAGGED) {
-		for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
-			/* Get untagged port memberships of this vlan */
-			priv->r->vlan_tables_read(v, &info);
-			portmask = info.untagged_ports | BIT_ULL(port);
-			pr_debug("Untagged ports, VLAN %d: %llx\n", v, portmask);
-			priv->r->vlan_set_untagged(v, portmask);
+	for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
+		/* Get port memberships of this vlan */
+		priv->r->vlan_tables_read(v, &info);
+
+		/* new VLAN? */
+		if (!info.tagged_ports) {
+			info.fid = 0;
+			info.hash_mc_fid = false;
+			info.hash_uc_fid = false;
+			info.profile_id = 0;
 		}
-	} else {
-		for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
-			/* Get tagged port memberships of this vlan */
-			priv->r->vlan_tables_read(v, &info);
-			info.tagged_ports |= BIT_ULL(port);
-			pr_debug("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
-			priv->r->vlan_set_tagged(v, &info);
-		}
+
+		/* sanitize untagged_ports - must be a subset */
+		if (info.untagged_ports & ~info.tagged_ports)
+			info.untagged_ports = 0;
+
+		info.tagged_ports |= BIT_ULL(port);
+		if (vlan->flags & BRIDGE_VLAN_INFO_UNTAGGED)
+			info.untagged_ports |= BIT_ULL(port);
+
+		priv->r->vlan_set_untagged(v, info.untagged_ports);
+		pr_info("Untagged ports, VLAN %d: %llx\n", v, info.untagged_ports);
+
+		priv->r->vlan_set_tagged(v, &info);
+		pr_info("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
 	}
 
 	mutex_unlock(&priv->reg_mutex);
@@ -2565,14 +3026,10 @@ static int rtl838x_vlan_del(struct dsa_switch *ds, int port,
 	struct rtl838x_vlan_info info;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int v;
-	u64 portmask;
+	u16 pvid;
 
 	pr_info("%s: port %d, vid_end %d, vid_end %d, flags %x\n", __func__,
 		port, vlan->vid_begin, vlan->vid_end, vlan->flags);
-	if(priv->family_id >= RTL9300_FAMILY_ID) {
-		pr_info("VLAN not supported\n");
-		return 0;
-	}
 
 	if (vlan->vid_begin > 4095 || vlan->vid_end > 4095) {
 		dev_err(priv->dev, "VLAN out of range: %d - %d",
@@ -2581,25 +3038,30 @@ static int rtl838x_vlan_del(struct dsa_switch *ds, int port,
 	}
 
 	mutex_lock(&priv->reg_mutex);
+	pvid = priv->ports[port].pvid;
 
 	for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
-		/* Reset both inner and out PVID of the port */
-		sw_w32(0, priv->r->vlan_port_pb(port));
+		/* Reset to default if removing the current PVID */
+		if (v == pvid)
+			sw_w32(0, priv->r->vlan_port_pb + (port << 2));
 
-		if (vlan->flags & BRIDGE_VLAN_INFO_UNTAGGED) {
-			/* Get untagged port memberships of this vlan */
-			priv->r->vlan_tables_read(v, &info);
-			portmask = info.untagged_ports & (~BIT_ULL(port));
-			pr_info("Untagged ports, VLAN %d: %llx\n", v, portmask);
-			priv->r->vlan_set_untagged(v, portmask);
-		}
-
-		/* Get tagged port memberships of this vlan */
+		/* Get port memberships of this vlan */
 		priv->r->vlan_tables_read(v, &info);
-		info.tagged_ports &= (~BIT_ULL(port));
-		pr_info("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
+
+		/* remove port from both tables */
+		info.untagged_ports &= (~BIT_ULL(port));
+
+		/* always leave vid 1 */
+		if (v != 1)
+			info.tagged_ports &= (~BIT_ULL(port));
+
+		priv->r->vlan_set_untagged(v, info.untagged_ports);
+		pr_info("Untagged ports, VLAN %d: %llx\n", v, info.untagged_ports);
+
 		priv->r->vlan_set_tagged(v, &info);
+		pr_info("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
 	}
+
 	mutex_unlock(&priv->reg_mutex);
 
 	return 0;
@@ -2609,7 +3071,7 @@ static void rtl838x_port_bridge_leave(struct dsa_switch *ds, int port,
 					struct net_device *bridge)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	u64 port_bitmap = 1ULL << priv->cpu_port;
+	u64 port_bitmap = 1ULL << priv->cpu_port, v;
 	int i;
 
 	pr_info("%s %x: %d", __func__, (u32)priv, port);
@@ -2624,23 +3086,19 @@ static void rtl838x_port_bridge_leave(struct dsa_switch *ds, int port,
 		if (dsa_is_user_port(ds, i) && i != port) {
 			if (dsa_to_port(ds, i)->bridge_dev != bridge)
 				continue;
-			// BUG:
-			if (priv->family_id < RTL9300_FAMILY_ID) {
 			if (priv->ports[i].enable)
-				priv->r->mask_port_reg_be(BIT_ULL(port), 0,
-						       priv->r->port_iso_ctrl(i));
-			}
-			priv->ports[i].pm |= 1ULL << port;
+				priv->r->traffic_disable(i, port);
 
+			priv->ports[i].pm |= 1ULL << port;
 			port_bitmap &= ~BIT_ULL(i);
 		}
 	}
 
 	/* Add all other ports to this port matrix. */
-	// BUG:
-	if (priv->family_id < RTL9300_FAMILY_ID) {
-	if (priv->ports[port].enable)
-		priv->r->mask_port_reg_be(0, port_bitmap, priv->r->port_iso_ctrl(port));
+	if (priv->ports[port].enable) {
+		v = priv->r->traffic_get(port);
+		v |= port_bitmap;
+		priv->r->traffic_set(port, v);
 	}
 	priv->ports[port].pm &= ~port_bitmap;
 
@@ -2651,7 +3109,7 @@ static int rtl838x_port_bridge_join(struct dsa_switch *ds, int port,
 					struct net_device *bridge)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	u64 port_bitmap = 1ULL << priv->cpu_port;
+	u64 port_bitmap = 1ULL << priv->cpu_port, v;
 	int i;
 
 	pr_info("%s %x: %d %llx", __func__, (u32)priv, port, port_bitmap);
@@ -2664,24 +3122,20 @@ static int rtl838x_port_bridge_join(struct dsa_switch *ds, int port,
 		if (dsa_is_user_port(ds, i) && i != port) {
 			if (dsa_to_port(ds, i)->bridge_dev != bridge)
 				continue;
-			// BUG:
-			if (priv->family_id < RTL9300_FAMILY_ID) {
 			if (priv->ports[i].enable)
-				priv->r->mask_port_reg_be(0, 1ULL << port,
-						       priv->r->port_iso_ctrl(i));
-			}
-			priv->ports[i].pm |= 1ULL << port;
+				priv->r->traffic_enable(i, port);
 
+			priv->ports[i].pm |= 1ULL << port;
 			port_bitmap |= 1ULL << i;
 		}
 	}
 
 	/* Add all other ports to this port matrix. */
-	if (priv->ports[port].enable && priv->family_id < RTL9300_FAMILY_ID) { // BUG
-		priv->r->mask_port_reg_be(0, 1ULL << port,
-					priv->r->port_iso_ctrl(priv->cpu_port));
-		priv->r->mask_port_reg_be(0, port_bitmap,
-					priv->r->port_iso_ctrl(port));
+	if (priv->ports[port].enable) {
+		priv->r->traffic_enable(priv->cpu_port, BIT_ULL(port));
+		v = priv->r->traffic_get(port);
+		v |= port_bitmap;
+		priv->r->traffic_set(port, v);
 	}
 	priv->ports[port].pm |= port_bitmap;
 	mutex_unlock(&priv->reg_mutex);
@@ -2693,27 +3147,38 @@ static int rtl838x_port_enable(struct dsa_switch *ds, int port,
 				struct phy_device *phydev)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
+	u64 v;
 
 	pr_info("%s: %x %d", __func__, (u32) priv, port);
 	priv->ports[port].enable = true;
 
+	/* enable inner tagging on egress, do not keep any tags */
+	if (priv->family_id == RTL9310_FAMILY_ID)
+		sw_w32(BIT(4), priv->r->vlan_port_tag_sts_ctrl + (port << 2));
+	else
+		sw_w32(1, priv->r->vlan_port_tag_sts_ctrl + (port << 2));
+
 	if (dsa_is_cpu_port(ds, port))
 		return 0;
 
-	// BUG:
-	if (priv->family_id < RTL9300_FAMILY_ID) {
 	/* add port to switch mask of CPU_PORT */
-	priv->r->mask_port_reg_be(0ULL, 1ULL << port, priv->r->port_iso_ctrl(priv->cpu_port));
+	priv->r->traffic_enable(priv->cpu_port, BIT_ULL(port));
 
 	/* add all other ports in the same bridge to switch mask of port */
-	priv->r->mask_port_reg_be(0ULL, priv->ports[port].pm, priv->r->port_iso_ctrl(port));
-	}
+	v = priv->r->traffic_get(port);
+	v |= priv->ports[port].pm;
+	priv->r->traffic_set(port, v);
+
+	sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_SABLK_CTRL);
+	sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_DABLK_CTRL);
+
 	return 0;
 }
 
 static void rtl838x_port_disable(struct dsa_switch *ds, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
+	u64 v;
 
 	pr_info("%s %x: %d", __func__, (u32)priv, port);
 	/* you can only disable user ports */
@@ -2721,13 +3186,13 @@ static void rtl838x_port_disable(struct dsa_switch *ds, int port)
 		return;
 
 	// BUG:
-	if (priv->family_id < RTL9300_FAMILY_ID) {
 	/* remove port from switch mask of CPU_PORT */
-	priv->r->mask_port_reg_be(BIT_ULL(port), 0, priv->r->port_iso_ctrl(priv->cpu_port));
+	priv->r->traffic_disable(priv->cpu_port, BIT_ULL(port));
 
 	/* remove all other ports in the same bridge from switch mask of port */
-	priv->r->mask_port_reg_be(priv->ports[port].pm, 0LL, priv->r->port_iso_ctrl(port));
-	}
+	v = priv->r->traffic_get(port);
+	v &= ~priv->ports[port].pm;
+	priv->r->traffic_set(port, v);
 
 	priv->ports[port].enable = false;
 }
@@ -3305,6 +3770,7 @@ static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
 	}
 
 	pr_info("E\n");
+	dump_fdb(priv);
 	/* Disable MAC polling the PHY so that we can start configuration */
 	priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
 
@@ -3406,7 +3872,7 @@ static int rtl838x_netdevice_event(struct notifier_block *this,
 
 static const struct dsa_switch_ops rtl930x_switch_ops = {
 	.get_tag_protocol	= rtl838x_get_tag_protocol,
-	.setup			= rtl838x_setup,
+	.setup			= rtl930x_setup,
 	.port_vlan_filtering	= rtl838x_vlan_filtering,
 	.port_vlan_prepare	= rtl838x_vlan_prepare,
 	.port_vlan_add		= rtl838x_vlan_add,
@@ -3477,6 +3943,8 @@ static int __init rtl838x_sw_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 
 	pr_info("Probing RTL838X switch device\n");
+
+	rtl_table_init();
 
 	if (!pdev->dev.of_node) {
 		dev_err(dev, "No DT found\n");

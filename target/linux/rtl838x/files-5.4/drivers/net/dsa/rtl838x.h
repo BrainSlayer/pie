@@ -72,20 +72,29 @@
 /* VLAN registers */
 #define RTL838X_VLAN_PROFILE(idx)		(0x3A88 + ((idx) << 2))
 #define RTL838X_VLAN_PORT_EGR_FLTR		(0x3A84)
-#define RTL838X_VLAN_PORT_PB_VLAN(port)		(0x3C00 + ((port) << 2))
+#define RTL838X_VLAN_PORT_PB_VLAN		(0x3C00)
 #define RTL838X_VLAN_PORT_IGR_FLTR(port)	(0x3A7C + (((port >> 4) << 2)))
-#define RTL838X_VLAN_PORT_IGR_FLTR_0		(0x3A7C)
-#define RTL838X_VLAN_PORT_IGR_FLTR_1		(0x3A7C + 4)
+#define RTL838X_VLAN_PORT_TAG_STS_CTRL		(0xA530)
 
 #define RTL839X_VLAN_PROFILE(idx)		(0x25C0 + (((idx) << 3)))
 #define RTL839X_VLAN_CTRL			(0x26D4)
-#define RTL839X_VLAN_PORT_PB_VLAN(port)		(0x26D8 + (((port) << 2)))
+#define RTL839X_VLAN_PORT_PB_VLAN		(0x26D8)
 #define RTL839X_VLAN_PORT_IGR_FLTR(port)	(0x27B4 + (((port >> 4) << 2)))
 #define RTL839X_VLAN_PORT_EGR_FLTR(port)	(0x27C4 + (((port >> 5) << 2)))
+#define RTL839X_VLAN_PORT_TAG_STS_CTRL		(0x6828)
 
 #define RTL930X_VLAN_PROFILE_SET(idx)		(0x9c60 + (((idx) * 20)))
+#define RTL930X_VLAN_CTRL			(0x82D4)
+#define RTL930X_VLAN_PORT_PB_VLAN		(0x82D8)
+#define RTL930X_VLAN_PORT_IGR_FLTR(port)	(0x83C0 + (((port >> 4) << 2)))
+#define RTL930X_VLAN_PORT_EGR_FLTR		(0x83C8)
+#define RTL930X_VLAN_PORT_TAG_STS_CTRL		(0xCE24)
 
 #define RTL931X_VLAN_PROFILE_SET(idx)		(0x9800 + (((idx) * 28)))
+#define RTL931X_VLAN_CTRL			(0x94E4)
+#define RTL931X_VLAN_PORT_IGR_FLTR(port)	(0x96B4 + (((port >> 4) << 2)))
+#define RTL931X_VLAN_PORT_EGR_FLTR(port)	(0x96C4 + (((port >> 5) << 2)))
+#define RTL931X_VLAN_PORT_TAG_CTRL		(0x4860)
 
 /* Table access registers */
 #define RTL838X_TBL_ACCESS_CTRL_0		(0x6914)
@@ -193,6 +202,9 @@
 
 #define RTL930X_ST_CTRL				(0x8798)
 
+#define RTL930X_L2_PORT_SABLK_CTRL		(0x905c)
+#define RTL930X_L2_PORT_DABLK_CTRL		(0x9060)
+
 /* Port Mirroring */
 #define RTL838X_MIR_CTRL(grp)			(0x5D00 + (((grp) << 2)))
 #define RTL838X_MIR_DPM_CTRL(grp)		(0x5D20 + (((grp) << 2)))
@@ -268,6 +280,10 @@
 #define RTL838X_ATK_PRVNT_ACT			(0x5B08)
 #define RTL838X_ATK_PRVNT_STS			(0x5B1C)
 
+/* Debug features */
+#define RTL930X_STAT_PRVTE_DROP_COUNTER0	(0xB5B8)
+
+
 #define MAX_LAGS 16
 
 enum phy_type {
@@ -293,8 +309,8 @@ struct rtl838x_vlan_info {
 	u64 untagged_ports;
 	u64 tagged_ports;
 	u8 profile_id;
-	bool hash_mc;
-	bool hash_uc;
+	bool hash_mc_fid;
+	bool hash_uc_fid;
 	u8 fid;
 };
 
@@ -321,6 +337,8 @@ struct rtl838x_l2_entry {
 	bool suspended;
 	bool next_hop;
 	int age;
+	u8 trunk;
+	u8 stackDev;
 	u16 mc_portmask_index;
 };
 
@@ -337,6 +355,10 @@ struct rtl838x_reg {
 	int stat_rst;
 	int stat_port_std_mib;
 	int (*port_iso_ctrl)(int p);
+	void (*traffic_enable)(int source, int dest);
+	void (*traffic_disable)(int source, int dest);
+	void (*traffic_set)(int source, u64 dest_matrix);
+	u64 (*traffic_get)(int source);
 	int l2_ctrl_0;
 	int l2_ctrl_1;
 	int l2_port_aging_out;
@@ -369,10 +391,10 @@ struct rtl838x_reg {
 	int mac_tx_pause_sts;
 	u64 (*read_l2_entry_using_hash)(u32 hash, u32 position, struct rtl838x_l2_entry *e);
 	u64 (*read_cam)(int idx, struct rtl838x_l2_entry *e);
-	int (*vlan_profile)(int profile);
-	int (*vlan_port_egr_filter)(int port);
-	int (*vlan_port_igr_filter)(int port);
-	int (*vlan_port_pb)(int port);
+	int vlan_port_egr_filter;
+	int vlan_port_igr_filter;
+	int vlan_port_pb;
+	int vlan_port_tag_sts_ctrl;
 	int (*trk_mbr_ctr)(int group);
 };
 

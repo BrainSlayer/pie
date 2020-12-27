@@ -142,6 +142,9 @@
 #define RTL930X_L2_TBL_FLUSH_CTRL		(0x9404)
 #define RTL931X_L2_TBL_FLUSH_CTRL		(0xCD9C)
 
+#define RTL930X_L2_PORT_SABLK_CTRL		(0x905c)
+#define RTL930X_L2_PORT_DABLK_CTRL		(0x9060)
+
 /* MAC link state bits */
 #define FORCE_EN				(1 << 0)
 #define FORCE_LINK_EN				(1 << 1)
@@ -159,6 +162,7 @@
 #define RTL931X_L2_NTFY_CTRL			(0xCDC8)
 #define RTL838X_L2_CTRL_0			(0x3200)
 #define RTL839X_L2_CTRL_0			(0x3800)
+#define RTL930X_L2_CTRL				(0x8FD8)
 #define RTL931X_L2_CTRL				(0xC800)
 
 /* TRAPPING to CPU-PORT */
