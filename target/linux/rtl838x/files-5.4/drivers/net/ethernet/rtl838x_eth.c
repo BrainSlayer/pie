@@ -166,7 +166,7 @@ extern int rtl839x_write_sds_phy(int phy_addr, int phy_reg, u16 v);
  * when the buffer runs over
  * Caller needs to hold priv->lock
  */
-static void rtl838x_rb_cleanup(struct rtl838x_eth_priv *priv)
+static void rtl838x_rb_cleanup(struct rtl838x_eth_priv *priv, int status)
 {
 	int r;
 	u32	*last;
@@ -175,6 +175,9 @@ static void rtl838x_rb_cleanup(struct rtl838x_eth_priv *priv)
 
 	pr_info("In %s\n", __func__);
 	for (r = 0; r < RXRINGS; r++) {
+		if (!(status & BIT(r)))
+			continue;
+
 		last = (u32 *)KSEG1ADDR(sw_r32(priv->r->dma_if_rx_cur(r)));
 		do {
 			if ((ring->rx_r[r][ring->c_rx[r]] & 0x1))
@@ -345,8 +348,8 @@ static irqreturn_t rtl838x_net_irq(int irq, void *dev_id)
 	if (status & 0x000ff) {
 		pr_info("RX buffer overrun: status %x, mask: %x\n",
 			 status, sw_r32(priv->r->dma_if_intr_msk));
-		sw_w32(0x000000ff, priv->r->dma_if_intr_sts);
-		rtl838x_rb_cleanup(priv);
+		sw_w32(status, priv->r->dma_if_intr_sts);
+		rtl838x_rb_cleanup(priv, status & 0xff);
 	}
 
 	if (priv->family_id == RTL8390_FAMILY_ID && status & 0x00100000) {
@@ -393,7 +396,7 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 	if (status_rx) {
 		/* Disable RX interrupt */
 		sw_w32(0, priv->r->dma_if_intr_rx_done_msk);
-		sw_w32(0xffffffff, priv->r->dma_if_intr_rx_done_sts);
+		sw_w32(status_rx, priv->r->dma_if_intr_rx_done_sts);
 		napi_schedule(&priv->napi);
 	}
 
@@ -401,8 +404,8 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 	if (status_rx_r) {
 		pr_info("RX buffer overrun: status %x, mask: %x\n",
 			 status_rx_r, sw_r32(priv->r->dma_if_intr_rx_runout_msk));
-		sw_w32(0xffffffff, priv->r->dma_if_intr_rx_runout_sts);
-		rtl838x_rb_cleanup(priv);
+		sw_w32(status_rx_r, priv->r->dma_if_intr_rx_runout_sts);
+		rtl838x_rb_cleanup(priv, status_rx_r);
 	}
 
 	spin_unlock(&priv->lock);
@@ -515,9 +518,8 @@ static void rtl838x_hw_reset(struct rtl838x_eth_priv *priv)
 	int i, pos;
 	
 	pr_info("RESETTING %x, CPU_PORT %d\n", priv->family_id, priv->cpu_port);
-	/* Stop TX/RX */
 	sw_w32_mask(0x3, 0, priv->r->mac_port_ctrl(priv->cpu_port));
-	mdelay(500);
+	mdelay(100);
 
 	if (priv->family_id == RTL8390_FAMILY_ID) {
 		/* Preserve L2 notification and NBUF settings */
@@ -810,6 +812,17 @@ static void rtl838x_hw_stop(struct rtl838x_eth_priv *priv)
 	u32 clear_irq = priv->family_id == RTL8380_FAMILY_ID ? 0x000fffff : 0x007fffff;
 	int i;
 
+	// Disable RX/TX from/to CPU-port
+	sw_w32_mask(0x3, 0, priv->r->mac_port_ctrl(priv->cpu_port));
+
+	pr_info("X2\n");
+	/* Disable traffic */
+	if (priv->family_id == RTL9300_FAMILY_ID || priv->family_id == RTL9310_FAMILY_ID)
+		sw_w32_mask(RX_EN_93XX | TX_EN_93XX, 0, priv->r->dma_if_ctrl);
+	else
+		sw_w32_mask(RX_EN | TX_EN, 0, priv->r->dma_if_ctrl);
+	mdelay(200); // Test, whether this is needed
+
 	/* Block all ports */
 	if (priv->family_id == RTL8380_FAMILY_ID) {
 		sw_w32(0x03000000, RTL838X_TBL_ACCESS_DATA_0(0));
@@ -838,14 +851,6 @@ static void rtl838x_hw_stop(struct rtl838x_eth_priv *priv)
 	else
 		sw_w32_mask(0x3, 0, priv->r->mac_force_mode_ctrl(priv->cpu_port));
 	mdelay(1000); // BUG: Must be 100
-
-	pr_info("X2\n");
-	/* Disable traffic */
-	if (priv->family_id == RTL9300_FAMILY_ID || priv->family_id == RTL9310_FAMILY_ID)
-		sw_w32_mask(RX_EN_93XX | TX_EN_93XX, 0, priv->r->dma_if_ctrl);
-	else
-		sw_w32_mask(RX_EN | TX_EN, 0, priv->r->dma_if_ctrl);
-	mdelay(200); // Test, whether this is needed
 
 	pr_info("X3\n");
 	/* Disable all TX/RX interrupts */
