@@ -489,6 +489,7 @@ struct rtl838x_reg {
 	u32 (*get_mac_tx_pause_sts)(int port);
 	int mac;
 	int l2_tbl_flush_ctrl;
+	void (*update_cntr)(int r, int work_done);
 };
 
 int rtl838x_write_phy(u32 port, u32 page, u32 reg, u32 val);
