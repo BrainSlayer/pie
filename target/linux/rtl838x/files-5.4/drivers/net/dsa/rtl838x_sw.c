@@ -644,7 +644,7 @@ static void rtl930x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port
 
 	for (i = 0; i < 2; i++)
 		port_state[i] = sw_r32(RTL930X_TBL_ACCESS_DATA_0(i));
-	pr_info("MSTI: %d STATE: %08x, %08x\n", msti, port_state[0], port_state[1]);
+	pr_debug("MSTI: %d STATE: %08x, %08x\n", msti, port_state[0], port_state[1]);
 }
 
 static void rtl931x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
@@ -1436,7 +1436,7 @@ static irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
 	for (i = 0; i < 28; i++) {
 		if (ports & (1 << i)) {
 			link = sw_r32(RTL838X_MAC_LINK_STS);
-			if (link & (1 << i))
+			if (link & BIT(i))
 				dsa_port_phylink_mac_change(ds, i, true);
 			else
 				dsa_port_phylink_mac_change(ds, i, false);
@@ -1506,7 +1506,10 @@ static irqreturn_t rtl930x_switch_irq(int irq, void *dev_id)
 	rtl9300_dump();
 
 	for (i = 0; i < 28; i++) {
-		if (ports & (1 << i)) {
+		if (ports & BIT(i)) {
+			/* Read the register twice because of issues with latency at least
+			 * with the external RTL8226 PHY on the XGS1210 */
+			link = sw_r32(RTL930X_MAC_LINK_STS);
 			link = sw_r32(RTL930X_MAC_LINK_STS);
 			if (link & (1 << i))
 				dsa_port_phylink_mac_change(ds, i, true);
@@ -1602,6 +1605,41 @@ int rtl8390_sds_power(int mac, int val)
 
 	// Set bit 1003. 1000 starts at 7c
 	sw_w32_mask(1 << 11, mode << 11, RTL839X_SDS12_13_PWR0 + offset);
+
+	return 0;
+}
+
+int rtl9300_sds_power(int mac, int val)
+{
+	int sds_num;
+	u32 mode;
+
+	// TODO: these numbers are hard-coded for the Zyxel XGS1210 12 Switch
+	pr_info("SerDes: %s %d\n", __func__, mac);
+	switch (mac) {
+	case 24:
+		sds_num = 6;
+		mode = 0x12; // HISGMII
+		break;
+	case 25:
+		sds_num = 7;
+		mode = 0x12; // HISGMII
+		break;
+	case 26:
+		sds_num = 8;
+		mode = 0x1b; // 10GR/1000BX auto
+		break;
+	case 27:
+		sds_num = 9;
+		mode = 0x1b; // 10GR/1000BX auto
+		break;
+	default:
+		return -1;
+	}
+	if (!val)
+		mode = 0x1f; // OFF
+
+	rtl9300_sds_rst(sds_num, mode);
 
 	return 0;
 }
@@ -1845,15 +1883,13 @@ int rtl930x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 		v = sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_1);
 	} while ( v & 0x1);
 
-	if (v & 0x2) {
+	if (v & BIT(25)) {
 		pr_err("Error reading phy %d, register %d\n", port, reg);
 		err = -EIO;
 	}
 	*val = (sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_2) & 0xffff);
 
-	if (port > 7)
-		pr_info("%s: port %d, page: %d, reg: %x, val: %x\n",
-			__func__, port, page, reg, *val);
+	pr_debug("%s: port %d, page: %d, reg: %x, val: %x\n", __func__, port, page, reg, *val);
 
 	mutex_unlock(&smi_lock);
 
@@ -1990,6 +2026,67 @@ int rtl838x_read_mmd_phy(u32 port, u32 addr, u32 reg, u32 *val)
 timeout:
 	mutex_unlock(&smi_lock);
 	return -ETIMEDOUT;
+}
+
+int rtl930x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
+{
+	int err = 0;
+	u32 v;
+
+	mutex_lock(&smi_lock);
+
+	// Set PHY to access
+	sw_w32_mask(0xffff << 16, port << 16, RTL930X_SMI_ACCESS_PHY_CTRL_2);
+
+	// Set MMD device number and register to write to
+	sw_w32(devnum << 16 | (regnum & 0xffff), RTL930X_SMI_ACCESS_PHY_CTRL_3);
+
+	v = BIT(1)| BIT(0); // MMD-access | EXEC
+	sw_w32(v, RTL930X_SMI_ACCESS_PHY_CTRL_1);
+
+	do {
+		v = sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_1);
+	} while ( v & 0x1);
+	// There is no error-checking via BIT 25 of v, as it does not seem to be set correctly
+	*val = (sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_2) & 0xffff);
+	pr_info("%s: port %d, regnum: %x, val: %x\n", __func__, port, regnum, *val);
+
+	mutex_unlock(&smi_lock);
+	pr_info("%s returning: %d\n", __func__, err);
+
+	return err;
+}
+
+int rtl930x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
+{
+	int err;
+	u32 v;
+
+	mutex_lock(&smi_lock);
+
+	// Set PHY to access
+	sw_w32(BIT(port), RTL930X_SMI_ACCESS_PHY_CTRL_0);
+
+	// Set data to write
+	sw_w32_mask(0xffff << 16, val << 16, RTL930X_SMI_ACCESS_PHY_CTRL_2);
+
+	// Set MMD device number and register to write to
+	sw_w32(devnum << 16 | (regnum & 0xffff), RTL930X_SMI_ACCESS_PHY_CTRL_3);
+
+	v = BIT(2)| BIT(1)| BIT(0); // WRITE | MMD-access | EXEC
+	sw_w32(v, RTL930X_SMI_ACCESS_PHY_CTRL_1);
+
+	do {
+		v = sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_1);
+	} while ( v & BIT(0));
+
+	if (v & BIT(25)) {  // TODO: Verify whether this gets correctly set
+		pr_err("Error reading phy %d, register %d\n", port, regnum);
+		err = -EIO;
+	}
+
+	mutex_unlock(&smi_lock);
+	return err;
 }
 
 static void rtl8380_get_version(struct rtl838x_switch_priv *priv)
@@ -2973,16 +3070,7 @@ static int rtl838x_vlan_prepare(struct dsa_switch *ds, int port,
 	pr_info("Tagged ports %llx, untag %llx, prof %x, MC# %d, UC# %d, FID %x\n",
 		info.tagged_ports, info.untagged_ports, info.profile_id,
 		info.hash_mc_fid, info.hash_uc_fid, info.fid);
-/*
-	sw_w32(0x00021001, 0xb340);
-	pr_info("VLAN 1 RAW: %08x %08x\n", sw_r32(0xb344), sw_r32(0xb348));
-	sw_w32(0x00008001, 0xce04);
-	pr_info("VLAN 1 RAW U: %08x\n", sw_r32(0xce08));
-	sw_w32(0x00021000, 0xb340);
-	pr_info("VLAN 0 RAW: %08x %08x\n", sw_r32(0xb344), sw_r32(0xb348));
-	sw_w32(0x00008000, 0xce04);
-	pr_info("VLAN 0 RAW U: %08x\n", sw_r32(0xce08));
-*/
+
 	// BUG: Test purposes only
 	info.fid = 0;
 	info.hash_mc_fid = true;
@@ -3455,12 +3543,15 @@ static int rtl838x_phylink_mac_link_state(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u64 speed;
+	u64 link;
 
 	if (port < 0 || port > priv->cpu_port)
 		return -EINVAL;
 
 	state->link = 0;
-	if (priv->r->get_port_reg_le(priv->r->mac_link_sts) & BIT_ULL(port))
+	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
+	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
+	if (link & BIT_ULL(port))
 		state->link = 1;
 	state->duplex = 0;
 	if (priv->r->get_port_reg_le(priv->r->mac_link_dup_sts) & BIT_ULL(port))
@@ -3813,8 +3904,15 @@ static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
 		}
 	}
 
-	pr_info("E\n");
-	dump_fdb(priv);
+	dump_fdb(priv);  // TODO: Remove, this just shows the state after u-boot finished
+	// TODO: Do this needs to come from the .dts, at least the SerDes number
+	if (priv->family_id == RTL9300_FAMILY_ID) {
+		priv->ports[24].is2G5 = true;
+		priv->ports[25].is2G5 = true;
+		priv->ports[24].sds_num = 1;
+		priv->ports[24].sds_num = 2;
+	}
+
 	/* Disable MAC polling the PHY so that we can start configuration */
 	priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
 
@@ -3832,6 +3930,14 @@ static int rtl838x_mdio_probe(struct rtl838x_switch_priv *priv)
 		pr_info("Powering on fibre ports & reset\n");
 		rtl8380_sds_power(24, 1);
 		rtl8380_sds_power(26, 1);
+	}
+
+	if (priv->family_id == RTL9300_FAMILY_ID) {
+		pr_info("RTL9300 Powering on SerDes ports\n");
+		rtl9300_sds_power(24, 1);
+		rtl9300_sds_power(25, 1);
+		rtl9300_sds_power(26, 1);
+		rtl9300_sds_power(27, 1);
 	}
 
 	pr_info("%s done\n", __func__);

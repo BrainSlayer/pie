@@ -502,5 +502,6 @@ int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val);
 int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 
 extern int rtl8380_sds_power(int mac, int val);
+extern void rtl9300_sds_power(int sds_num, int val);
 
 #endif /* _RTL838X_ETH_H */

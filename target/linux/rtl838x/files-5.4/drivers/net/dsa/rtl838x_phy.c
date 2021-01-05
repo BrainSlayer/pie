@@ -23,8 +23,10 @@
 #define PHY_ID_RTL8218B_E	0x001cc981
 #define PHY_ID_RTL8218D		0x001cc983
 #define PHY_ID_RTL8218B_I	0x001cca40
+#define PHY_ID_RTL8226		0x001cc838
 #define PHY_ID_RTL8390_GENERIC	0x001ccab0
 #define PHY_ID_RTL8393_I	0x001c8393
+#define PHY_ID_RTL9300_I	0x70d03106
 
 struct __attribute__ ((__packed__)) part {
 	uint16_t start;
@@ -48,6 +50,11 @@ static const struct firmware rtl838x_8380_fw;
 static const struct firmware rtl838x_8214fc_fw;
 static const struct firmware rtl838x_8218b_fw;
 
+
+// TODO Refactor mmd for RTL8226 so this is no longer needed
+extern struct mutex smi_lock;
+
+
 struct rtl838x_phy_priv {
 	char *name;
 };
@@ -58,6 +65,8 @@ static int read_phy(u32 port, u32 page, u32 reg, u32 *val)
 		return rtl838x_read_phy(port, page, reg, val);
 	case RTL8390_FAMILY_ID:
 		return rtl839x_read_phy(port, page, reg, val);
+	case RTL9300_FAMILY_ID:
+		return rtl930x_read_phy(port, page, reg, val);
 	case RTL9310_FAMILY_ID:
 		return rtl931x_read_phy(port, page, reg, val);
 	}
@@ -71,6 +80,8 @@ static int write_phy(u32 port, u32 page, u32 reg, u32 val)
 		return rtl838x_write_phy(port, page, reg, val);
 	case RTL8390_FAMILY_ID:
 		return rtl839x_write_phy(port, page, reg, val);
+	case RTL9300_FAMILY_ID:
+		return rtl930x_write_phy(port, page, reg, val);
 	case RTL9310_FAMILY_ID:
 		return rtl931x_write_phy(port, page, reg, val);
 	}
@@ -83,9 +94,9 @@ static void rtl8380_int_phy_on_off(int mac, bool on)
 
 	read_phy(mac, 0, 0, &val);
 	if (on)
-		write_phy(mac, 0, 0, val & ~(1 << 11));
+		write_phy(mac, 0, 0, val & ~BIT(11));
 	else
-		write_phy(mac, 0, 0, val | (1 << 11));
+		write_phy(mac, 0, 0, val | BIT(11));
 }
 
 static void rtl8380_rtl8214fc_on_off(int mac, bool on)
@@ -96,17 +107,17 @@ static void rtl8380_rtl8214fc_on_off(int mac, bool on)
 	write_phy(mac, 4095, 30, 3);
 	read_phy(mac, 0, 16, &val);
 	if (on)
-		write_phy(mac, 0, 16, val & ~(1 << 11));
+		write_phy(mac, 0, 16, val & ~BIT(11));
 	else
-		write_phy(mac, 0, 16, val | (1 << 11));
+		write_phy(mac, 0, 16, val | BIT(11));
 
 	/* copper ports */
 	write_phy(mac, 4095, 30, 1);
 	read_phy(mac, 0, 16, &val);
 	if (on)
-		write_phy(mac, 0xa40, 16, val & ~(1 << 11));
+		write_phy(mac, 0xa40, 16, val & ~BIT(11));
 	else
-		write_phy(mac, 0xa40, 16, val | (1 << 11));
+		write_phy(mac, 0xa40, 16, val | BIT(11));
 }
 
 static void rtl8380_phy_reset(int mac)
@@ -129,6 +140,42 @@ void rtl8380_sds_rst(int mac)
 	pr_info("SERDES reset: %d\n", mac);
 }
 
+/*
+ * Reset the SerDes by powering it off and set a new operations mode
+ * of the SerDes. 0x1f is off. Other modes are
+ * 0x01: QSGMII		0x04: 1000BX_FIBER	0x05: FIBER100
+ * 0x06: QSGMII		0x09: RSGMII		0x0d: USXGMII
+ * 0x10: XSGMII		0x12: HISGMII		0x16: 2500Base_X
+ * 0x17: RXAUI_LITE	0x19: RXAUI_PLUS	0x1a: 10G Base-R
+ * 0x1b: 10GR1000BX_AUTO			0x1f: OFF
+ */
+void rtl9300_sds_rst(int sds_num, u32 mode)
+{
+	// The access registers for SDS_MODE_SEL and the LSB for each SDS within
+	u16 regs[] = { 0x0194, 0x0194, 0x0194, 0x0194, 0x02a0, 0x02a0, 0x02a0, 0x02a0,
+		       0x02A4, 0x02A4, 0x0198, 0x0198 };
+	u8  lsb[]  = { 0, 6, 12, 18, 0, 6, 12, 18, 0, 6, 0, 6};
+
+	pr_info("SerDes: %s %d\n", __func__, mode);
+	if (sds_num < 0 || sds_num > 11) {
+		pr_err("Wrong SerDes number: %d\n", sds_num);
+		return;
+	}
+
+	sw_w32_mask(0x1f << lsb[sds_num], 0x1f << lsb[sds_num], regs[sds_num]);
+	mdelay(10);
+
+	sw_w32_mask(0x1f << lsb[sds_num], mode << lsb[sds_num], regs[sds_num]);
+	mdelay(10);
+
+	pr_info("SDS: 194:%08x 198:%08x 2a0:%08x 2a4:%08x\n",
+		sw_r32(0x194), sw_r32(0x198), sw_r32(0x2a0), sw_r32(0x2a4));
+}
+
+/*
+ * On the RTL839x family of SoCs with inbuilt SerDes, these SerDes are accessed through
+ * a 2048 bit register that holds the contents of the PHY being simulated by the SoC.
+ */
 int rtl839x_read_sds_phy(int phy_addr, int phy_reg)
 {
 	int offset = 0;
@@ -138,8 +185,9 @@ int rtl839x_read_sds_phy(int phy_addr, int phy_reg)
 	if (phy_addr == 49)
 		offset = 0x100;
 
-	/* For the RTL8393 internal SerDes, we simulate a PHY ID in registers 2/3
-	 * which would otherwise read as 0
+	/*
+	 * For the RTL8393 internal SerDes, we simulate a PHY ID in registers 2/3
+	 * which would otherwise read as 0.
 	 */
 	if (soc_info.id == 0x8393) {
 		if (phy_reg == 2)
@@ -148,6 +196,12 @@ int rtl839x_read_sds_phy(int phy_addr, int phy_reg)
 			return 0x8393;
 	}
 
+	/*
+	 * Register RTL839X_SDS12_13_XSG0 is 2048 bit broad, the MSB (bit 15) of the
+	 * 0th PHY register is bit 1023 (in byte 0x80). Because PHY-registers are 16
+	 * bit broad, we offset by reg << 1. In the SoC 2 registers are stored in
+	 * one 32 bit register.
+	 */
 	reg = (phy_reg << 1) & 0xfc;
 	val = sw_r32(RTL839X_SDS12_13_XSG0 + offset + 0x80 + reg);
 
@@ -158,6 +212,57 @@ int rtl839x_read_sds_phy(int phy_addr, int phy_reg)
 	return val;
 }
 
+/*
+ * On the RTL930x family of SoCs, the internal SerDes are accessed through an IO
+ * register which simulates commands to an internal MDIO bus.
+ */
+int rtl930x_read_sds_phy(int phy_addr, int page, int phy_reg)
+{
+	int i;
+	u32 cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 1;
+
+	pr_info("%s: phy_addr %d, phy_reg: %d\n", __func__, phy_addr, phy_reg);
+	sw_w32(cmd, RTL930X_SDS_INDACS_CMD);
+
+	for (i = 0; i < 100; i++) {
+		if (!(sw_r32(RTL930X_SDS_INDACS_CMD) & 0x1))
+			break;
+		mdelay(1);
+	}
+
+	if (i >= 100)
+		return -EIO;
+
+	pr_info("%s: returning %04x\n", __func__, sw_r32(RTL930X_SDS_INDACS_DATA) & 0xffff);
+	return sw_r32(RTL930X_SDS_INDACS_DATA) & 0xffff;
+}
+
+
+int rtl930x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v)
+{
+	int i;
+	u32 cmd;
+
+	sw_w32(v, RTL930X_SDS_INDACS_DATA);
+	cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 0x3;
+
+	for (i = 0; i < 100; i++) {
+		if (!(sw_r32(RTL930X_SDS_INDACS_CMD) & 0x1))
+			break;
+		mdelay(1);
+	}
+
+	if (i >= 100)
+		return -EIO;
+
+	return 0;
+}
+
+/*
+ * On the RTL838x SoCs, the internal SerDes is accessed through direct access to
+ * standard PHY registers, where a 32 bit register holds a 16 bit word as found
+ * in a standard page 0 of a PHY
+ */
 int rtl838x_read_sds_phy(int phy_addr, int phy_reg)
 {
 	int offset = 0;
@@ -199,7 +304,6 @@ int rtl839x_write_sds_phy(int phy_addr, int phy_reg, u16 v)
 static int rtl8380_read_status(struct phy_device *phydev)
 {
 	int err;
-	int phy_addr = phydev->mdio.addr;
 
 	err = genphy_read_status(phydev);
 
@@ -558,6 +662,40 @@ static int rtl8380_rtl8218b_read_mmd(struct phy_device *phydev,
 	if (ret)
 		return ret;
 	return val;
+}
+
+static int rtl8226_read_mmd(struct phy_device *phydev, int devnum, u16 regnum)
+{
+	int port = phydev->mdio.addr;  // the SoC translates port addresses to PHY addr
+	int err;
+	u32 v, val;
+
+	err = rtl930x_read_mmd_phy(port, devnum, regnum, &val);
+
+	if (err)
+		return err;
+	return val;
+}
+
+static int rtl8226_write_mmd(struct phy_device *phydev, int devnum, u16 regnum, u16 val)
+{
+	int port = phydev->mdio.addr; // the SoC translates port addresses to PHY addr
+
+	return rtl930x_write_mmd_phy(port, devnum, regnum, val);
+}
+
+static int rtl8226_read_page(struct phy_device *phydev)
+{
+	// return __phy_read(phydev, 0x1f);
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+static int rtl8226_write_page(struct phy_device *phydev, int page)
+{
+	// return __phy_write(phydev, 0x1f, page);
+	pr_info("%s: %d\n", __func__, page);
+	return 0;
 }
 
 static void rtl8380_rtl8214fc_media_set(int mac, bool set_fibre)
@@ -1210,6 +1348,46 @@ static int rtl8390_configure_serdes(struct phy_device *phydev)
 	return 0;
 }
 
+static int rtl9300_configure_serdes(struct phy_device *phydev)
+{
+	struct device *dev = &phydev->mdio.dev;
+	int phy_addr = phydev->mdio.addr;
+	int sds_num = 0;
+	int v;
+
+	phydev_info(phydev, "Configuring internal RTL9300 SERDES\n");
+
+	switch (phy_addr) {
+	case 26:
+		sds_num = 8;
+		break;
+	case 27:
+		sds_num = 9;
+		break;
+	default:
+		dev_err(dev, "Not a SerDes PHY\n");
+		return -EINVAL;
+	}
+
+	/* Set default Medium to fibre */
+	v = rtl930x_read_sds_phy(sds_num, 0x1f, 11);
+	if (v < 0) {
+		dev_err(dev, "Cannot access SerDes PHY %d\n", phy_addr);
+		return -EINVAL;
+	}
+	v |= BIT(2);
+	rtl930x_write_sds_phy(sds_num, 0x1f, 11, v);
+
+	// TODO: this needs to be configurable via ethtool/.dts
+	pr_info("Setting 10G/1000BX auto fibre medium\n");
+	rtl9300_sds_rst(sds_num, 0x1b);
+
+	// TODO: Apply patch set for fibre type
+
+	return 0;
+}
+
+
 static int rtl8214fc_phy_probe(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
@@ -1320,6 +1498,22 @@ static int rtl8218d_phy_probe(struct phy_device *phydev)
 	return 0;
 }
 
+static int rtl8226_phy_probe(struct phy_device *phydev)
+{
+	struct device *dev = &phydev->mdio.dev;
+	struct rtl838x_phy_priv *priv;
+	int addr = phydev->mdio.addr;
+
+	pr_info("%s: id: %d\n", __func__, addr);
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->name = "RTL8226";
+
+	return 0;
+}
+
 static int rtl838x_serdes_probe(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
@@ -1387,6 +1581,26 @@ static int rtl8390_serdes_probe(struct phy_device *phydev)
 	return rtl8390_configure_generic(phydev);
 }
 
+static int rtl9300_serdes_probe(struct phy_device *phydev)
+{
+	struct device *dev = &phydev->mdio.dev;
+	struct rtl838x_phy_priv *priv;
+	int addr = phydev->mdio.addr;
+
+	if (soc_info.family != RTL9300_FAMILY_ID)
+		return -ENODEV;
+
+	if (addr < 24)
+		return -ENODEV;
+
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->name = "RTL9300 Serdes";
+	return rtl9300_configure_serdes(phydev);
+}
+
 static struct phy_driver rtl838x_phy_driver[] = {
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8214C),
@@ -1436,6 +1650,18 @@ static struct phy_driver rtl838x_phy_driver[] = {
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
 		.set_loopback	= genphy_loopback,
+	},	{
+		PHY_ID_MATCH_MODEL(PHY_ID_RTL8226),
+		.name		= "REALTEK RTL8226",
+		.features	= PHY_GBIT_FEATURES,
+		.probe		= rtl8226_phy_probe,
+		.suspend	= genphy_suspend,
+		.resume		= genphy_resume,
+		.set_loopback	= genphy_loopback,
+		.read_mmd	= rtl8226_read_mmd,
+		.write_mmd	= rtl8226_write_mmd,
+		.read_page	= rtl8226_read_page,
+		.write_page	= rtl8226_write_page,
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8218B_I),
@@ -1480,7 +1706,16 @@ static struct phy_driver rtl838x_phy_driver[] = {
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
 		.set_loopback	= genphy_loopback,
-	}
+	},
+	{
+		PHY_ID_MATCH_MODEL(PHY_ID_RTL9300_I),
+		.name		= "REALTEK RTL9300 SERDES",
+		.features	= PHY_GBIT_FIBRE_FEATURES,
+		.probe		= rtl9300_serdes_probe,
+		.suspend	= genphy_suspend,
+		.resume		= genphy_resume,
+		.set_loopback	= genphy_loopback,
+	},
 };
 
 module_phy_driver(rtl838x_phy_driver);

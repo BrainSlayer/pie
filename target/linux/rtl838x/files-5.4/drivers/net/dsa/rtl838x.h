@@ -45,14 +45,6 @@
 #define RTL930X_STAT_CTRL			(0x3248)
 #define RTL931X_STAT_CTRL			(0x5720)
 
-/* Registers of the internal Serdes of the 8390 */
-#define RTL8390_SDS0_1_XSG0			(0xA000)
-#define RTL8390_SDS0_1_XSG1			(0xA100)
-#define RTL839X_SDS12_13_XSG0			(0xB800)
-#define RTL839X_SDS12_13_XSG1			(0xB900)
-#define RTL839X_SDS12_13_PWR0			(0xb880)
-#define RTL839X_SDS12_13_PWR1			(0xb980)
-
 /* Registers of the internal Serdes of the 8380 */
 #define MAPLE_SDS4_REG0r			RTL838X_SDS4_REG28
 #define MAPLE_SDS5_REG0r			(RTL838X_SDS4_REG28 + 0x100)
@@ -68,6 +60,10 @@
 #define RTL839X_SDS12_13_XSG1			(0xB900)
 #define RTL839X_SDS12_13_PWR0			(0xb880)
 #define RTL839X_SDS12_13_PWR1			(0xb980)
+
+/* Access registers of the internal SerDes of the 9300 */
+#define RTL930X_SDS_INDACS_CMD			(0x03B0)
+#define RTL930X_SDS_INDACS_DATA			(0x03B4)
 
 /* VLAN registers */
 #define RTL838X_VLAN_PROFILE(idx)		(0x3A88 + ((idx) << 2))
@@ -283,7 +279,6 @@
 /* Debug features */
 #define RTL930X_STAT_PRVTE_DROP_COUNTER0	(0xB5B8)
 
-
 #define MAX_LAGS 16
 
 enum phy_type {
@@ -302,6 +297,8 @@ struct rtl838x_port {
 	bool eee_enabled;
 	enum phy_type phy;
 	bool is10G;
+	bool is2G5;
+	u8   sds_num;
 	const struct dsa_port *dp;
 };
 
@@ -423,17 +420,23 @@ struct rtl838x_switch_priv {
 	struct notifier_block nb;
 };
 
-extern struct rtl838x_soc_info soc_info;
 extern void rtl8380_sds_rst(int mac);
+extern void rtl9300_sds_rst(int sds_num, u32 mode);
 
 extern int rtl838x_write_phy(u32 port, u32 page, u32 reg, u32 val);
 extern int rtl839x_write_phy(u32 port, u32 page, u32 reg, u32 val);
+extern int rtl930x_write_phy(u32 port, u32 page, u32 reg, u32 val);
 extern int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val);
+
 extern int rtl838x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 extern int rtl839x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
+extern int rtl930x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 extern int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
+
 extern int rtl838x_write_mmd_phy(u32 port, u32 addr, u32 reg, u32 val);
 extern int rtl838x_read_mmd_phy(u32 port, u32 addr, u32 reg, u32 *val);
+extern int rtl930x_write_mmd_phy(u32 port, u32 addr, u32 reg, u32 val);
+extern int rtl930x_read_mmd_phy(u32 port, u32 addr, u32 reg, u32 *val);
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);
 int rtl838x_port_get_stp_state(struct rtl838x_switch_priv *priv, int port);
