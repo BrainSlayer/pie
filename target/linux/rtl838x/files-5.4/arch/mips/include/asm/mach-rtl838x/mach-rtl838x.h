@@ -325,6 +325,17 @@
 #define MC_DTCR			0xB8001008
 #define MC_DTCR_VAL		0xFFFF05C0
 
+/* System Clocks */
+#define SYSPLLCTR			((volatile void *) 0xb8000200)
+#define MCKG_DIV_SEL			((volatile void *) 0xb8000224)
+#define LX_CLK_PLL			((volatile void *) 0xb8000228)
+#define SFCR_ADDR			((volatile void *) 0xb8001200)
+#define MEMPLL95_64			((volatile void *) 0xb800023c)
+#define MEMPLL127_96			((volatile void *) 0xb8000240)
+#define RTL930X_PLL_CPU_CTRL0		(0xE208)
+#define RTL930X_PLL_SW_CTRL0		(0xE214)
+#define RTL930X_PLL_CPU_MISC_CTRL	(0xE210)
+
 /*
  * GPIO
  */
@@ -357,6 +368,9 @@
 #define RTL838X_EXTRA_GPIO_CTRL		(0xA0E0)
 #define RTL838X_DMY_REG5		(0x0144)
 #define RTL838X_EXTRA_GPIO_CTRL		(0xA0E0)
+
+#define RTL930X_PABCD_DIR
+#define RTL930X_PABCD_DAT
 
 #define RTL838X_GMII_INTF_SEL		(0x1000)
 #define RTL838X_IO_DRIVING_ABILITY_CTRL	(0x1010)
@@ -504,8 +518,13 @@ struct rtl838x_soc_info {
 	volatile void *sw_base;
 	volatile void *icu_base;
 	volatile void *timer_base;
+	u32 cpu_freq;
+	u32 mem_freq;
+	u32 lx_freq;
+	u32 spi_freq;
 };
 
+extern struct rtl838x_soc_info soc_info;
 void rtl838x_soc_detect(struct rtl838x_soc_info *i);
 
 #endif   /* _MACH_RTL838X_H_ */

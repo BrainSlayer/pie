@@ -26,6 +26,48 @@ const void *fdt;
 extern const char __appended_dtb;
 //extern int __init rtl838x_serial_init(void);
 
+struct rtl838x_soc_info soc_info;
+
+static void freq_detect(void)
+{
+	unsigned char pdiv = 1 << ((rtl838x_r32(MEMPLL95_64) >> 14) & 0x3);
+	u32 vco_freq;
+	u32 cmu_sel_prediv = sw_r32(RTL930X_PLL_SW_CTRL0) & 0x3;
+	u32 cmu_del_div4 = (sw_r32(RTL930X_PLL_SW_CTRL0) >> 2) & 0x1;
+	u32 cmu_ncode_in = (sw_r32(RTL930X_PLL_SW_CTRL0) >> 4) & 0xff;
+	u32 cmu_divn2_cpu = (sw_r32(RTL930X_PLL_CPU_MISC_CTRL) >> 1) & 0x7;
+	u32 cmu_divn3_cpu = (sw_r32(RTL930X_PLL_CPU_CTRL0) >> 25) & 0x3;
+	u32 lx_div;
+
+	soc_info.mem_freq = ((((rtl838x_r32(MEMPLL127_96) >> 24) & 0x0FF) + 2) * 25) >> 1;
+	soc_info.mem_freq /= pdiv;
+
+//	soc_info.lx_freq = 1000 / ((rtl838x_r32(LX_CLK_PLL) & 0xf) + 2);
+	pr_info("LX_CLK_PLL: %08x\n", rtl838x_r32(LX_CLK_PLL));
+
+	pr_info("cmu_del_div4 : %d, cmu_ncode_in: %d, cmu_sel_prediv: %d\n",
+		cmu_del_div4, cmu_ncode_in, cmu_sel_prediv
+	);
+	vco_freq = 25 * ((cmu_del_div4 ? 4 : 1) * (2 * (cmu_ncode_in + 1)))
+			/ (1 << cmu_sel_prediv);
+
+	lx_div = (vco_freq / (2 * 175)) - 2;
+	if (lx_div > ((vco_freq / (2 * 133)) - 2))
+		lx_div = (vco_freq / (2 * 175)) - 2;
+	soc_info.lx_freq =  vco_freq / (2 * (lx_div + 2));
+
+	soc_info.cpu_freq = vco_freq / ((cmu_divn2_cpu + 2) * (cmu_divn3_cpu + 1));
+
+	soc_info.spi_freq = (((rtl838x_r32(SFCR_ADDR) >> 29) & 0xf) + 1) * 2;
+	soc_info.spi_freq = 1000 / (((rtl838x_r32(LX_CLK_PLL) >> 8) & 0xf) + 2)
+				 / soc_info.spi_freq;
+
+	pr_info("VCO freq %d MHz\n", vco_freq);
+	pr_info("Memory freq: %d MHz, Lexra-Bus freq: %d MHz, SPI-freq: %d MHz, CPU-Freq: %d MHz\n",
+		soc_info.mem_freq, soc_info.lx_freq, soc_info.spi_freq, soc_info.cpu_freq
+	);
+}
+
 void prom_console_init(void)
 {
 	/* UART 16550A is initialized by the bootloader */
@@ -67,7 +109,6 @@ char prom_getchar(void)
 }
 #endif
 
-struct rtl838x_soc_info soc_info;
 
 const char *get_system_type(void)
 {
@@ -222,6 +263,8 @@ void __init prom_init(void)
 	pr_info("SoC Type: %s\n", get_system_type());
 	if (soc_info.rev)
 		pr_info("SoC Revision %d\n", soc_info.rev);
+
+	freq_detect();
 
 	if (soc_info.family == RTL9300_FAMILY_ID || soc_info.family == RTL9310_FAMILY_ID)
 		soc_info.timer_base = RTL93XX_TIMER0_BASE;
