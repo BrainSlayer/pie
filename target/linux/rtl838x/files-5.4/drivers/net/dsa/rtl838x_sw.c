@@ -420,14 +420,11 @@ static void rtl930x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	// Read VLAN table (0) via register 0
 	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 1);
 
-	pr_info("VLAN_READ: %d\n", vlan);
 	rtl_table_read(r, vlan);
-	pr_info("VLAN_READ: A0\n");
 	v = sw_r32(rtl_table_data(r, 0));
 	w = sw_r32(rtl_table_data(r, 1));
-	pr_info("VLAN_READ %d: %08x %08x\n", vlan, v, w);
+	pr_debug("VLAN_READ %d: %08x %08x\n", vlan, v, w);
 	rtl_table_release(r);
-	pr_info("VLAN_READ: B0\n");
 
 	info->tagged_ports = v >> 3;
 	info->profile_id = (w >> 24) & 7;
@@ -435,15 +432,11 @@ static void rtl930x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	info->hash_uc_fid = !!(w & BIT(28));
 	info->fid = ((v & 0x7) << 3) | ((w >> 29) & 0x7);
 
-	// Read UNTAG table via register 2
-	pr_info("VLAN_READ A\n");
+	// Read UNTAG table via table register 2
 	r = rtl_table_get(RTL9300_TBL_2, 0);
-	pr_info("VLAN_READ B\n");
 	rtl_table_read(r, vlan);
-	pr_info("VLAN_READ C\n");
 	v = sw_r32(rtl_table_data(r, 0));
 	rtl_table_release(r);
-	pr_info("VLAN_READ D\n");
 
 	info->untagged_ports = v >> 3;
 }
@@ -1511,7 +1504,7 @@ static irqreturn_t rtl930x_switch_irq(int irq, void *dev_id)
 			 * with the external RTL8226 PHY on the XGS1210 */
 			link = sw_r32(RTL930X_MAC_LINK_STS);
 			link = sw_r32(RTL930X_MAC_LINK_STS);
-			if (link & (1 << i))
+			if (link & BIT(i))
 				dsa_port_phylink_mac_change(ds, i, true);
 			else
 				dsa_port_phylink_mac_change(ds, i, false);
@@ -1884,7 +1877,7 @@ int rtl930x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 	} while ( v & 0x1);
 
 	if (v & BIT(25)) {
-		pr_err("Error reading phy %d, register %d\n", port, reg);
+		pr_debug("Error reading phy %d, register %d\n", port, reg);
 		err = -EIO;
 	}
 	*val = (sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_2) & 0xffff);
@@ -2049,17 +2042,16 @@ int rtl930x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 	} while ( v & 0x1);
 	// There is no error-checking via BIT 25 of v, as it does not seem to be set correctly
 	*val = (sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_2) & 0xffff);
-	pr_info("%s: port %d, regnum: %x, val: %x\n", __func__, port, regnum, *val);
+	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
 
 	mutex_unlock(&smi_lock);
-	pr_info("%s returning: %d\n", __func__, err);
 
 	return err;
 }
 
 int rtl930x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
 {
-	int err;
+	int err = 0;
 	u32 v;
 
 	mutex_lock(&smi_lock);
@@ -2080,11 +2072,11 @@ int rtl930x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
 		v = sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_1);
 	} while ( v & BIT(0));
 
-	if (v & BIT(25)) {  // TODO: Verify whether this gets correctly set
-		pr_err("Error reading phy %d, register %d\n", port, regnum);
-		err = -EIO;
-	}
-
+// 	if (v & BIT(25)) {  // TODO: Verify whether this gets correctly set
+// 		pr_err("Error reading phy %d, register %d\n", port, regnum);
+// 		err = -EIO;
+// 	}
+	pr_info("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, val, err);
 	mutex_unlock(&smi_lock);
 	return err;
 }
@@ -3272,6 +3264,7 @@ static int rtl838x_port_bridge_join(struct dsa_switch *ds, int port,
 	priv->ports[port].pm |= port_bitmap;
 	mutex_unlock(&priv->reg_mutex);
 
+	rtl930x_print_matrix();
 	return 0;
 }
 
@@ -3304,6 +3297,8 @@ static int rtl838x_port_enable(struct dsa_switch *ds, int port,
 	sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_SABLK_CTRL);
 	sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_DABLK_CTRL);
 
+	rtl930x_print_matrix();
+	
 	return 0;
 }
 
@@ -3553,6 +3548,7 @@ static int rtl838x_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
 	if (link & BIT_ULL(port))
 		state->link = 1;
+	pr_info("%s: link state: %llx\n", __func__, link & BIT_ULL(port));
 	state->duplex = 0;
 	if (priv->r->get_port_reg_le(priv->r->mac_link_dup_sts) & BIT_ULL(port))
 		state->duplex = 1;

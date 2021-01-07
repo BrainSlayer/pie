@@ -950,18 +950,58 @@ static void rtl839x_eth_set_multicast_list(struct net_device *ndev)
 	}
 }
 
-// TODO: Copy over rtl930x_eth_set_multicast_list
+static void rtl930x_eth_set_multicast_list(struct net_device *ndev)
+{
+	if (!(ndev->flags & (IFF_PROMISC | IFF_ALLMULTI))) {
+		sw_w32(0x0, RTL930X_RMA_CTRL_0);
+		sw_w32(0x0, RTL930X_RMA_CTRL_1);
+		sw_w32(0x0, RTL930X_RMA_CTRL_2);
+	}
+	if (ndev->flags & IFF_ALLMULTI) {
+		sw_w32(0x7fffffff, RTL930X_RMA_CTRL_0);
+		sw_w32(0x7fffffff, RTL930X_RMA_CTRL_1);
+		sw_w32(0x7fffffff, RTL930X_RMA_CTRL_2);
+	}
+	if (ndev->flags & IFF_PROMISC) {
+		sw_w32(0x7fffffff, RTL930X_RMA_CTRL_0);
+		sw_w32(0x7fffffff, RTL930X_RMA_CTRL_1);
+		sw_w32(0x7fffffff, RTL930X_RMA_CTRL_2);
+	}
+}
+
+static void rtl931x_eth_set_multicast_list(struct net_device *ndev)
+{
+	if (!(ndev->flags & (IFF_PROMISC | IFF_ALLMULTI))) {
+		sw_w32(0x0, RTL931X_RMA_CTRL_0);
+		sw_w32(0x0, RTL931X_RMA_CTRL_1);
+		sw_w32(0x0, RTL931X_RMA_CTRL_2);
+	}
+	if (ndev->flags & IFF_ALLMULTI) {
+		sw_w32(0x7fffffff, RTL931X_RMA_CTRL_0);
+		sw_w32(0x7fffffff, RTL931X_RMA_CTRL_1);
+		sw_w32(0x7fffffff, RTL931X_RMA_CTRL_2);
+	}
+	if (ndev->flags & IFF_PROMISC) {
+		sw_w32(0x7fffffff, RTL931X_RMA_CTRL_0);
+		sw_w32(0x7fffffff, RTL931X_RMA_CTRL_1);
+		sw_w32(0x7fffffff, RTL931X_RMA_CTRL_2);
+	}
+}
 
 static void rtl838x_eth_set_multicast_list(struct net_device *ndev)
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(ndev);
 
+	// TODO: This should be done through a different callback-structure
 	if (priv->family_id == RTL8390_FAMILY_ID)
 		return rtl839x_eth_set_multicast_list(ndev);
 
-	if (priv->family_id == RTL9300_FAMILY_ID || priv->family_id == RTL9310_FAMILY_ID)
-		return;
-	
+	if (priv->family_id == RTL9300_FAMILY_ID)
+		return rtl930x_eth_set_multicast_list(ndev);
+
+	if (priv->family_id == RTL9310_FAMILY_ID)
+		return rtl931x_eth_set_multicast_list(ndev);
+
 	if (!(ndev->flags & (IFF_PROMISC | IFF_ALLMULTI))) {
 		sw_w32(0x0, RTL838X_RMA_CTRL_0);
 		sw_w32(0x0, RTL838X_RMA_CTRL_1);
