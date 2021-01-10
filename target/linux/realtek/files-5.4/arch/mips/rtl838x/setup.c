@@ -27,7 +27,6 @@
 
 #include "mach-rtl83xx.h"
 
-extern int rtl838x_serial_init(void);
 extern struct rtl83xx_soc_info soc_info;
 
 u32 pll_reset_value;
@@ -85,6 +84,9 @@ void __init plat_time_init(void)
 	struct device_node *np;
 	u32 freq = 500000000;
 
+	of_clk_init(NULL);
+	timer_probe();
+
 	np = of_find_node_by_name(NULL, "cpus");
 	if (!np) {
 		pr_err("Missing 'cpus' DT node, using default frequency.");
@@ -92,7 +94,7 @@ void __init plat_time_init(void)
 		if (of_property_read_u32(np, "frequency", &freq) < 0)
 			pr_err("No 'frequency' property in DT, using default.");
 		else
-			pr_info("CPU frequency from device tree: %d", freq);
+			pr_info("CPU frequency from device tree: %dMHz", freq / 1000000);
 		of_node_put(np);
 	}
 
