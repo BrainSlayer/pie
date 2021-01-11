@@ -220,6 +220,10 @@
 
 #define RTL838X_LED_GLB_CTRL		(0xA000)
 #define RTL839X_LED_GLB_CTRL		(0x00E4)
+#define RTL9302_LED_GLB_CTRL		(0xcc00)
+#define RTL930X_LED_GLB_CTRL		(0xC400)
+#define RTL931X_LED_GLB_CTRL		(0x0600)
+
 #define RTL838X_EXT_GPIO_DIR		(0xA08C)
 #define RTL839X_EXT_GPIO_DIR		(0x0214)
 #define RTL838X_EXT_GPIO_DATA		(0xA094)
@@ -267,8 +271,11 @@
  * Reset
  */
 #define	RGCR				(0x1E70)
-#define RTL839X_RST_GLB_CTRL		(0x0014)
+#define RTL838X_RST_GLB_CTRL_0		(0x003c)
 #define RTL838X_RST_GLB_CTRL_1		(0x0040)
+#define RTL839X_RST_GLB_CTRL		(0x0014)
+#define RTL930X_RST_GLB_CTRL_0		(0x000c)
+#define RTL931X_RST_GLB_CTRL		(0x0400)
 
 /* LED control by switch */
 #define RTL838X_LED_MODE_SEL		(0x1004)
@@ -329,7 +336,7 @@
 #define RTL8380_FAMILY_ID   (0x8380)
 #define RTL8330_FAMILY_ID   (0x8330)
 #define RTL9300_FAMILY_ID   (0x9300)
-#define RTL9310_FAMILY_ID   (0x9300)
+#define RTL9310_FAMILY_ID   (0x9310)
 
 struct rtl83xx_soc_info {
 	unsigned char *name;
