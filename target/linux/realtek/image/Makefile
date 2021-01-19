@@ -19,6 +19,15 @@ define Device/Default
 	append-metadata | check-size
 endef
 
+define Build/custom-uimage
+	mkimage -A $(LINUX_KARCH) \
+		-O linux -T kernel \
+		-C gzip -a $(KERNEL_LOADADDR) $(if $(UIMAGE_MAGIC),-M $(UIMAGE_MAGIC),) \
+		-e $(if $(KERNEL_ENTRY),$(KERNEL_ENTRY),$(KERNEL_LOADADDR)) \
+		-n '$(1)' -d $@ $@.new
+	mv $@.new $@
+endef
+
 define Device/allnet_all-sg8208m
   SOC := rtl8382
   IMAGE_SIZE := 7168k
@@ -92,5 +101,16 @@ define Device/zyxel_gs1900-8hp-v2
   DEVICE_PACKAGES += lua-rs232
 endef
 TARGET_DEVICES += zyxel_gs1900-8hp-v2
+
+define Device/zyxel_xgs1210-12
+  SOC := rtl9302
+  UIMAGE_MAGIC := 0x93001210
+  DEVICE_VENDOR := Zyxel
+  DEVICE_MODEL := XGS1210-12
+  KERNEL := kernel-bin | append-dtb | gzip | custom-uimage OpenWRT
+  KERNEL_INITRAMFS := kernel-bin | append-dtb | gzip | custom-uimage OpenWRT
+  DEVICE_PACKAGES := ip-bridge ethtool
+endef
+TARGET_DEVICES += zyxel_xgs1210-12
 
 $(eval $(call BuildImage))
