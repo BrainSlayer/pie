@@ -267,9 +267,6 @@
 #define RTL838X_PLL_CML_CTRL		(0x0FF8)
 #define RTL838X_STRAP_DBG		(0x100C)
 
-#define RTL838X_CPU_PORT                28
-#define RTL839X_CPU_PORT                52
-
 /*
  * Reset
  */
@@ -319,6 +316,24 @@
 #define RTL839X_PHYREG_PORT_CTRL(p)	(0x03E4 + ((p >> 5) << 2))
 #define RTL839X_PHYREG_DATA_CTRL	(0x03F0)
 
+#define RTL930X_SMI_GLB_CTRL		(0xCA00)
+#define RTL930X_SMI_POLL_CTRL		(0xca90)
+#define RTL930X_SMI_PORT0_15_POLLING_SEL (0xCA08)
+#define RTL930X_SMI_PORT16_27_POLLING_SEL (0xCA0C)
+#define RTL930X_SMI_PORT0_5_ADDR	(0xCB80)
+#define RTL930X_SMI_ACCESS_PHY_CTRL_0	(0xCB70)
+#define RTL930X_SMI_ACCESS_PHY_CTRL_1	(0xCB74)
+#define RTL930X_SMI_ACCESS_PHY_CTRL_2	(0xCB78)
+#define RTL930X_SMI_ACCESS_PHY_CTRL_3	(0xCB7C)
+
+#define RTL931X_SMI_GLB_CTRL1		(0x0CBC)
+#define RTL931X_SMI_GLB_CTRL0		(0x0CC0)
+#define RTL931X_SMI_PORT_POLLING_CTRL	(0x0CCC)
+#define RTL931X_SMI_INDRT_ACCESS_CTRL_0	(0x0C00)
+#define RTL931X_SMI_INDRT_ACCESS_CTRL_1	(0x0C04)
+#define RTL931X_SMI_INDRT_ACCESS_CTRL_2	(0x0C08)
+#define RTL931X_SMI_INDRT_ACCESS_CTRL_3	(0x0C10)
+
 /*
  * Switch interrupts
  */
@@ -326,10 +341,21 @@
 #define RTL838X_IMR_PORT_LINK_STS_CHG	(0x1104)
 #define RTL838X_ISR_GLB_SRC		(0x1148)
 #define RTL838X_ISR_PORT_LINK_STS_CHG	(0x114C)
+
 #define RTL839X_IMR_GLB			(0x0064)
 #define RTL839X_IMR_PORT_LINK_STS_CHG	(0x0068)
 #define RTL839X_ISR_GLB_SRC		(0x009c)
 #define RTL839X_ISR_PORT_LINK_STS_CHG	(0x00a0)
+
+#define RTL930X_IMR_GLB			(0xC628)
+#define RTL930X_IMR_PORT_LINK_STS_CHG	(0xC62C)
+#define RTL930X_ISR_GLB			(0xC658)
+#define RTL930X_ISR_PORT_LINK_STS_CHG	(0xC660)
+
+// IMR_GLB does not exit on RTL931X
+#define RTL931X_IMR_PORT_LINK_STS_CHG	(0x126C)
+#define RTL931X_ISR_GLB_SRC		(0x12B4)
+#define RTL931X_ISR_PORT_LINK_STS_CHG	(0x12B8)
 
 /* Definition of family IDs */
 #define RTL8389_FAMILY_ID   (0x8389)
@@ -340,6 +366,12 @@
 #define RTL8330_FAMILY_ID   (0x8330)
 #define RTL9300_FAMILY_ID   (0x9300)
 #define RTL9310_FAMILY_ID   (0x9310)
+
+/* Basic SoC Features */
+#define RTL838X_CPU_PORT			28
+#define RTL839X_CPU_PORT			52
+#define RTL930X_CPU_PORT			28
+#define RTL931X_CPU_PORT			56
 
 struct rtl83xx_soc_info {
 	unsigned char *name;
@@ -357,5 +389,9 @@ int rtl838x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 int rtl838x_write_phy(u32 port, u32 page, u32 reg, u32 val);
 int rtl839x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
 int rtl839x_write_phy(u32 port, u32 page, u32 reg, u32 val);
+int rtl930x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
+int rtl930x_write_phy(u32 port, u32 page, u32 reg, u32 val);
+int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val);
+int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val);
 
 #endif   /* _MACH_RTL838X_H_ */

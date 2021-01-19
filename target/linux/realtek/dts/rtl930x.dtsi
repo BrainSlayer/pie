@@ -126,7 +126,10 @@
 
 	switch0: switch@bb000000 {
 		status = "okay";
-		compatible = "realtek,rtl838x-switch";
-		reg = <0>;
+
+		interrupt-parent = <&intc>;
+		interrupts = <20>;
+
+		compatible = "realtek,rtl83xx-switch";
 	};
 };
