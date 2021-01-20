@@ -275,9 +275,8 @@ void rtl839x_traffic_enable(int source, int dest)
 
 void rtl839x_traffic_disable(int source, int dest)
 {
-	rtl839x_mask_port_reg_be(0, BIT(dest), rtl839x_port_iso_ctrl(source));
+	rtl839x_mask_port_reg_be(BIT(dest), 0, rtl839x_port_iso_ctrl(source));
 }
-
 
 irqreturn_t rtl839x_switch_irq(int irq, void *dev_id)
 {
@@ -467,6 +466,10 @@ const struct rtl838x_reg rtl839x_reg = {
 	.stat_port_rst = RTL839X_STAT_PORT_RST,
 	.stat_rst = RTL839X_STAT_RST,
 	.stat_port_std_mib = RTL839X_STAT_PORT_STD_MIB,
+	.traffic_enable = rtl839x_traffic_enable,
+	.traffic_disable = rtl839x_traffic_disable,
+	.traffic_get = rtl839x_traffic_get,
+	.traffic_set = rtl839x_traffic_set,
 	.port_iso_ctrl = rtl839x_port_iso_ctrl,
 	.l2_ctrl_0 = RTL839X_L2_CTRL_0,
 	.l2_ctrl_1 = RTL839X_L2_CTRL_1,
