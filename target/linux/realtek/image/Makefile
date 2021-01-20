@@ -102,6 +102,14 @@ define Device/zyxel_gs1900-8hp-v2
 endef
 TARGET_DEVICES += zyxel_gs1900-8hp-v2
 
+define Device/zyxel_gs1900-48
+  SOC := rtl8393
+  IMAGE_SIZE := 6976k
+  DEVICE_VENDOR := ZyXEL
+  DEVICE_MODEL := GS1900-48
+endef
+TARGET_DEVICES += zyxel_gs1900-48
+
 define Device/zyxel_xgs1210-12
   SOC := rtl9302
   UIMAGE_MAGIC := 0x93001210
