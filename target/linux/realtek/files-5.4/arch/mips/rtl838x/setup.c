@@ -52,9 +52,10 @@ static void rtl839x_restart(char *command)
 	void (*f)(void) = (void *) 0xbfc00000;
 
 	pr_info("System restart.\n");
-	f();
-	/* If calling reset vector fails, reset entire chip */
+	/* Reset SoC */
 	sw_w32(0xFFFFFFFF, RTL839X_RST_GLB_CTRL);
+	/* and call reset vector */
+	f();
 	/* If this fails, halt the CPU */
 	while
 		(1);
