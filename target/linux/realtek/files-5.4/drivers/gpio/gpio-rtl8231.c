@@ -12,7 +12,7 @@
 #define RTL8231_GPIO_DIR(gpio)			((0x0005) + ((gpio) >> 4))
 #define RTL8231_GPIO_DATA(gpio)			((0x001C) + ((gpio) >> 4))
 
-#define USEC_TIMEOUT 5000
+#define USEC_TIMEOUT 50000
 
 struct rtl8231_gpios {
 	struct gpio_chip gc;
@@ -51,7 +51,7 @@ static u32 rtl8231_read(struct rtl8231_gpios *gpios, u32 reg)
 
 	if (n >= USEC_TIMEOUT)
 		return 0x80000000;
-	
+
 	pr_debug("%s: %x, %x, %x\n", __func__, bus_id, reg, (t & 0xffff0000) >> 16);
 
 	return (t & 0xffff0000) >> 16;
@@ -117,7 +117,7 @@ static int rtl8231_pin_dir(struct rtl8231_gpios *gpios, u32 gpio, u32 dir)
 
 	v = rtl8231_read_cached(gpios, pin_dir_addr);
 	if (v & 0x80000000) {
-		pr_err("Error reading RTL8231\n");
+		pr_err("%s: Error reading RTL8231\n", __func__);
 		return -1;
 	}
 
@@ -157,7 +157,7 @@ static int rtl8231_pin_set(struct rtl8231_gpios *gpios, u32 gpio, u32 data)
 
 	pr_debug("%s: %d to %d\n", __func__, gpio, data);
 	if (v & 0x80000000) {
-		pr_err("Error reading RTL8231\n");
+		pr_err("%s: Error reading RTL8231\n", __func__);
 		return -1;
 	}
 	v = (v & ~(1 << (gpio % 16))) | (data << (gpio % 16));
@@ -172,7 +172,7 @@ static int rtl8231_pin_get(struct rtl8231_gpios *gpios, u32 gpio, u16 *state)
 	u32 v = rtl8231_read(gpios, RTL8231_GPIO_DATA(gpio));
 
 	if (v & 0x80000000) {
-		pr_err("Error reading RTL8231\n");
+		pr_err("%s: Error reading RTL8231\n", __func__);
 		return -1;
 	}
 
