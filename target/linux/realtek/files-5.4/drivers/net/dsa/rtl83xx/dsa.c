@@ -79,7 +79,7 @@ static void rtl83xx_enable_phy_polling(struct rtl838x_switch_priv *priv)
 	/* Enable all ports with a PHY, including the SFP-ports */
 	for (i = 0; i < priv->cpu_port; i++) {
 		if (priv->ports[i].phy)
-			v |= BIT(i);
+			v |= BIT_ULL(i);
 	}
 
 	pr_debug("%s: %16llx\n", __func__, v);
@@ -174,7 +174,7 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 	 */
 	for (i = 0; i < priv->cpu_port; i++) {
 		if (priv->ports[i].phy) {
-			priv->r->set_port_reg_be(BIT_ULL(priv->cpu_port) | BIT(i),
+			priv->r->set_port_reg_be(BIT_ULL(priv->cpu_port) | BIT_ULL(i),
 					      priv->r->port_iso_ctrl(i));
 			port_bitmap |= BIT_ULL(i);
 		}
@@ -218,8 +218,8 @@ static int rtl930x_setup(struct dsa_switch *ds)
 
 	for (i = 0; i < priv->cpu_port; i++) {
 		if (priv->ports[i].phy) {
-			priv->r->traffic_set(i, BIT(priv->cpu_port) | BIT(i));
-			port_bitmap |= 1ULL << i;
+			priv->r->traffic_set(i, BIT_ULL(priv->cpu_port) | BIT_ULL(i));
+			port_bitmap |= BIT_ULL(i);
 		}
 	}
 	priv->r->traffic_set(priv->cpu_port, port_bitmap);
@@ -242,9 +242,10 @@ static void rtl83xx_phylink_validate(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
-	pr_debug("In %s port %d", __func__, port);
+	pr_debug("In %s port %d, state is %d", __func__, port, state->interface);
 
 	if (!phy_interface_mode_is_rgmii(state->interface) &&
+	    state->interface != PHY_INTERFACE_MODE_NA &&
 	    state->interface != PHY_INTERFACE_MODE_1000BASEX &&
 	    state->interface != PHY_INTERFACE_MODE_MII &&
 	    state->interface != PHY_INTERFACE_MODE_REVMII &&
@@ -276,6 +277,10 @@ static void rtl83xx_phylink_validate(struct dsa_switch *ds, int port,
 
 	/* On both the 8380 and 8382, ports 24-27 are SFP ports */
 	if (port >= 24 && port <= 27 && priv->family_id == RTL8380_FAMILY_ID)
+		phylink_set(mask, 1000baseX_Full);
+
+	/* On the RTL839x family of SoCs, ports 48 to 51 are SFP ports */
+	if (port >=48 && port <= 51 && priv->family_id == RTL8390_FAMILY_ID)
 		phylink_set(mask, 1000baseX_Full);
 
 	phylink_set(mask, 10baseT_Half);
@@ -310,7 +315,7 @@ static int rtl83xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
 	if (link & BIT_ULL(port))
 		state->link = 1;
-	pr_info("%s: link state: %llx\n", __func__, link & BIT_ULL(port));
+	pr_info("%s: link state port %d: %llx\n", __func__, port, link & BIT_ULL(port));
 
 	state->duplex = 0;
 	if (priv->r->get_port_reg_le(priv->r->mac_link_dup_sts) & BIT_ULL(port))
@@ -329,7 +334,8 @@ static int rtl83xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
 		state->speed = SPEED_1000;
 		break;
 	case 3:
-		if (port == 24 || port == 26) /* Internal serdes */
+		if (priv->family_id == RTL9300_FAMILY_ID
+			&& (port == 24 || port == 26)) /* Internal serdes */
 			state->speed = SPEED_2500;
 		else
 			state->speed = SPEED_100; /* Is in fact 500Mbit */
@@ -618,7 +624,7 @@ static int rtl83xx_port_bridge_join(struct dsa_switch *ds, int port,
 					struct net_device *bridge)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	u64 port_bitmap = 1ULL << priv->cpu_port, v;
+	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
 	int i;
 
 	pr_debug("%s %x: %d %llx", __func__, (u32)priv, port, port_bitmap);
@@ -634,8 +640,8 @@ static int rtl83xx_port_bridge_join(struct dsa_switch *ds, int port,
 			if (priv->ports[i].enable)
 				priv->r->traffic_enable(i, port);
 
-			priv->ports[i].pm |= 1ULL << port;
-			port_bitmap |= 1ULL << i;
+			priv->ports[i].pm |= BIT_ULL(port);
+			port_bitmap |= BIT_ULL(i);
 		}
 	}
 
@@ -656,7 +662,7 @@ static void rtl83xx_port_bridge_leave(struct dsa_switch *ds, int port,
 					struct net_device *bridge)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	u64 port_bitmap = 1ULL << priv->cpu_port, v;
+	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
 	int i;
 
 	pr_debug("%s %x: %d", __func__, (u32)priv, port);
@@ -674,7 +680,7 @@ static void rtl83xx_port_bridge_leave(struct dsa_switch *ds, int port,
 			if (priv->ports[i].enable)
 				priv->r->traffic_disable(i, port);
 
-			priv->ports[i].pm |= 1ULL << port;
+			priv->ports[i].pm |= BIT_ULL(port);
 			port_bitmap &= ~BIT_ULL(i);
 		}
 	}

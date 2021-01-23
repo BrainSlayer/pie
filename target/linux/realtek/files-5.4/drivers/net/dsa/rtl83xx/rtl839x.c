@@ -275,7 +275,7 @@ void rtl839x_traffic_enable(int source, int dest)
 
 void rtl839x_traffic_disable(int source, int dest)
 {
-	rtl839x_mask_port_reg_be(BIT(dest), 0, rtl839x_port_iso_ctrl(source));
+	rtl839x_mask_port_reg_be(BIT_ULL(dest), 0, rtl839x_port_iso_ctrl(source));
 }
 
 irqreturn_t rtl839x_switch_irq(int irq, void *dev_id)
