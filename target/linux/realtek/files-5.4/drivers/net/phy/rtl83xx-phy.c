@@ -18,6 +18,14 @@
 extern struct rtl83xx_soc_info soc_info;
 extern struct mutex smi_lock;
 
+/*
+ * This lock protects the state of the SoC automatically polling the PHYs over the SMI
+ * bus to detect e.g. link and media changes. For operations on the PHYs such as
+ * patching or other configuration changes such as EEE, polling needs to be disabled
+ * since otherwise these operations may fails or lead to unpredictable results.
+ */
+DEFINE_MUTEX(poll_lock);
+
 static const struct firmware rtl838x_8380_fw;
 static const struct firmware rtl838x_8214fc_fw;
 static const struct firmware rtl838x_8218b_fw;
@@ -52,6 +60,57 @@ static int write_phy(u32 port, u32 page, u32 reg, u32 val)
 		return rtl931x_write_phy(port, page, reg, val);
 	}
 	return -1;
+}
+
+static u64 disable_polling(int port)
+{
+	u64 saved_state;
+
+	mutex_lock(&poll_lock);
+
+	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
+		saved_state = sw_r32(RTL838X_SMI_POLL_CTRL);
+		sw_w32_mask(BIT(port), 0, RTL838X_SMI_POLL_CTRL);
+		break;
+	case RTL8390_FAMILY_ID:
+		saved_state = sw_r32(RTL839X_SMI_PORT_POLLING_CTRL + 4);
+		saved_state <<= 32;
+		saved_state |= sw_r32(RTL839X_SMI_PORT_POLLING_CTRL);
+		sw_w32_mask(BIT(port % 32), 0,
+			    RTL839X_SMI_PORT_POLLING_CTRL + ((port >> 5) << 2));
+		break;
+	case RTL9300_FAMILY_ID:
+		saved_state = sw_r32(RTL930X_SMI_POLL_CTRL);
+		sw_w32_mask(BIT(port), 0, RTL930X_SMI_POLL_CTRL);
+		break;
+	}
+
+	mutex_unlock(&poll_lock);
+
+	return saved_state;
+}
+
+static int resume_polling(u64 saved_state)
+{
+	mutex_lock(&poll_lock);
+
+	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
+		sw_w32(saved_state, RTL838X_SMI_POLL_CTRL);
+		break;
+	case RTL8390_FAMILY_ID:
+		sw_w32(saved_state >> 32, RTL839X_SMI_PORT_POLLING_CTRL + 4);
+		sw_w32(saved_state, RTL839X_SMI_PORT_POLLING_CTRL);
+		break;
+	case RTL9300_FAMILY_ID:
+		sw_w32(saved_state, RTL930X_SMI_POLL_CTRL);
+		break;
+	}
+
+	mutex_unlock(&poll_lock);
+
+	return 0;
 }
 
 static void rtl8380_int_phy_on_off(int mac, bool on)
@@ -957,7 +1016,13 @@ static int rtl8214fc_get_port(struct phy_device *phydev)
 	return PORT_MII;
 }
 
-static void rtl8218b_eee_set_u_boot(int port, bool enable)
+/*
+ * Enable EEE on the RTL8218B PHYs
+ * The method used is not the preferred way (which would be based on the MAC-EEE state,
+ * but the only way that works since the kernel first enables EEE in the MAC
+ * and then sets up the PHY. The MAC-based approach would require the oppsite.
+ */
+static void rtl8218b_eee_set(int port, bool enable)
 {
 	u32 val;
 	bool an_enabled;
@@ -965,7 +1030,7 @@ static void rtl8218b_eee_set_u_boot(int port, bool enable)
 	/* Set GPHY page to copper */
 	write_phy(port, 0, 30, 0x0001);
 	read_phy(port, 0, 0, &val);
-	an_enabled = val & (1 << 12);
+	an_enabled = val & BIT(12);
 
 	if (enable) {
 		/* 100/1000M EEE Capability */
@@ -975,7 +1040,7 @@ static void rtl8218b_eee_set_u_boot(int port, bool enable)
 		write_phy(port, 0, 14, 0x0006);
 
 		read_phy(port, 0x0A43, 25, &val);
-		val |= 1 << 4;
+		val |= BIT(4);
 		write_phy(port, 0x0A43, 25, val);
 	} else {
 		/* 100/1000M EEE Capability */
@@ -985,14 +1050,14 @@ static void rtl8218b_eee_set_u_boot(int port, bool enable)
 		write_phy(port, 0, 14, 0x0000);
 
 		read_phy(port, 0x0A43, 25, &val);
-		val &= ~(1 << 4);
+		val &= ~BIT(4);
 		write_phy(port, 0x0A43, 25, val);
 	}
 
 	/* Restart AN if enabled */
 	if (an_enabled) {
 		read_phy(port, 0, 0, &val);
-		val |= (1 << 12) | (1 << 9);
+		val |= BIT(9);
 		write_phy(port, 0, 0, val);
 	}
 
@@ -1000,47 +1065,38 @@ static void rtl8218b_eee_set_u_boot(int port, bool enable)
 	write_phy(port, 0xa42, 29, 0);
 }
 
-// TODO: unused
-void rtl8380_rtl8218b_eee_set(int port, bool enable)
+void rtl8218d_eee_set(int port, bool enable)
 {
 	u32 val;
 	bool an_enabled;
 
 	pr_debug("In %s %d, enable %d\n", __func__, port, enable);
 	/* Set GPHY page to copper */
-	write_phy(port, 0xa42, 29, 0x0001);
+	write_phy(port, 0xa42, 30, 0x0001);
 
 	read_phy(port, 0, 0, &val);
-	an_enabled = val & (1 << 12);
+	an_enabled = val & BIT(12);
 
-	/* MAC based EEE */
-	read_phy(port, 0xa43, 25, &val);
-	val &= ~(1 << 5);
-	write_phy(port, 0xa43, 25, val);
-
-	/* 100M / 1000M EEE */
-	if (enable)
-		rtl838x_write_mmd_phy(port, 7, 60, 0x6);
-	else
-		rtl838x_write_mmd_phy(port, 7, 60, 0);
+	/* Enable 100M (bit 1) / 1000M (bit 2) EEE */
+	rtl838x_write_mmd_phy(port, 7, 60, enable ? 0x6 : 0);
 
 	/* 500M EEE ability */
 	read_phy(port, 0xa42, 20, &val);
 	if (enable)
-		val |= 1 << 7;
+		val |= BIT(7);
 	else
-		val &= ~(1 << 7);
+		val &= ~BIT(7);
 	write_phy(port, 0xa42, 20, val);
 
 	/* Restart AN if enabled */
 	if (an_enabled) {
 		read_phy(port, 0, 0, &val);
-		val |= (1 << 12) | (1 << 9);
+		val |= BIT(9);
 		write_phy(port, 0, 0, val);
 	}
 
 	/* GPHY page back to auto*/
-	write_phy(port, 0xa42, 29, 0);
+	write_phy(port, 0xa42, 30, 0);
 }
 
 static int rtl8218b_get_eee(struct phy_device *phydev,
@@ -1049,16 +1105,21 @@ static int rtl8218b_get_eee(struct phy_device *phydev,
 	u32 val;
 	int addr = phydev->mdio.addr;
 
-	pr_debug("In %s, port %d\n", __func__, addr);
+	pr_debug("In %s, port %d, was enabled: %d\n", __func__, addr, e->eee_enabled);
 
 	/* Set GPHY page to copper */
 	write_phy(addr, 0xa42, 29, 0x0001);
 
-	rtl83xx_read_mmd_phy(addr, 7, 60, &val);
-	if (e->eee_enabled && (!!(val & (1 << 7))))
-		e->eee_enabled = !!(val & (1 << 7));
-	else
-		e->eee_enabled = 0;
+	read_phy(addr, 7, 60, &val);
+	if (e->eee_enabled) {
+		// Verify vs MAC-based EEE
+		e->eee_enabled = !!(val & BIT(7));
+		if (!e->eee_enabled) {
+			read_phy(addr, 0x0A43, 25, &val);
+			e->eee_enabled = !!(val & BIT(4));
+		}
+	}
+	pr_debug("%s: enabled: %d\n", __func__, e->eee_enabled);
 
 	/* GPHY page to auto */
 	write_phy(addr, 0xa42, 29, 0x0000);
@@ -1066,49 +1127,24 @@ static int rtl8218b_get_eee(struct phy_device *phydev,
 	return 0;
 }
 
-// TODO: unused
-void rtl8380_rtl8218b_green_set(int mac, bool enable)
-{
-	u32 val;
-
-	/* Set GPHY page to copper */
-	write_phy(mac, 0xa42, 29, 0x0001);
-
-	write_phy(mac, 0, 27, 0x8011);
-	read_phy(mac, 0, 28, &val);
-	if (enable) {
-		val |= 1 << 9;
-		write_phy(mac, 0, 27, 0x8011);
-		write_phy(mac, 0, 28, val);
-	} else {
-		val &= ~(1 << 9);
-		write_phy(mac, 0, 27, 0x8011);
-		write_phy(mac, 0, 28, val);
-	}
-
-	/* GPHY page to auto */
-	write_phy(mac, 0xa42, 29, 0x0000);
-}
-
-// TODO: unused
-int rtl8380_rtl8214fc_get_green(struct phy_device *phydev, struct ethtool_eee *e)
+static int rtl8218d_get_eee(struct phy_device *phydev,
+				     struct ethtool_eee *e)
 {
 	u32 val;
 	int addr = phydev->mdio.addr;
 
-	pr_debug("In %s %d\n", __func__, addr);
-	/* Set GPHY page to copper */
-	write_phy(addr, 0xa42, 29, 0x0001);
+	pr_debug("In %s, port %d, was enabled: %d\n", __func__, addr, e->eee_enabled);
 
-	write_phy(addr, 0, 27, 0x8011);
-	read_phy(addr, 0, 28, &val);
-	if (e->eee_enabled && (!!(val & (1 << 9))))
-		e->eee_enabled = !!(val & (1 << 9));
-	else
-		e->eee_enabled = 0;
+	/* Set GPHY page to copper */
+	write_phy(addr, 0xa42, 30, 0x0001);
+
+	read_phy(addr, 7, 60, &val);
+	if (e->eee_enabled)
+		e->eee_enabled = !!(val & BIT(7));
+	pr_debug("%s: enabled: %d\n", __func__, e->eee_enabled);
 
 	/* GPHY page to auto */
-	write_phy(addr, 0xa42, 29, 0x0000);
+	write_phy(addr, 0xa42, 30, 0x0000);
 
 	return 0;
 }
@@ -1116,7 +1152,7 @@ int rtl8380_rtl8214fc_get_green(struct phy_device *phydev, struct ethtool_eee *e
 static int rtl8214fc_set_eee(struct phy_device *phydev,
 				     struct ethtool_eee *e)
 {
-	u32 pollMask;
+	u32 poll_state;
 	int addr = phydev->mdio.addr;
 
 	pr_debug("In %s port %d, enabled %d\n", __func__, addr, e->eee_enabled);
@@ -1126,10 +1162,10 @@ static int rtl8214fc_set_eee(struct phy_device *phydev,
 		return -ENOTSUPP;
 	}
 
-	pollMask = sw_r32(RTL838X_SMI_POLL_CTRL);
+	poll_state = sw_r32(RTL838X_SMI_POLL_CTRL);
 	sw_w32(0, RTL838X_SMI_POLL_CTRL);
-	rtl8218b_eee_set_u_boot(addr, (bool) e->eee_enabled);
-	sw_w32(pollMask, RTL838X_SMI_POLL_CTRL);
+	rtl8218b_eee_set(addr, (bool) e->eee_enabled);
+	sw_w32(poll_state, RTL838X_SMI_POLL_CTRL);
 	return 0;
 }
 
@@ -1147,18 +1183,34 @@ static int rtl8214fc_get_eee(struct phy_device *phydev,
 	return rtl8218b_get_eee(phydev, e);
 }
 
-static int rtl8218b_set_eee(struct phy_device *phydev,
-				     struct ethtool_eee *e)
+static int rtl8218b_set_eee(struct phy_device *phydev, struct ethtool_eee *e)
 {
-	u32 pollMask;
 	int addr = phydev->mdio.addr;
+	u64 poll_state;
 
-	pr_debug("In %s, port %d, enabled %d\n", __func__, addr, e->eee_enabled);
+	pr_info("In %s, port %d, enabled %d\n", __func__, addr, e->eee_enabled);
 
-	pollMask = sw_r32(RTL838X_SMI_POLL_CTRL);
-	sw_w32(0, RTL838X_SMI_POLL_CTRL);
-	rtl8218b_eee_set_u_boot(addr, (bool) e->eee_enabled);
-	sw_w32(pollMask, RTL838X_SMI_POLL_CTRL);
+	poll_state = disable_polling(addr);
+
+	rtl8218b_eee_set(addr, (bool) e->eee_enabled);
+
+	resume_polling(poll_state);
+
+	return 0;
+}
+
+static int rtl8218d_set_eee(struct phy_device *phydev, struct ethtool_eee *e)
+{
+	int addr = phydev->mdio.addr;
+	u64 poll_state;
+
+	pr_info("In %s, port %d, enabled %d\n", __func__, addr, e->eee_enabled);
+
+	poll_state = disable_polling(addr);
+
+	rtl8218d_eee_set(addr, (bool) e->eee_enabled);
+
+	resume_polling(poll_state);
 
 	return 0;
 }
@@ -1791,6 +1843,8 @@ static struct phy_driver rtl83xx_phy_driver[] = {
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
 		.set_loopback	= genphy_loopback,
+		.set_eee	= rtl8218d_set_eee,
+		.get_eee	= rtl8218d_get_eee,
 	},	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8226),
 		.name		= "REALTEK RTL8226",

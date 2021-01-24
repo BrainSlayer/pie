@@ -1526,9 +1526,6 @@ static int rtl8380_init_mac(struct rtl838x_eth_priv *priv)
 		return rtl8390_init_mac(priv);
 
 	pr_info("%s\n", __func__);
-	/* fix timer for EEE */
-	sw_w32(0x5001411, RTL838X_EEE_TX_TIMER_GIGA_CTRL);
-	sw_w32(0x5001417, RTL838X_EEE_TX_TIMER_GELITE_CTRL);
 
 	/* Init VLAN */
 	if (priv->id == 0x8382) {
