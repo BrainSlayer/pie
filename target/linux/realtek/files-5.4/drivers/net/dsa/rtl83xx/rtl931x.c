@@ -264,6 +264,73 @@ int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 	return 0;
 }
 
+/*
+ * Read an mmd register of the PHY
+ */
+int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
+{
+	int err = 0;
+	u32 v;
+	int type = 1; // TODO: For C45 PHYs need to set to 2
+
+	mutex_lock(&smi_lock);
+
+	// Set PHY to access via port-number
+	sw_w32(port << 5, RTL931X_SMI_INDRT_ACCESS_BC_PHYID_CTRL);
+
+	// Set MMD device number and register to write to
+	sw_w32(devnum << 16 | (regnum & 0xffff), RTL931X_SMI_INDRT_ACCESS_MMD_CTRL);
+
+	v = type << 2 | BIT(0); // MMD-access-type | EXEC
+	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+
+	do {
+		v = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+	} while (v & BIT(0));
+
+	// There is no error-checking via BIT 1 of v, as it does not seem to be set correctly
+
+	*val = (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) & 0xffff);
+
+	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
+
+	mutex_unlock(&smi_lock);
+
+	return err;
+}
+
+/*
+ * Write to an mmd register of the PHY
+ */
+int rtl931x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
+{
+	int err = 0;
+	u32 v;
+	int type = 1; // TODO: For C45 PHYs need to set to 2
+
+	mutex_lock(&smi_lock);
+
+	// Set PHY to access via port-number
+	sw_w32(port << 5, RTL931X_SMI_INDRT_ACCESS_BC_PHYID_CTRL);
+
+	// Set data to write
+	sw_w32_mask(0xffff << 16, val << 16, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+
+	// Set MMD device number and register to write to
+	sw_w32(devnum << 16 | (regnum & 0xffff), RTL931X_SMI_INDRT_ACCESS_MMD_CTRL);
+
+	v = BIT(4) | type << 2 | BIT(0); // WRITE | MMD-access-type | EXEC
+	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+
+	do {
+		v = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+	} while (v & BIT(0));
+
+	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, val, err);
+	mutex_unlock(&smi_lock);
+	return err;
+}
+
 void rtl931x_print_matrix(void)
 {
 	volatile u64 *ptr = RTL838X_SW_BASE + RTL839X_PORT_ISO_CTRL(0);
