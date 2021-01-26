@@ -169,7 +169,8 @@
 #define RTL839X_MAC_EEE_ABLTY			(0x03C8)
 
 #define RTL930X_MAC_EEE_ABLTY			(0xCB34)
-#define RTL930X_EEE_CTRL(p)			(0x3274 + (((p) << 6)))
+#define RTL930X_EEE_CTRL(p)			(0x3274 + ((p) << 6))
+#define RTL930X_EEEP_PORT_CTRL(p)		(0x3278 + ((p) << 6))
 
 /* L2 functionality */
 #define RTL838X_L2_CTRL_0			(0x3200)

@@ -30,8 +30,14 @@ static const struct firmware rtl838x_8380_fw;
 static const struct firmware rtl838x_8214fc_fw;
 static const struct firmware rtl838x_8218b_fw;
 
+int rtl838x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val);
+int rtl838x_write_mmd_phy(u32 port, u32 devnum, u32 reg, u32 val);
+int rtl839x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val);
+int rtl839x_write_mmd_phy(u32 port, u32 devnum, u32 reg, u32 val);
 int rtl930x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val);
-int rtl930x_write_mmd_phy(u32 port, u32 addr, u32 reg, u32 val);
+int rtl930x_write_mmd_phy(u32 port, u32 devnum, u32 reg, u32 val);
+int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val);
+int rtl931x_write_mmd_phy(u32 port, u32 devnum, u32 reg, u32 val);
 
 static int read_phy(u32 port, u32 page, u32 reg, u32 *val)
 {	switch (soc_info.family) {
@@ -58,6 +64,36 @@ static int write_phy(u32 port, u32 page, u32 reg, u32 val)
 		return rtl930x_write_phy(port, page, reg, val);
 	case RTL9310_FAMILY_ID:
 		return rtl931x_write_phy(port, page, reg, val);
+	}
+	return -1;
+}
+
+static int read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
+{
+	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
+		return rtl838x_read_mmd_phy(port, devnum, regnum, val);
+	case RTL8390_FAMILY_ID:
+		return rtl839x_read_mmd_phy(port, devnum, regnum, val);
+	case RTL9300_FAMILY_ID:
+		return rtl930x_read_mmd_phy(port, devnum, regnum, val);
+	case RTL9310_FAMILY_ID:
+		return rtl931x_read_mmd_phy(port, devnum, regnum, val);
+	}
+	return -1;
+}
+
+int write_mmd_phy(u32 port, u32 devnum, u32 reg, u32 val)
+{
+	switch (soc_info.family) {
+	case RTL8380_FAMILY_ID:
+		return rtl838x_write_mmd_phy(port, devnum, reg, val);
+	case RTL8390_FAMILY_ID:
+		return rtl839x_write_mmd_phy(port, devnum, reg, val);
+	case RTL9300_FAMILY_ID:
+		return rtl930x_write_mmd_phy(port, devnum, reg, val);
+	case RTL9310_FAMILY_ID:
+		return rtl931x_write_mmd_phy(port, devnum, reg, val);
 	}
 	return -1;
 }
@@ -151,18 +187,6 @@ static void rtl8380_phy_reset(int mac)
 
 	read_phy(mac, 0, 0, &val);
 	write_phy(mac, 0, 0, val | BIT(15));
-}
-
-static void rtl8380_sds_rst(int mac)
-{
-	u32 offset = (mac == 24) ? 0 : 0x100;
-
-	sw_w32_mask(1 << 11, 0, RTL8380_SDS4_FIB_REG0 + offset);
-	sw_w32_mask(0x3, 0, RTL838X_SDS4_REG28 + offset);
-	sw_w32_mask(0x3, 0x3, RTL838X_SDS4_REG28 + offset);
-	sw_w32_mask(0, 0x1 << 6, RTL838X_SDS4_DUMMY0 + offset);
-	sw_w32_mask(0x1 << 6, 0, RTL838X_SDS4_DUMMY0 + offset);
-	pr_info("SERDES reset: %d\n", mac);
 }
 
 /*
@@ -510,6 +534,68 @@ out:
 	return ret;
 }
 
+static int rtl8226_get_eee(struct phy_device *phydev,
+				     struct ethtool_eee *e)
+{
+	u32 val;
+	int addr = phydev->mdio.addr;
+
+	pr_debug("In %s, port %d, was enabled: %d\n", __func__, addr, e->eee_enabled);
+
+	read_mmd_phy(addr, MMD_AN, 60, &val);
+	if (e->eee_enabled) {
+		e->eee_enabled = !!(val & BIT(1));
+		if (!e->eee_enabled) {
+			read_mmd_phy(addr, MMD_AN, 62, &val);
+			e->eee_enabled = !!(val & BIT(0));
+		}
+	}
+	pr_debug("%s: enabled: %d\n", __func__, e->eee_enabled);
+
+	return 0;
+}
+
+static int rtl8226_set_eee(struct phy_device *phydev, struct ethtool_eee *e)
+{
+	int port = phydev->mdio.addr;
+	u64 poll_state;
+	bool an_enabled;
+	u32 val;
+
+	pr_info("In %s, port %d, enabled %d\n", __func__, port, e->eee_enabled);
+
+	poll_state = disable_polling(port);
+
+	// Remember aneg state
+	read_mmd_phy(port, MMD_AN, 0, &val);
+	an_enabled = !!(val & BIT(12));
+
+	// Setup 100/1000MBit
+	read_mmd_phy(port, MMD_AN, 60, &val);
+	if (e->eee_enabled)
+		val |= 0x6;
+	else
+		val &= 0x6;
+	write_mmd_phy(port, MMD_AN, 60, val);
+
+	// Setup 2.5GBit
+	read_mmd_phy(port, MMD_AN, 62, &val);
+	if (e->eee_enabled)
+		val |= 0x1;
+	else
+		val &= 0x1;
+	write_mmd_phy(port, MMD_AN, 62, val);
+
+	// RestartAutoNegotiation
+	read_mmd_phy(port, MMD_VEND2, 0xA400, &val);
+	val |= BIT(9);
+	write_mmd_phy(port, MMD_VEND2, 0xA400, val);
+
+	resume_polling(poll_state);
+
+	return 0;
+}
+
 static struct fw_header *rtl838x_request_fw(struct phy_device *phydev,
 					    const struct firmware *fw,
 					    const char *name)
@@ -809,79 +895,6 @@ static int rtl8218b_ext_match_phy_device(struct phy_device *phydev)
 		return phydev->phy_id == PHY_ID_RTL8218B_E;
 }
 
-/*
- * Read an mmd register of the PHY
- */
-static int rtl83xx_read_mmd_phy(u32 port, u32 addr, u32 reg, u32 *val)
-{
-	u32 v;
-
-	mutex_lock(&smi_lock);
-
-	if (rtl838x_smi_wait_op(10000))
-		goto timeout;
-
-	sw_w32(1 << port, RTL838X_SMI_ACCESS_PHY_CTRL_0);
-	mdelay(10);
-
-	sw_w32_mask(0xffff0000, port << 16, RTL838X_SMI_ACCESS_PHY_CTRL_2);
-
-	v = addr << 16 | reg;
-	sw_w32(v, RTL838X_SMI_ACCESS_PHY_CTRL_3);
-
-	/* mmd-access | read | cmd-start */
-	v = 1 << 1 | 0 << 2 | 1;
-	sw_w32(v, RTL838X_SMI_ACCESS_PHY_CTRL_1);
-
-	if (rtl838x_smi_wait_op(10000))
-		goto timeout;
-
-	*val = sw_r32(RTL838X_SMI_ACCESS_PHY_CTRL_2) & 0xffff;
-
-	mutex_unlock(&smi_lock);
-	return 0;
-
-timeout:
-	mutex_unlock(&smi_lock);
-	return -ETIMEDOUT;
-}
-
-/*
- * Write to an mmd register of the PHY
- */
-static int rtl838x_write_mmd_phy(u32 port, u32 addr, u32 reg, u32 val)
-{
-	u32 v;
-
-	pr_debug("MMD write: port %d, dev %d, reg %d, val %x\n", port, addr, reg, val);
-	val &= 0xffff;
-	mutex_lock(&smi_lock);
-
-	if (rtl838x_smi_wait_op(10000))
-		goto timeout;
-
-	sw_w32(1 << port, RTL838X_SMI_ACCESS_PHY_CTRL_0);
-	mdelay(10);
-
-	sw_w32_mask(0xffff0000, val << 16, RTL838X_SMI_ACCESS_PHY_CTRL_2);
-
-	sw_w32_mask(0x1f << 16, addr << 16, RTL838X_SMI_ACCESS_PHY_CTRL_3);
-	sw_w32_mask(0xffff, reg, RTL838X_SMI_ACCESS_PHY_CTRL_3);
-	/* mmd-access | write | cmd-start */
-	v = 1 << 1 | 1 << 2 | 1;
-	sw_w32(v, RTL838X_SMI_ACCESS_PHY_CTRL_1);
-
-	if (rtl838x_smi_wait_op(10000))
-		goto timeout;
-
-	mutex_unlock(&smi_lock);
-	return 0;
-
-timeout:
-	mutex_unlock(&smi_lock);
-	return -ETIMEDOUT;
-}
-
 static int rtl8218b_read_mmd(struct phy_device *phydev,
 				     int devnum, u16 regnum)
 {
@@ -889,7 +902,7 @@ static int rtl8218b_read_mmd(struct phy_device *phydev,
 	u32 val;
 	int addr = phydev->mdio.addr;
 
-	ret = rtl83xx_read_mmd_phy(addr, devnum, regnum, &val);
+	ret = read_mmd_phy(addr, devnum, regnum, &val);
 	if (ret)
 		return ret;
 	return val;
@@ -1022,48 +1035,6 @@ static int rtl8214fc_get_port(struct phy_device *phydev)
  * but the only way that works since the kernel first enables EEE in the MAC
  * and then sets up the PHY. The MAC-based approach would require the oppsite.
  */
-static void rtl8218b_eee_set(int port, bool enable)
-{
-	u32 val;
-	bool an_enabled;
-
-	/* Set GPHY page to copper */
-	write_phy(port, 0, 30, 0x0001);
-	read_phy(port, 0, 0, &val);
-	an_enabled = val & BIT(12);
-
-	if (enable) {
-		/* 100/1000M EEE Capability */
-		write_phy(port, 0, 13, 0x0007);
-		write_phy(port, 0, 14, 0x003C);
-		write_phy(port, 0, 13, 0x4007);
-		write_phy(port, 0, 14, 0x0006);
-
-		read_phy(port, 0x0A43, 25, &val);
-		val |= BIT(4);
-		write_phy(port, 0x0A43, 25, val);
-	} else {
-		/* 100/1000M EEE Capability */
-		write_phy(port, 0, 13, 0x0007);
-		write_phy(port, 0, 14, 0x003C);
-		write_phy(port, 0, 13, 0x0007);
-		write_phy(port, 0, 14, 0x0000);
-
-		read_phy(port, 0x0A43, 25, &val);
-		val &= ~BIT(4);
-		write_phy(port, 0x0A43, 25, val);
-	}
-
-	/* Restart AN if enabled */
-	if (an_enabled) {
-		read_phy(port, 0, 0, &val);
-		val |= BIT(9);
-		write_phy(port, 0, 0, val);
-	}
-
-	/* GPHY page back to auto*/
-	write_phy(port, 0xa42, 29, 0);
-}
 
 void rtl8218d_eee_set(int port, bool enable)
 {
@@ -1078,7 +1049,9 @@ void rtl8218d_eee_set(int port, bool enable)
 	an_enabled = val & BIT(12);
 
 	/* Enable 100M (bit 1) / 1000M (bit 2) EEE */
-	rtl838x_write_mmd_phy(port, 7, 60, enable ? 0x6 : 0);
+	read_mmd_phy(port, 7, 60, &val);
+	val |= BIT(2) | BIT(1);
+	write_mmd_phy(port, 7, 60, enable ? 0x6 : 0);
 
 	/* 500M EEE ability */
 	read_phy(port, 0xa42, 20, &val);
@@ -1153,19 +1126,55 @@ static int rtl8214fc_set_eee(struct phy_device *phydev,
 				     struct ethtool_eee *e)
 {
 	u32 poll_state;
-	int addr = phydev->mdio.addr;
+	int port = phydev->mdio.addr;
+	bool an_enabled;
+	u32 val;
 
-	pr_debug("In %s port %d, enabled %d\n", __func__, addr, e->eee_enabled);
+	pr_debug("In %s port %d, enabled %d\n", __func__, port, e->eee_enabled);
 
-	if (rtl8380_rtl8214fc_media_is_fibre(addr)) {
-		netdev_err(phydev->attached_dev, "Port %d configured for FIBRE", addr);
+	if (rtl8380_rtl8214fc_media_is_fibre(port)) {
+		netdev_err(phydev->attached_dev, "Port %d configured for FIBRE", port);
 		return -ENOTSUPP;
 	}
 
-	poll_state = sw_r32(RTL838X_SMI_POLL_CTRL);
-	sw_w32(0, RTL838X_SMI_POLL_CTRL);
-	rtl8218b_eee_set(addr, (bool) e->eee_enabled);
-	sw_w32(poll_state, RTL838X_SMI_POLL_CTRL);
+	poll_state = disable_polling(port);
+
+	/* Set GPHY page to copper */
+	write_phy(port, 0xa42, 29, 0x0001);
+
+	// Get auto-negotiation status
+	read_phy(port, 0, 0, &val);
+	an_enabled = val & BIT(12);
+
+	pr_info("%s: aneg: %d\n", __func__, an_enabled);
+	read_phy(port, 0x0A43, 25, &val);
+	val &= ~BIT(5);  // Use MAC-based EEE
+	write_phy(port, 0x0A43, 25, val);
+
+	/* Enable 100M (bit 1) / 1000M (bit 2) EEE */
+	write_phy(port, 7, 60, e->eee_enabled ? 0x6 : 0);
+
+	/* 500M EEE ability */
+	read_phy(port, 0xa42, 20, &val);
+	if (e->eee_enabled)
+		val |= BIT(7);
+	else
+		val &= ~BIT(7);
+	write_phy(port, 0xa42, 20, val);
+
+	/* Restart AN if enabled */
+	if (an_enabled) {
+		pr_info("%s: doing aneg\n", __func__);
+		read_phy(port, 0, 0, &val);
+		val |= BIT(9);
+		write_phy(port, 0, 0, val);
+	}
+
+	/* GPHY page back to auto*/
+	write_phy(port, 0xa42, 29, 0);
+
+	resume_polling(poll_state);
+
 	return 0;
 }
 
@@ -1185,15 +1194,53 @@ static int rtl8214fc_get_eee(struct phy_device *phydev,
 
 static int rtl8218b_set_eee(struct phy_device *phydev, struct ethtool_eee *e)
 {
-	int addr = phydev->mdio.addr;
+	int port = phydev->mdio.addr;
 	u64 poll_state;
+	u32 val;
+	bool an_enabled;
 
-	pr_info("In %s, port %d, enabled %d\n", __func__, addr, e->eee_enabled);
+	pr_info("In %s, port %d, enabled %d\n", __func__, port, e->eee_enabled);
 
-	poll_state = disable_polling(addr);
+	poll_state = disable_polling(port);
 
-	rtl8218b_eee_set(addr, (bool) e->eee_enabled);
+	/* Set GPHY page to copper */
+	write_phy(port, 0, 30, 0x0001);
+	read_phy(port, 0, 0, &val);
+	an_enabled = val & BIT(12);
 
+	if (e->eee_enabled) {
+		/* 100/1000M EEE Capability */
+		write_phy(port, 0, 13, 0x0007);
+		write_phy(port, 0, 14, 0x003C);
+		write_phy(port, 0, 13, 0x4007);
+		write_phy(port, 0, 14, 0x0006);
+
+		read_phy(port, 0x0A43, 25, &val);
+		val |= BIT(4);
+		write_phy(port, 0x0A43, 25, val);
+	} else {
+		/* 100/1000M EEE Capability */
+		write_phy(port, 0, 13, 0x0007);
+		write_phy(port, 0, 14, 0x003C);
+		write_phy(port, 0, 13, 0x0007);
+		write_phy(port, 0, 14, 0x0000);
+
+		read_phy(port, 0x0A43, 25, &val);
+		val &= ~BIT(4);
+		write_phy(port, 0x0A43, 25, val);
+	}
+
+	/* Restart AN if enabled */
+	if (an_enabled) {
+		read_phy(port, 0, 0, &val);
+		val |= BIT(9);
+		write_phy(port, 0, 0, val);
+	}
+
+	/* GPHY page back to auto*/
+	write_phy(port, 0xa42, 30, 0);
+
+	pr_info("%s done\n", __func__);
 	resume_polling(poll_state);
 
 	return 0;
@@ -1859,6 +1906,8 @@ static struct phy_driver rtl83xx_phy_driver[] = {
 		.write_page	= rtl8226_write_page,
 		.read_status	= rtl8226_read_status,
 		.config_aneg	= rtl8226_config_aneg,
+		.set_eee	= rtl8226_set_eee,
+		.get_eee	= rtl8226_get_eee,
 	},
 	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8218B_I),

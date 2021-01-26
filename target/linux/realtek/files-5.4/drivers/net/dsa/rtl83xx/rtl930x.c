@@ -403,7 +403,7 @@ int rtl930x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 
 	do {
 		v = sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_1);
-	} while (v & 0x1);
+	} while (v & BIT(0));
 
 	if (v & 0x2)
 		err = -EIO;
@@ -430,7 +430,7 @@ int rtl930x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 
 	do {
 		v = sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_1);
-	} while ( v & 0x1);
+	} while (v & BIT(0));
 
 	if (v & BIT(25)) {
 		pr_debug("Error reading phy %d, register %d\n", port, reg);
@@ -444,7 +444,6 @@ int rtl930x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 
 	return err;
 }
-
 
 /*
  * Write to an mmd register of the PHY
@@ -465,12 +464,12 @@ int rtl930x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
 	// Set MMD device number and register to write to
 	sw_w32(devnum << 16 | (regnum & 0xffff), RTL930X_SMI_ACCESS_PHY_CTRL_3);
 
-	v = BIT(2)| BIT(1)| BIT(0); // WRITE | MMD-access | EXEC
+	v = BIT(2) | BIT(1) | BIT(0); // WRITE | MMD-access | EXEC
 	sw_w32(v, RTL930X_SMI_ACCESS_PHY_CTRL_1);
 
 	do {
 		v = sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_1);
-	} while ( v & BIT(0));
+	} while (v & BIT(0));
 
 	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, val, err);
 	mutex_unlock(&smi_lock);
@@ -493,12 +492,12 @@ int rtl930x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 	// Set MMD device number and register to write to
 	sw_w32(devnum << 16 | (regnum & 0xffff), RTL930X_SMI_ACCESS_PHY_CTRL_3);
 
-	v = BIT(1)| BIT(0); // MMD-access | EXEC
+	v = BIT(1) | BIT(0); // MMD-access | EXEC
 	sw_w32(v, RTL930X_SMI_ACCESS_PHY_CTRL_1);
 
 	do {
 		v = sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_1);
-	} while ( v & 0x1);
+	} while (v & BIT(0));
 	// There is no error-checking via BIT 25 of v, as it does not seem to be set correctly
 	*val = (sw_r32(RTL930X_SMI_ACCESS_PHY_CTRL_2) & 0xffff);
 	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
@@ -563,7 +562,7 @@ void rtl930x_port_eee_set(struct rtl838x_switch_priv *priv, int port, bool enabl
 	if (port >= 26)
 		return;
 
-	pr_info("In %s: setting port %d to %d\n", __func__, port, enable);
+	pr_debug("In %s: setting port %d to %d\n", __func__, port, enable);
 	v = enable ? 0x3f : 0x0;
 
 	// Set EEE/EEEP state for 100, 500, 1000MBit and 2.5, 5 and 10GBit
@@ -584,7 +583,7 @@ int rtl930x_eee_port_ability(struct rtl838x_switch_priv *priv, struct ethtool_ee
 	u32 link, a;
 
 	if (port >= 26)
-		return 0;
+		return -ENOTSUPP;
 
 	pr_info("In %s, port %d\n", __func__, port);
 	link = sw_r32(RTL930X_MAC_LINK_STS);
@@ -599,12 +598,15 @@ int rtl930x_eee_port_ability(struct rtl838x_switch_priv *priv, struct ethtool_ee
 	if (sw_r32(rtl930x_mac_force_mode_ctrl(port)) & BIT(12))
 		e->advertised |= ADVERTISED_1000baseT_Full;
 
-	if (priv->ports[port].is2G5 && sw_r32(rtl930x_mac_force_mode_ctrl(port)) & BIT(13))
+	if (priv->ports[port].is2G5 && sw_r32(rtl930x_mac_force_mode_ctrl(port)) & BIT(13)) {
+		pr_info("ADVERTISING 2.5G EEE\n");
 		e->advertised |= ADVERTISED_2500baseX_Full;
+	}
 
 	if (priv->ports[port].is10G && sw_r32(rtl930x_mac_force_mode_ctrl(port)) & BIT(15))
 		e->advertised |= ADVERTISED_10000baseT_Full;
 
+	a = sw_r32(RTL930X_MAC_EEE_ABLTY);
 	a = sw_r32(RTL930X_MAC_EEE_ABLTY);
 	pr_info("Link partner: %08x\n", a);
 	if (a & BIT(port)) {
@@ -614,8 +616,12 @@ int rtl930x_eee_port_ability(struct rtl838x_switch_priv *priv, struct ethtool_ee
 			e->lp_advertised |= ADVERTISED_2500baseX_Full;
 		if (priv->ports[port].is10G)
 			e->lp_advertised |= ADVERTISED_10000baseT_Full;
-		return 1;
 	}
+
+	// Read 2x to clear latched state
+	a = sw_r32(RTL930X_EEEP_PORT_CTRL(port));
+	a = sw_r32(RTL930X_EEEP_PORT_CTRL(port));
+	pr_info("%s RTL930X_EEEP_PORT_CTRL: %08x\n", __func__, a);
 
 	return 0;
 }
@@ -629,7 +635,7 @@ static void rtl930x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 	// Setup EEE on all ports
 	for (i = 0; i < priv->cpu_port; i++) {
 		if (priv->ports[i].phy)
-			rtl930x_port_eee_set(priv, i, true);
+			rtl930x_port_eee_set(priv, i, enable);
 	}
 
 	priv->eee_enabled = enable;

@@ -358,10 +358,9 @@ int rtl839x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 		return -ENOTSUPP;
 
 	mutex_lock(&smi_lock);
-	/* Clear both port registers */
-	sw_w32(0, RTL839X_PHYREG_PORT_CTRL(0));
-	sw_w32(0, RTL839X_PHYREG_PORT_CTRL(0) + 4);
-	sw_w32_mask(0, BIT(port), RTL839X_PHYREG_PORT_CTRL(port));
+
+	// Set PHY to access
+	rtl839x_set_port_reg_le(BIT_ULL(port), RTL839X_PHYREG_PORT_CTRL);
 
 	sw_w32_mask(0xffff0000, val << 16, RTL839X_PHYREG_DATA_CTRL);
 
@@ -379,6 +378,68 @@ int rtl839x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 	if (sw_r32(RTL839X_PHYREG_ACCESS_CTRL) & 0x2)
 		err = -EIO;
 
+	mutex_unlock(&smi_lock);
+	return err;
+}
+
+/*
+ * Read an mmd register of the PHY
+ */
+int rtl839x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
+{
+	int err = 0;
+	u32 v;
+
+	mutex_lock(&smi_lock);
+
+	// Set PHY to access
+	sw_w32_mask(0xffff << 16, port << 16, RTL839X_PHYREG_DATA_CTRL);
+
+	// Set MMD device number and register to write to
+	sw_w32(devnum << 16 | (regnum & 0xffff), RTL839X_PHYREG_MMD_CTRL);
+
+	v = BIT(2) | BIT(0); // MMD-access | EXEC
+	sw_w32(v, RTL839X_PHYREG_ACCESS_CTRL);
+
+	do {
+		v = sw_r32(RTL839X_PHYREG_ACCESS_CTRL);
+	} while (v & BIT(0));
+	// There is no error-checking via BIT 1 of v, as it does not seem to be set correctly
+	*val = (sw_r32(RTL839X_PHYREG_DATA_CTRL) & 0xffff);
+	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
+
+	mutex_unlock(&smi_lock);
+
+	return err;
+}
+
+/*
+ * Write to an mmd register of the PHY
+ */
+int rtl839x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
+{
+	int err = 0;
+	u32 v;
+
+	mutex_lock(&smi_lock);
+
+	// Set PHY to access
+	rtl839x_set_port_reg_le(BIT_ULL(port), RTL839X_PHYREG_PORT_CTRL);
+
+	// Set data to write
+	sw_w32_mask(0xffff << 16, val << 16, RTL839X_PHYREG_DATA_CTRL);
+
+	// Set MMD device number and register to write to
+	sw_w32(devnum << 16 | (regnum & 0xffff), RTL839X_PHYREG_MMD_CTRL);
+
+	v = BIT(3) | BIT(2) | BIT(0); // WRITE | MMD-access | EXEC
+	sw_w32(v, RTL839X_PHYREG_ACCESS_CTRL);
+
+	do {
+		v = sw_r32(RTL839X_PHYREG_ACCESS_CTRL);
+	} while (v & BIT(0));
+
+	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, val, err);
 	mutex_unlock(&smi_lock);
 	return err;
 }
@@ -468,7 +529,7 @@ void rtl839x_port_eee_set(struct rtl838x_switch_priv *priv, int port, bool enabl
 		return;
 
 	enable = true;
-	pr_info("In %s: setting port %d to %d\n", __func__, port, enable);
+	pr_debug("In %s: setting port %d to %d\n", __func__, port, enable);
 	v = enable ? 0xf : 0x0;
 
 	// Set EEE for 100, 500, 1000MBit and 10GBit

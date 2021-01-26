@@ -274,7 +274,7 @@ static void rtl838x_port_eee_set(struct rtl838x_switch_priv *priv, int port, boo
 	if (port >= 24)
 		return;
 
-	pr_info("In %s: setting port %d to %d\n", __func__, port, enable);
+	pr_debug("In %s: setting port %d to %d\n", __func__, port, enable);
 	v = enable ? 0x3 : 0x0;
 
 	// Set EEE state for 100 (bit 9) & 1000MBit (bit 10)
@@ -333,10 +333,10 @@ static void rtl838x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 	sw_w32(0x5001411, RTL838X_EEE_TX_TIMER_GIGA_CTRL);
 	sw_w32(0x5001417, RTL838X_EEE_TX_TIMER_GELITE_CTRL);
 
-	// Always by default disable EEE status on ports
+	// Enable EEE MAC support on ports
 	for (i = 0; i < priv->cpu_port; i++) {
 		if (priv->ports[i].phy)
-			rtl838x_port_eee_set(priv, i, false);
+			rtl838x_port_eee_set(priv, i, enable);
 	}
 	priv->eee_enabled = enable;
 }
@@ -501,6 +501,79 @@ int rtl838x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 	v = reg << 20 | page << 3 | 0x4;
 	sw_w32(v | park_page, RTL838X_SMI_ACCESS_PHY_CTRL_1);
 	sw_w32_mask(0, 1, RTL838X_SMI_ACCESS_PHY_CTRL_1);
+
+	if (rtl838x_smi_wait_op(10000))
+		goto timeout;
+
+	mutex_unlock(&smi_lock);
+	return 0;
+
+timeout:
+	mutex_unlock(&smi_lock);
+	return -ETIMEDOUT;
+}
+
+/*
+ * Read an mmd register of a PHY
+ */
+int rtl838x_read_mmd_phy(u32 port, u32 addr, u32 reg, u32 *val)
+{
+	u32 v;
+
+	mutex_lock(&smi_lock);
+
+	if (rtl838x_smi_wait_op(10000))
+		goto timeout;
+
+	sw_w32(1 << port, RTL838X_SMI_ACCESS_PHY_CTRL_0);
+	mdelay(10);
+
+	sw_w32_mask(0xffff0000, port << 16, RTL838X_SMI_ACCESS_PHY_CTRL_2);
+
+	v = addr << 16 | reg;
+	sw_w32(v, RTL838X_SMI_ACCESS_PHY_CTRL_3);
+
+	/* mmd-access | read | cmd-start */
+	v = 1 << 1 | 0 << 2 | 1;
+	sw_w32(v, RTL838X_SMI_ACCESS_PHY_CTRL_1);
+
+	if (rtl838x_smi_wait_op(10000))
+		goto timeout;
+
+	*val = sw_r32(RTL838X_SMI_ACCESS_PHY_CTRL_2) & 0xffff;
+
+	mutex_unlock(&smi_lock);
+	return 0;
+
+timeout:
+	mutex_unlock(&smi_lock);
+	return -ETIMEDOUT;
+}
+
+/*
+ * Write to an mmd register of a PHY
+ */
+int rtl838x_write_mmd_phy(u32 port, u32 addr, u32 reg, u32 val)
+{
+	u32 v;
+
+	pr_debug("MMD write: port %d, dev %d, reg %d, val %x\n", port, addr, reg, val);
+	val &= 0xffff;
+	mutex_lock(&smi_lock);
+
+	if (rtl838x_smi_wait_op(10000))
+		goto timeout;
+
+	sw_w32(1 << port, RTL838X_SMI_ACCESS_PHY_CTRL_0);
+	mdelay(10);
+
+	sw_w32_mask(0xffff0000, val << 16, RTL838X_SMI_ACCESS_PHY_CTRL_2);
+
+	sw_w32_mask(0x1f << 16, addr << 16, RTL838X_SMI_ACCESS_PHY_CTRL_3);
+	sw_w32_mask(0xffff, reg, RTL838X_SMI_ACCESS_PHY_CTRL_3);
+	/* mmd-access | write | cmd-start */
+	v = 1 << 1 | 1 << 2 | 1;
+	sw_w32(v, RTL838X_SMI_ACCESS_PHY_CTRL_1);
 
 	if (rtl838x_smi_wait_op(10000))
 		goto timeout;
