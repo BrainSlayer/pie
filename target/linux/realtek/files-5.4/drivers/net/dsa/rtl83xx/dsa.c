@@ -575,10 +575,10 @@ static int rtl83xx_get_mac_eee(struct dsa_switch *ds, int port,
 	priv->r->eee_port_ability(priv, e, port);
 
 	e->eee_enabled = priv->ports[port].eee_enabled;
-	pr_info("enabled: %d, active %x\n", e->eee_enabled, e->advertised);
+	pr_info("%s enabled: %d, active %x\n", __func__, e->eee_enabled, e->advertised);
 
 	e->eee_active = !!(e->advertised & e->lp_advertised);
-	pr_debug("active: %d, lp %x\n", e->eee_active, e->lp_advertised);
+	pr_debug("%s active: %d, lp %x\n", __func__, e->eee_active, e->lp_advertised);
 
 	return 0;
 }

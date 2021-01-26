@@ -128,7 +128,7 @@
 		status = "okay";
 
 		interrupt-parent = <&intc>;
-		interrupts = <20>;
+		interrupts = <23>;
 
 		compatible = "realtek,rtl83xx-switch";
 	};
