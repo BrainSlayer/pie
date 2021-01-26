@@ -1926,7 +1926,7 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 	SET_NETDEV_DEV(dev, &pdev->dev);
 	priv = netdev_priv(dev);
 
-	/* obtain buffer memory space */
+	/* Get IO Space */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (res) {
 		mem = devm_request_mem_region(&pdev->dev, res->start,
@@ -1946,14 +1946,18 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 	}
 
 	/* Allocate buffer memory */
-	priv->membase = dmam_alloc_coherent(&pdev->dev, rxrings * rxringlen * RING_BUFFER
-				+ sizeof(struct ring_b) + sizeof(struct notify_b),
-				(void *)&dev->mem_start, GFP_KERNEL);
+	priv->membase = devm_kzalloc(&pdev->dev, rxrings * rxringlen * RING_BUFFER
+					+ sizeof(struct ring_b)
+					+ sizeof(struct notify_b),
+				     GFP_KERNEL);
 	if (!priv->membase) {
 		dev_err(&pdev->dev, "cannot allocate DMA buffer\n");
 		err = -ENOMEM;
 		goto err_free;
 	}
+
+	// The headers and ring structures need to be in uncached memory
+	priv->membase = KSEG1ADDR(priv->membase);
 
 	// Allocate ring-buffer space at the end of the allocated memory
 	ring = priv->membase;
