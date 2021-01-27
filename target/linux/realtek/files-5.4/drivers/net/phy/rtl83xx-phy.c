@@ -120,8 +120,8 @@ static u64 disable_polling(int port)
 		saved_state = sw_r32(RTL930X_SMI_POLL_CTRL);
 		sw_w32_mask(BIT(port), 0, RTL930X_SMI_POLL_CTRL);
 		break;
-	case RTL9300_FAMILY_ID:
-		pr_warn("%s not implemented for RTL931X\n");
+	case RTL9310_FAMILY_ID:
+		pr_warn("%s not implemented for RTL931X\n", __func__);
 		break;
 	}
 
@@ -145,8 +145,8 @@ static int resume_polling(u64 saved_state)
 	case RTL9300_FAMILY_ID:
 		sw_w32(saved_state, RTL930X_SMI_POLL_CTRL);
 		break;
-	case RTL9300_FAMILY_ID:
-		pr_warn("%s not implemented for RTL931X\n");
+	case RTL9310_FAMILY_ID:
+		pr_warn("%s not implemented for RTL931X\n", __func__);
 		break;
 	}
 
@@ -929,7 +929,6 @@ static int rtl8226_read_mmd(struct phy_device *phydev, int devnum, u16 regnum)
 	u32 val;
 
 	err = read_mmd_phy(port, devnum, regnum, &val);
-
 	if (err)
 		return err;
 	return val;
@@ -1041,7 +1040,6 @@ static int rtl8214fc_get_port(struct phy_device *phydev)
  * but the only way that works since the kernel first enables EEE in the MAC
  * and then sets up the PHY. The MAC-based approach would require the oppsite.
  */
-
 void rtl8218d_eee_set(int port, bool enable)
 {
 	u32 val;
@@ -1898,7 +1896,8 @@ static struct phy_driver rtl83xx_phy_driver[] = {
 		.set_loopback	= genphy_loopback,
 		.set_eee	= rtl8218d_set_eee,
 		.get_eee	= rtl8218d_get_eee,
-	},	{
+	},
+	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8226),
 		.name		= "REALTEK RTL8226",
 		.features	= PHY_GBIT_FEATURES,

@@ -631,6 +631,7 @@ static int rtl83xx_port_bridge_join(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
+
 	int i;
 
 	pr_debug("%s %x: %d %llx", __func__, (u32)priv, port, port_bitmap);
@@ -838,14 +839,14 @@ static int rtl83xx_vlan_prepare(struct dsa_switch *ds, int port,
 	struct rtl838x_vlan_info info;
 	struct rtl838x_switch_priv *priv = ds->priv;
 
-	pr_debug("%s: port %d\n", __func__, port);
+	pr_info("%s: port %d\n", __func__, port);
 
 	mutex_lock(&priv->reg_mutex);
 
 	priv->r->vlan_profile_dump(1);
 	priv->r->vlan_tables_read(1, &info);
 
-	pr_debug("Tagged ports %llx, untag %llx, prof %x, MC# %d, UC# %d, FID %x\n",
+	pr_info("Tagged ports %llx, untag %llx, prof %x, MC# %d, UC# %d, FID %x\n",
 		info.tagged_ports, info.untagged_ports, info.profile_id,
 		info.hash_mc_fid, info.hash_uc_fid, info.fid);
 
@@ -866,7 +867,7 @@ static void rtl83xx_vlan_add(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int v;
 
-	pr_debug("%s port %d, vid_end %d, vid_end %d, flags %x\n", __func__,
+	pr_info("%s port %d, vid_end %d, vid_end %d, flags %x\n", __func__,
 		port, vlan->vid_begin, vlan->vid_end, vlan->flags);
 
 	if (vlan->vid_begin > 4095 || vlan->vid_end > 4095) {
@@ -911,10 +912,10 @@ static void rtl83xx_vlan_add(struct dsa_switch *ds, int port,
 			info.untagged_ports |= BIT_ULL(port);
 
 		priv->r->vlan_set_untagged(v, info.untagged_ports);
-		pr_debug("Untagged ports, VLAN %d: %llx\n", v, info.untagged_ports);
+		pr_info("Untagged ports, VLAN %d: %llx\n", v, info.untagged_ports);
 
 		priv->r->vlan_set_tagged(v, &info);
-		pr_debug("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
+		pr_info("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
 	}
 
 	mutex_unlock(&priv->reg_mutex);

@@ -649,7 +649,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 
 	/* Enable link and media change interrupts. Are the SERDES masks needed? */
 	sw_w32_mask(0, 3, priv->r->isr_glb_src);
-	
+
 	priv->r->set_port_reg_le(priv->irq_mask, priv->r->isr_port_link_sts_chg);
 	priv->r->set_port_reg_le(priv->irq_mask, priv->r->imr_port_link_sts_chg);
 

@@ -13,7 +13,6 @@
 #define RTL8231_GPIO_DATA(gpio)			((0x001C) + ((gpio) >> 4))
 
 #define USEC_TIMEOUT 50000
-
 struct rtl8231_gpios {
 	struct gpio_chip gc;
 	struct device *dev;
