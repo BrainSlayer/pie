@@ -120,6 +120,9 @@ static u64 disable_polling(int port)
 		saved_state = sw_r32(RTL930X_SMI_POLL_CTRL);
 		sw_w32_mask(BIT(port), 0, RTL930X_SMI_POLL_CTRL);
 		break;
+	case RTL9300_FAMILY_ID:
+		pr_warn("%s not implemented for RTL931X\n");
+		break;
 	}
 
 	mutex_unlock(&poll_lock);
@@ -141,6 +144,9 @@ static int resume_polling(u64 saved_state)
 		break;
 	case RTL9300_FAMILY_ID:
 		sw_w32(saved_state, RTL930X_SMI_POLL_CTRL);
+		break;
+	case RTL9300_FAMILY_ID:
+		pr_warn("%s not implemented for RTL931X\n");
 		break;
 	}
 
@@ -390,6 +396,7 @@ static int rtl8393_read_status(struct phy_device *phydev)
 
 	return err;
 }
+
 static int rtl8226_read_page(struct phy_device *phydev)
 {
 	return __phy_read(phydev, 0x1f);
@@ -414,20 +421,20 @@ static int rtl8226_read_status(struct phy_device *phydev)
 
 	// Link status must be read twice
 	for (i = 0; i < 2; i++) {
-		rtl930x_read_mmd_phy(port, MMD_VEND2, 0xA402, &val);
+		read_mmd_phy(port, MMD_VEND2, 0xA402, &val);
 	}
 	phydev->link = val & BIT(2) ? 1 : 0;
 	if (!phydev->link)
 		goto out;
 
 	// Read duplex status
-	ret = rtl930x_read_mmd_phy(port, MMD_VEND2, 0xA434, &val);
+	ret = read_mmd_phy(port, MMD_VEND2, 0xA434, &val);
 	if (ret)
 		goto out;
 	phydev->duplex = !!(val & BIT(3));
 
 	// Read speed
-	ret = rtl930x_read_mmd_phy(port, MMD_VEND2, 0xA434, &val);
+	ret = read_mmd_phy(port, MMD_VEND2, 0xA434, &val);
 	switch (val & 0x0630) {
 	case 0x0000:
 		phydev->speed = SPEED_10;
@@ -454,7 +461,7 @@ out:
 	return ret;
 }
 
-static int rtl8266_advertise_aneg(struct phy_device *phydev)
+static int rtl8226_advertise_aneg(struct phy_device *phydev)
 {
 	int ret = 0;
 	u32 v;
@@ -462,7 +469,7 @@ static int rtl8266_advertise_aneg(struct phy_device *phydev)
 
 	pr_info("In %s\n", __func__);
 
-	ret = rtl930x_read_mmd_phy(port, MMD_AN, 16, &v);
+	ret = read_mmd_phy(port, MMD_AN, 16, &v);
 	if (ret)
 		goto out;
 
@@ -471,30 +478,29 @@ static int rtl8266_advertise_aneg(struct phy_device *phydev)
 	v |= BIT(7); // HD 100M
 	v |= BIT(8); // FD 100M
 
-	ret = rtl930x_write_mmd_phy(port, MMD_AN, 16, v);
+	ret = write_mmd_phy(port, MMD_AN, 16, v);
 
 	// Allow 1GBit
-	ret = rtl930x_read_mmd_phy(port, MMD_VEND2, 0xA412, &v);
+	ret = read_mmd_phy(port, MMD_VEND2, 0xA412, &v);
 	if (ret)
 		goto out;
 	v |= BIT(9); // FD 1000M
 
-	ret = rtl930x_write_mmd_phy(port, MMD_VEND2, 0xA412, v);
+	ret = write_mmd_phy(port, MMD_VEND2, 0xA412, v);
 	if (ret)
 		goto out;
 
 	// Allow 2.5G
-	ret = rtl930x_read_mmd_phy(port, MMD_AN, 32, &v);
+	ret = read_mmd_phy(port, MMD_AN, 32, &v);
 	if (ret)
 		goto out;
 
 	v |= BIT(7);
-	ret = rtl930x_write_mmd_phy(port, MMD_AN, 32, v);
+	ret = write_mmd_phy(port, MMD_AN, 32, v);
 
 out:
 	return ret;
 }
-
 
 static int rtl8226_config_aneg(struct phy_device *phydev)
 {
@@ -504,26 +510,26 @@ static int rtl8226_config_aneg(struct phy_device *phydev)
 
 	pr_info("In %s\n", __func__);
 	if (phydev->autoneg == AUTONEG_ENABLE) {
-		ret = rtl8266_advertise_aneg(phydev);
+		ret = rtl8226_advertise_aneg(phydev);
 		if (ret)
 			goto out;
 		// AutoNegotiationEnable
-		ret = rtl930x_read_mmd_phy(port, MMD_AN, 0, &v);
+		ret = read_mmd_phy(port, MMD_AN, 0, &v);
 		if (ret)
 			goto out;
 
 		v |= BIT(12); // Enable AN
-		ret = rtl930x_write_mmd_phy(port, MMD_AN, 0, v);
+		ret = write_mmd_phy(port, MMD_AN, 0, v);
 		if (ret)
 			goto out;
 
 		// RestartAutoNegotiation
-		ret = rtl930x_read_mmd_phy(port, MMD_VEND2, 0xA400, &v);
+		ret = read_mmd_phy(port, MMD_VEND2, 0xA400, &v);
 		if (ret)
 			goto out;
 		v |= BIT(9);
 
-		ret = rtl930x_write_mmd_phy(port, MMD_VEND2, 0xA400, v);
+		ret = write_mmd_phy(port, MMD_VEND2, 0xA400, v);
 	}
 
 	pr_info("%s: Ret is already: %d\n", __func__, ret);
@@ -922,7 +928,7 @@ static int rtl8226_read_mmd(struct phy_device *phydev, int devnum, u16 regnum)
 	int err;
 	u32 val;
 
-	err = rtl930x_read_mmd_phy(port, devnum, regnum, &val);
+	err = read_mmd_phy(port, devnum, regnum, &val);
 
 	if (err)
 		return err;
@@ -933,7 +939,7 @@ static int rtl8226_write_mmd(struct phy_device *phydev, int devnum, u16 regnum, 
 {
 	int port = phydev->mdio.addr; // the SoC translates port addresses to PHY addr
 
-	return rtl930x_write_mmd_phy(port, devnum, regnum, val);
+	return write_mmd_phy(port, devnum, regnum, val);
 }
 
 static void rtl8380_rtl8214fc_media_set(int mac, bool set_fibre)
