@@ -4,6 +4,7 @@
 #define _RTL838X_H
 
 #include <net/dsa.h>
+#include <linux/in6.h>
 
 /*
  * Register definition
@@ -332,8 +333,23 @@
 /* Debug features */
 #define RTL930X_STAT_PRVTE_DROP_COUNTER0	(0xB5B8)
 
+/* L3 Features */
+#define RTL930X_L3_HOST_TBL_CTRL		(0xAB48)
+#define RTL930X_L3_IPUC_ROUTE_CTRL		(0xAB4C)
+#define RTL930X_L3_IPUC_ROUTE_CTRL		(0xAB4C)
+#define RTL930X_L3_IP6UC_ROUTE_CTRL		(0xAB50)
+#define RTL930X_L3_IPMC_ROUTE_CTRL		(0xAB54)
+#define RTL930X_L3_IP6MC_ROUTE_CTRL		(0xAB58)
+#define RTL930X_L3_IP_MTU_CTRL(i)		(0xAB5C + ((i >> 1) << 2))
+#define RTL930X_L3_IP6_MTU_CTRL(i)		(0xAB6C + ((i >> 1) << 2))
+
+
 #define MAX_LAGS 16
 #define MAX_PRIOS 8
+#define MAX_INTF_MTUS 8
+#define DEFAULT_MTU 1536
+#define MAX_INTERFACES 100
+#define MAX_ROUTES 100
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -391,6 +407,49 @@ struct rtl838x_l2_entry {
 	u8 trunk;
 	u8 stackDev;
 	u16 mc_portmask_index;
+};
+
+struct rtl838x_route_info {
+	bool valid;
+	u8 type;
+	struct in6_addr ip6_r;
+	u32 ip4_r;
+	bool hit;
+	u8 prefix_len;
+	u8 action;
+	u16 next_hop;
+	bool ttl_dec;
+	bool ttl_check;
+	bool dst_null;
+	bool qos_as;
+	u8 qos_prio;
+};
+
+struct rtl838x_l3_intf {
+	u16 vid;
+	u8 smac_idx;
+	u8 ip4_mtu_id;
+	u8 ip6_mtu_id;
+	u16 ip4_mtu;
+	u16 ip6_mtu;
+	u8 ttl_scope;
+	u8 hl_scope;
+	u8 ip4_icmp_redirect;
+	u8 ip6_icmp_redirect;
+	u8 ip4_pbr_icmp_redirect;
+	u8 ip6_pbr_icmp_redirect;
+};
+
+struct rtl838x_rt_mac {
+	bool valid;
+	bool p_type;
+	bool p_mask;
+	u8 p_id;
+	u8 action;
+	u16 vid;
+	u16 vid_mask;
+	u64 mac;
+	u64 mac_mask;
 };
 
 struct rtl838x_switch_priv;
@@ -479,7 +538,11 @@ struct rtl838x_switch_priv {
 	u64 lags_port_members[MAX_LAGS];
 	struct net_device *lag_devs[MAX_LAGS];
 	struct notifier_block nb;
+	struct notifier_block fib_nb;
 	bool eee_enabled;
+	u16 intf_mtus[MAX_INTF_MTUS];
+	int intf_mtu_count[MAX_INTF_MTUS];
+	struct rtl838x_l3_intf *interfaces[MAX_INTERFACES];
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);

@@ -1957,7 +1957,7 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 	}
 
 	// The headers and ring structures need to be in uncached memory
-	priv->membase = KSEG1ADDR(priv->membase);
+	priv->membase = (void *)KSEG1ADDR(priv->membase);
 
 	// Allocate ring-buffer space at the end of the allocated memory
 	ring = priv->membase;

@@ -550,6 +550,52 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+/* Called with rcu_read_lock() */
+static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+//	struct rtl93xx_fib_event_work *fib_work;
+	struct fib_notifier_info *info = ptr;
+	struct rtl838x_switch_priv *priv;
+
+	if ((info->family != AF_INET && info->family != AF_INET6 &&
+	     info->family != RTNL_FAMILY_IPMR &&
+	     info->family != RTNL_FAMILY_IP6MR))
+		return NOTIFY_DONE;
+
+	priv = container_of(this, struct rtl838x_switch_priv, fib_nb);
+
+	switch (event) {
+	case FIB_EVENT_RULE_ADD:
+	case FIB_EVENT_RULE_DEL:
+		pr_info("%s: FIB_RULE ADD/DELL\n", __func__);
+		return NOTIFY_DONE;
+	case FIB_EVENT_ENTRY_ADD:
+	case FIB_EVENT_ENTRY_REPLACE:
+	case FIB_EVENT_ENTRY_APPEND:
+		pr_info("%s: FIB_ENTRY ADD/DELL\n", __func__);
+		break;
+	}
+
+/*
+	fib_work = kzalloc(sizeof(*fib_work), GFP_ATOMIC);
+	if (!fib_work)
+		return NOTIFY_BAD;
+
+	fib_work->mlxsw_sp = router->mlxsw_sp;
+	fib_work->event = event;
+*/
+
+	switch (info->family) {
+	case AF_INET:
+		pr_info("AF_INET\n");
+		break;
+	case AF_INET6:
+		pr_info("AF_INET6\n");
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
 static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 {
 	int err = 0, i;
@@ -571,9 +617,9 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	priv->ds = dsa_switch_alloc(dev, DSA_MAX_PORTS);
-
 	if (!priv->ds)
 		return -ENOMEM;
+
 	priv->ds->dev = dev;
 	priv->ds->priv = priv;
 	priv->ds->ops = &rtl83xx_switch_ops;
@@ -686,15 +732,28 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 
 	rtl83xx_setup_qos(priv);
 
+	if (priv->family_id == RTL9300_FAMILY_ID)
+		rtl930x_l3_setup(priv);
+
 	/* Clear all destination ports for mirror groups */
 	for (i = 0; i < 4; i++)
 		priv->mirror_group_ports[i] = -1;
 
 	priv->nb.notifier_call = rtl83xx_netdevice_event;
-		if (register_netdevice_notifier(&priv->nb)) {
-			priv->nb.notifier_call = NULL;
-			dev_err(dev, "Failed to register LAG netdev notifier\n");
+	if (register_netdevice_notifier(&priv->nb)) {
+		priv->nb.notifier_call = NULL;
+		dev_err(dev, "Failed to register LAG netdev notifier\n");
+		goto err_register_nb;
 	}
+
+	priv->fib_nb.notifier_call = rtl83xx_fib_event;
+	/* Only FIBs pointing to our own netdevs are programmed into
+	 * the device, so no need to pass a callback.
+	 */
+	// TODO 5.9: err = register_fib_notifier(&init_net, &priv->fib_nb, NULL, NULL);
+	err = register_fib_notifier(&priv->fib_nb, NULL);
+	if (err)
+		goto err_register_fib_nb;
 
 	// Flood BPDUs to all ports including cpu-port
 	if (soc_info.family != RTL9300_FAMILY_ID) { // TODO: Port this functionality
@@ -707,6 +766,11 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		rtl838x_dbgfs_init(priv);
 	}
 
+	return 0;
+
+err_register_fib_nb:
+	unregister_netdevice_notifier(&priv->nb);
+err_register_nb:
 	return err;
 }
 
