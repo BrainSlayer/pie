@@ -513,6 +513,8 @@ struct rtl838x_reg {
 	void (*port_eee_set)(struct rtl838x_switch_priv *priv, int port, bool enable);
 	int (*eee_port_ability)(struct rtl838x_switch_priv *priv,
 				struct ethtool_eee *e, int port);
+	int (*fib4_del)(struct rtl838x_switch_priv *, struct fib_entry_notifier_info *);
+	int (*fib4_add)(struct rtl838x_switch_priv *, struct fib_entry_notifier_info *);
 };
 
 struct rtl838x_switch_priv {

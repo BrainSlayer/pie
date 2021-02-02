@@ -1070,13 +1070,25 @@ static int rtl930x_l3_intf_add(struct rtl838x_switch_priv *priv, struct rtl838x_
 	}
 }
 
-
-
 static void rtl930x_l3_dump(void)
 {
 	pr_info("L3 UC Routing enabled: %d\n", sw_r32(RTL930X_L3_IPUC_ROUTE_CTRL) & 0x1);
 	pr_info("RTL930X_L3_IPUC_ROUTE_CTRL: %08x\n", sw_r32(RTL930X_L3_IPUC_ROUTE_CTRL));
 	
+}
+
+static int rtl930x_fib4_del(struct rtl838x_switch_priv *priv,
+			    struct fib_entry_notifier_info *info)
+{
+	pr_info("In %s\n", __func__);
+	return 0;
+}
+
+int rtl930x_fib4_add(struct rtl838x_switch_priv *priv,
+		     struct fib_entry_notifier_info *info)
+{
+	pr_info("In %s\n", __func__);
+	return 0;
 }
 
 int rtl930x_l3_setup(struct rtl838x_switch_priv *priv)
@@ -1090,6 +1102,9 @@ int rtl930x_l3_setup(struct rtl838x_switch_priv *priv)
 	priv->intf_mtus[i] = DEFAULT_MTU;
 	sw_w32_mask(0xffff, DEFAULT_MTU, RTL930X_L3_IP_MTU_CTRL(0));
 	sw_w32_mask(0xffff, DEFAULT_MTU, RTL930X_L3_IP6_MTU_CTRL(0));
+
+	// Set up MACs for the ports
+	rtl930x_setup_port_macs(priv);
 
 	// Configure the default hash algorithm
 
@@ -1163,4 +1178,6 @@ const struct rtl838x_reg rtl930x_reg = {
 	.init_eee = rtl930x_init_eee,
 	.port_eee_set = rtl930x_port_eee_set,
 	.eee_port_ability = rtl930x_eee_port_ability,
+	.fib4_del = rtl930x_fib4_del,
+	.fib4_add = rtl930x_fib4_add,
 };

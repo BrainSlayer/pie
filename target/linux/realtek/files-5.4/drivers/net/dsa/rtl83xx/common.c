@@ -550,12 +550,59 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+struct rtl83xx_fib_event_work {
+	struct work_struct work;
+	union {
+		struct fib_entry_notifier_info fen_info;
+		struct fib_rule_notifier_info fr_info;
+	};
+	struct rtl838x_switch_priv *priv;
+	unsigned long event;
+};
+
+static void rtl83xx_fib_event_work_do(struct work_struct *work)
+{
+	struct rtl83xx_fib_event_work *fib_work =
+		container_of(work, struct rtl83xx_fib_event_work, work);
+	struct rtl838x_switch_priv *priv = fib_work->priv;
+	struct fib_rule *rule;
+	int err;
+
+	/* Protect internal structures from changes */
+	rtnl_lock();
+	pr_info("%s: doing work, event %ld\n", __func__, fib_work->event);
+	switch (fib_work->event) {
+	case FIB_EVENT_ENTRY_ADD:
+	case FIB_EVENT_ENTRY_REPLACE:
+	case FIB_EVENT_ENTRY_APPEND:
+		err = priv->r->fib4_add(priv, &fib_work->fen_info);
+		if (err)
+			pr_err("%s: FIB4 failed\n", __func__);
+		fib_info_put(fib_work->fen_info.fi);
+		break;
+	case FIB_EVENT_ENTRY_DEL:
+		priv->r->fib4_del(priv, &fib_work->fen_info);
+		fib_info_put(fib_work->fen_info.fi);
+		break;
+	case FIB_EVENT_RULE_ADD:
+	case FIB_EVENT_RULE_DEL:
+		pr_info("%s Change rules\n", __func__);
+		rule = fib_work->fr_info.rule;
+		if (!fib4_rule_default(rule))
+			pr_err("%s: FIB4 default rule failed\n", __func__);
+		fib_rule_put(rule);
+		break;
+	}
+	rtnl_unlock();
+	kfree(fib_work);
+}
+
 /* Called with rcu_read_lock() */
 static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
-//	struct rtl93xx_fib_event_work *fib_work;
 	struct fib_notifier_info *info = ptr;
 	struct rtl838x_switch_priv *priv;
+	struct rtl83xx_fib_event_work *fib_work;
 
 	if ((info->family != AF_INET && info->family != AF_INET6 &&
 	     info->family != RTNL_FAMILY_IPMR &&
@@ -564,35 +611,54 @@ static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, v
 
 	priv = container_of(this, struct rtl838x_switch_priv, fib_nb);
 
-	switch (event) {
-	case FIB_EVENT_RULE_ADD:
-	case FIB_EVENT_RULE_DEL:
-		pr_info("%s: FIB_RULE ADD/DELL\n", __func__);
-		return NOTIFY_DONE;
-	case FIB_EVENT_ENTRY_ADD:
-	case FIB_EVENT_ENTRY_REPLACE:
-	case FIB_EVENT_ENTRY_APPEND:
-		pr_info("%s: FIB_ENTRY ADD/DELL\n", __func__);
-		break;
-	}
-
-/*
 	fib_work = kzalloc(sizeof(*fib_work), GFP_ATOMIC);
 	if (!fib_work)
 		return NOTIFY_BAD;
 
-	fib_work->mlxsw_sp = router->mlxsw_sp;
+	INIT_WORK(&fib_work->work, rtl83xx_fib_event_work_do);
+	fib_work->priv = priv;
 	fib_work->event = event;
-*/
 
-	switch (info->family) {
-	case AF_INET:
-		pr_info("AF_INET\n");
+	switch (event) {
+	case FIB_EVENT_ENTRY_ADD:
+	case FIB_EVENT_ENTRY_REPLACE:
+	case FIB_EVENT_ENTRY_APPEND:
+	case FIB_EVENT_ENTRY_DEL:
+		pr_info("%s: FIB_ENTRY ADD/DELL, event %ld\n", __func__, event);
+		if (info->family == AF_INET) {
+			struct fib_entry_notifier_info *fen_info = ptr;
+
+			if (fen_info->fi->fib_nh_is_v6) {
+				NL_SET_ERR_MSG_MOD(info->extack,
+					"IPv6 gateway with IPv4 route is not supported");
+				kfree(fib_work);
+				return notifier_from_errno(-EINVAL);
+			}
+
+		} else if (info->family == AF_INET6) {
+			struct fib6_entry_notifier_info *fen6_info = ptr;
+			pr_info("%s: FIB_RULE ADD/DELL for IPv6 not supported\n", __func__);
+			kfree(fib_work);
+			return notifier_from_errno(-EINVAL);
+		}
+
+		memcpy(&fib_work->fen_info, ptr, sizeof(fib_work->fen_info));
+		/* Take referece on fib_info to prevent it from being
+		 * freed while work is queued. Release it afterwards.
+		 */
+		fib_info_hold(fib_work->fen_info.fi);
+
 		break;
-	case AF_INET6:
-		pr_info("AF_INET6\n");
+	case FIB_EVENT_RULE_ADD:
+	case FIB_EVENT_RULE_DEL:
+		pr_info("%s: FIB_RULE ADD/DELL, event: %ld\n", __func__, event);
+		memcpy(&fib_work->fr_info, ptr, sizeof(fib_work->fr_info));
+		fib_rule_get(fib_work->fr_info.rule);
 		break;
 	}
+
+	schedule_work(&fib_work->work);
+
 	return NOTIFY_DONE;
 }
 
