@@ -342,7 +342,9 @@
 #define RTL930X_L3_IP6MC_ROUTE_CTRL		(0xAB58)
 #define RTL930X_L3_IP_MTU_CTRL(i)		(0xAB5C + ((i >> 1) << 2))
 #define RTL930X_L3_IP6_MTU_CTRL(i)		(0xAB6C + ((i >> 1) << 2))
-
+#define RTL930X_L3_HW_LU_KEY_CTRL		(0xAC9C)
+#define RTL930X_L3_HW_LU_KEY_IP_CTRL		(0xACA0)
+#define RTL930X_L3_HW_LU_CTRL			(0xACC0)
 
 #define MAX_LAGS 16
 #define MAX_PRIOS 8
@@ -350,6 +352,8 @@
 #define DEFAULT_MTU 1536
 #define MAX_INTERFACES 100
 #define MAX_ROUTES 100
+#define MAX_ROUTE_CAM_ENTRIES 512
+#define RTL83XX_MAX_PORTS 57
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -415,7 +419,7 @@ struct rtl838x_route_info {
 	struct in6_addr ip6_r;
 	u32 ip4_r;
 	bool hit;
-	u8 prefix_len;
+	int prefix_len;
 	u8 action;
 	u16 next_hop;
 	bool ttl_dec;
@@ -524,7 +528,7 @@ struct rtl838x_switch_priv {
 	u16 id;
 	u16 family_id;
 	char version;
-	struct rtl838x_port ports[57];
+	struct rtl838x_port ports[RTL83XX_MAX_PORTS];
 	struct mutex reg_mutex;
 	int link_state_irq;
 	int mirror_group_ports[4];
@@ -545,6 +549,8 @@ struct rtl838x_switch_priv {
 	u16 intf_mtus[MAX_INTF_MTUS];
 	int intf_mtu_count[MAX_INTF_MTUS];
 	struct rtl838x_l3_intf *interfaces[MAX_INTERFACES];
+	unsigned long int prefix_ip4route_use_bm[MAX_ROUTE_CAM_ENTRIES >> 6];
+	unsigned long int prefix_ip6route_use_bm[MAX_ROUTE_CAM_ENTRIES >> 6];
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);
