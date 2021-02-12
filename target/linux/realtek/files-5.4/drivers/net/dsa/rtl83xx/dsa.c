@@ -41,35 +41,6 @@ static void rtl83xx_write_cam(int idx, u32 *r)
 	do { }  while (sw_r32(RTL838X_TBL_ACCESS_L2_CTRL) & BIT(16));
 }
 
-static u64 rtl83xx_hash_key(struct rtl838x_switch_priv *priv, u64 mac, u32 vid)
-{
-	switch (priv->family_id) {
-	case RTL8380_FAMILY_ID:
-		return rtl838x_hash(priv, mac << 12 | vid);
-	case RTL8390_FAMILY_ID:
-		return rtl839x_hash(priv, mac << 12 | vid);
-	case RTL9300_FAMILY_ID:
-		return rtl930x_hash(priv, ((u64)vid) << 48 | mac);
-	default:
-		pr_err("Hash not implemented\n");
-	}
-	return 0;
-}
-
-static void rtl83xx_write_hash(int idx, u32 *r)
-{
-	u32 cmd = BIT(16) /* Execute cmd */
-		| 0 << 15 /* Write */
-		| 0 << 13 /* Table type 0b00 */
-		| (idx & 0x1fff);
-
-	sw_w32(0, RTL838X_TBL_ACCESS_L2_DATA(0));
-	sw_w32(0, RTL838X_TBL_ACCESS_L2_DATA(1));
-	sw_w32(0, RTL838X_TBL_ACCESS_L2_DATA(2));
-	sw_w32(cmd, RTL838X_TBL_ACCESS_L2_CTRL);
-	do { }  while (sw_r32(RTL838X_TBL_ACCESS_L2_CTRL) & BIT(16));
-}
-
 static void rtl83xx_enable_phy_polling(struct rtl838x_switch_priv *priv)
 {
 	int i;
@@ -966,56 +937,76 @@ static int rtl83xx_vlan_del(struct dsa_switch *ds, int port,
 	return 0;
 }
 
+static void dump_l2_entry(struct rtl838x_l2_entry *e)
+{
+	pr_info("MAC: %02x:%02x:%02x:%02x:%02x:%02x vid: %d, rvid: %d, port: %d, valid: %d\n",
+		e->mac[0], e->mac[1], e->mac[2], e->mac[3], e->mac[4], e->mac[5],
+		e->vid, e->rvid, e->port, e->valid);
+	pr_info("Type: %d, is_static: %d, is_ip_mc: %d, is_ipv6_mc: %d, block_da: %d\n",
+		e->type, e->is_static, e->is_ip_mc, e->is_ipv6_mc, e->block_da);
+	pr_info("  block_sa: %d, suspended: %d, next_hop: %d, age: %d, is_trunk: %d, trunk: %d\n",
+		e->block_sa, e->suspended, e->next_hop, e->age, e->is_trunk, e->trunk);
+	pr_info("  stack_dev: %d, mc_portmask_index: %d, mc_gip: %d, mc_sip: %d\n",
+		e->stack_dev, e->mc_portmask_index, e->mc_gip, e->mc_sip);
+	pr_info("  nh_vlan_target: %d, nh_route_id: %d\n",
+		e->nh_vlan_target, e->nh_route_id);
+}
+
+static void rtl83xx_setup_l2_uc_entry(struct rtl838x_l2_entry *e, int port, int vid, u64 mac)
+{
+	e->valid = true;
+	e->age = 3;
+	e->port = port,
+	e->vid = vid;
+	u64_to_ether_addr(mac, e->mac);
+}
+
 static int rtl83xx_port_fdb_add(struct dsa_switch *ds, int port,
 				const unsigned char *addr, u16 vid)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u64 mac = ether_addr_to_u64(addr);
-	u32 key = rtl83xx_hash_key(priv, mac, vid);
+	u32 key = priv->r->l2_hash_key(priv, mac, vid);
 	struct rtl838x_l2_entry e;
 	u32 r[3];
 	u64 entry;
 	int idx = -1, err = 0, i;
+	u64 seed = priv->r->l2_hash_seed(mac, vid);
 
 	mutex_lock(&priv->reg_mutex);
-	for (i = 0; i < 4; i++) {
+
+	// Loop over all entries in the hash-bucket and over the second block on 93xx SoCs
+	for (i = 0; i < priv->l2_bucket_size; i++) {
 		entry = priv->r->read_l2_entry_using_hash(key, i, &e);
-		if (!e.valid) {
-			idx = (key << 2) | i;
-			break;
-		}
-		if ((entry & 0x0fffffffffffffffULL) == ((mac << 12) | vid)) {
-			idx = (key << 2) | i;
+		if (!e.valid 
+			|| ((entry & 0x0fffffffffffffffULL) == seed)) {
+			idx = i > 3 ? ((key >> 14) & 0xffff) | i >> 1 : ((key << 2) | i) & 0xffff;
 			break;
 		}
 	}
+
+	// Found an existing or empty entry
 	if (idx >= 0) {
-		r[0] = 3 << 17 | port << 12; // Aging and  port
-		r[0] |= vid;
-		r[1] = mac >> 16;
-		r[2] = (mac & 0xffff) << 12; /* rvid = 0 */
-		rtl83xx_write_hash(idx, r);
+		rtl83xx_setup_l2_uc_entry(&e, port, vid, mac);
+		priv->r->write_l2_entry_using_hash(idx >> 3, idx & 0x3, &e);
 		goto out;
 	}
 
-	/* Hash buckets full, try CAM */
+	// Hash buckets full, try CAM
 	for (i = 0; i < 64; i++) {
 		entry = priv->r->read_cam(i, &e);
 		if (!e.valid) {
 			if (idx < 0) /* First empty entry? */
 				idx = i;
 			break;
-		} else if ((entry & 0x0fffffffffffffffULL) == ((mac << 12) | vid)) {
+		} else if ((entry & 0x0fffffffffffffffULL) == seed) {
 			pr_debug("Found entry in CAM\n");
 			idx = i;
 			break;
 		}
 	}
 	if (idx >= 0) {
-		r[0] = 3 << 17 | port << 12; // Aging
-		r[0] |= vid;
-		r[1] = mac >> 16;
-		r[2] = (mac & 0xffff) << 12; /* rvid = 0 */
+		rtl83xx_setup_l2_uc_entry(&e, port, vid, mac);
 		rtl83xx_write_cam(idx, r);
 		goto out;
 	}
@@ -1030,34 +1021,38 @@ static int rtl83xx_port_fdb_del(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u64 mac = ether_addr_to_u64(addr);
-	u32 key = rtl83xx_hash_key(priv, mac, vid);
+	u32 key = priv->r->l2_hash_key(priv, mac, vid);
 	struct rtl838x_l2_entry e;
 	u32 r[3];
 	u64 entry;
 	int idx = -1, err = 0, i;
+	u64 seed = priv->r->l2_hash_seed(mac, vid);
 
-	pr_debug("In %s, mac %llx, vid: %d, key: %x08x\n", __func__, mac, vid, key);
+	pr_info("In %s, mac %llx, vid: %d, key1 %d, key2 %d\n",
+		__func__, mac, vid, key & 0xffff, key >> 16);
 	mutex_lock(&priv->reg_mutex);
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < priv->l2_bucket_size; i++) {
 		entry = priv->r->read_l2_entry_using_hash(key, i, &e);
 		if (!e.valid)
 			continue;
-		if ((entry & 0x0fffffffffffffffULL) == ((mac << 12) | vid)) {
-			idx = (key << 2) | i;
+		if ((entry & 0x0fffffffffffffffULL) == seed) {
+			idx = i > 3 ? ((key >> 14) & 0xffff) | i >> 1 : ((key << 2) | i) & 0xffff;
 			break;
 		}
 	}
 
+	pr_info("Found entry index %d, key %d and bucket %d\n", idx, idx >> 2, idx & 3);
 	if (idx >= 0) {
-		r[0] = r[1] = r[2] = 0;
-		rtl83xx_write_hash(idx, r);
+		e.valid = false;
+		dump_l2_entry(&e);
+		priv->r->write_l2_entry_using_hash(idx >> 2, idx & 0x3, &e);
 		goto out;
 	}
 
 	/* Check CAM for spillover from hash buckets */
 	for (i = 0; i < 64; i++) {
 		entry = priv->r->read_cam(i, &e);
-		if ((entry & 0x0fffffffffffffffULL) == ((mac << 12) | vid)) {
+		if ((entry & 0x0fffffffffffffffULL) == seed) {
 			idx = i;
 			break;
 		}
@@ -1096,7 +1091,9 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 			mac = ether_addr_to_u64(&e.mac[0]);
 			pkey = rtl838x_hash(priv, mac << 12 | fid);
 			fid = (pkey & 0x3ff) | (fid & ~0x3ff);
-			pr_debug("-> mac %016llx, fid: %d\n", mac, fid);
+			pr_info("-> index %d, key %d, bucket %d, dmac %016llx, fid: %d\n",
+				i, i >> 2, i & 0x3, mac, fid);
+			dump_l2_entry(&e);
 			cb(e.mac, e.vid, e.is_static, data);
 		}
 	}

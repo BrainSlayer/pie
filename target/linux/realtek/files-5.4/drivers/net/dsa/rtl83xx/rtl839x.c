@@ -112,6 +112,18 @@ static void rtl839x_vlan_set_untagged(u32 vlan, u64 portmask)
 	rtl839x_exec_tbl1_cmd(cmd);
 }
 
+static u64 rtl839x_l2_hash_seed(u64 mac, u32 vid)
+{
+	return mac << 12 | vid;
+}
+
+static u64 rtl839x_l2_hash_key(struct rtl838x_switch_priv *priv, u64 mac, u32 vid)
+{
+	u64 seed = rtl839x_l2_hash_seed(mac, vid);
+
+	return rtl839x_hash(priv, seed);
+}
+
 static inline int rtl839x_mac_force_mode_ctrl(int p)
 {
 	return RTL839X_MAC_FORCE_MODE_CTRL + (p << 2);
@@ -150,7 +162,7 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 	e->is_ip_mc = !!(r[2] & BIT(31));
 	e->is_ipv6_mc = !!(r[2] & BIT(30));
 	e->type = L2_INVALID;
-	if (!e->is_ip_mc) {
+	if (!e->is_ip_mc  && !e->is_ipv6_mc) {
 		e->mac[0] = (r[0] >> 12);
 		e->mac[1] = (r[0] >> 4);
 		e->mac[2] = ((r[1] >> 28) | (r[0] << 4));
@@ -168,53 +180,128 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 			e->block_sa = !!(r[2] & (1 << 20));
 			e->suspended = !!(r[2] & (1 << 17));
 			e->next_hop = !!(r[2] & (1 << 16));
-			if (e->next_hop)
-				pr_info("Found next hop entry, need to read data\n");
+			if (e->next_hop) {
+				pr_info("Found next hop entry, need to read extra data\n");
+				e->nh_vlan_target = !!(r[2] & BIT(15));
+				e->nh_route_id = (r[2] >> 4) & 0x7ff;
+			}
 			e->age = (r[2] >> 21) & 3;
 			e->valid = true;
 			if (!(r[2] & 0xc0fd0000)) /* Check for valid entry */
 				e->valid = false;
 			else
 				e->type = L2_UNICAST;
-		} else {
+		} else {  // L2 Multicast
 			e->valid = true;
 			e->type = L2_MULTICAST;
-			e->mc_portmask_index = (r[2]>>6) & 0xfff;
+			e->mc_portmask_index = (r[2] >> 6) & 0xfff;
+			e->rvid = (r[0] >> 20) & 0xfff;
 		}
-	}
-	if (e->is_ip_mc) {
+	} else { // IPv4 or IPv6 MC entry
 		e->valid = true;
+		e->mc_portmask_index = (r[2] >> 6) & 0xfff;
+		e->mc_gip = r[1];
+		e->mc_sip = r[0];
+		e->rvid = r[2] & 0xfff;
+	}
+
+	if (e->is_ip_mc)
 		e->type = IP4_MULTICAST;
-	}
-	if (e->is_ipv6_mc) {
-		e->valid = true;
+	if (e->is_ipv6_mc)
 		e->type = IP6_MULTICAST;
+}
+
+/*
+ * Fills the 3 SoC table registers r[] with the information of in the rtl838x_l2_entry
+ */
+static void rtl839x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
+{
+	if (!e->valid) {
+		r[0] = r[1] = r[2] = 0;
+		return;
+	}
+
+	r[2] = e->is_ip_mc ? BIT(31) : 0;
+	r[2] |= e->is_ipv6_mc ? BIT(30) : 0;
+
+	if (!e->is_ip_mc  && !e->is_ipv6_mc) {
+		r[0] = ((u32)e->mac[0]) << 12;
+		r[0] |= ((u32)e->mac[1]) << 4;
+		r[0] |= ((u32)e->mac[2]) >> 4;
+		r[1] = ((u32)e->mac[2]) << 28;
+		r[1] |= ((u32)e->mac[3]) << 20;
+		r[1] |= ((u32)e->mac[3]) << 12;
+		r[1] |= ((u32)e->mac[3]) << 4;
+
+		if (!(e->mac[0] & 1)) { // Not multicast
+			r[2] |= e->is_static ? BIT(18) : 0;
+			r[2] |= e->vid << 4;
+			r[0] |= e->rvid << 20;
+			r[2] |= e->port << 24;
+			r[2] |= e->block_da ? BIT(19) : 0;
+			r[2] |= e->block_sa ? BIT(20) : 0;
+			r[2] |= e->suspended ? BIT(17) : 0;
+			if (e->next_hop) {
+				r[2] |= BIT(16);
+				r[2] |= e->nh_vlan_target ? BIT(15) : 0;
+				r[2] |= (e->nh_route_id & 0x7ff) << 4;
+			}
+			r[2] |= ((u32)e->age) << 21;
+		} else {  // L2 Multicast
+			r[2] |= ((u32)e->mc_portmask_index) << 6;
+			r[2] |= e->vid << 4;
+			r[0] |= e->rvid << 20;
+		}
+	} else { // IPv4 or IPv6 MC entry
+		r[2] |= ((u32)e->mc_portmask_index) << 6;
+		r[1] = e->mc_gip;
+		r[0] = e->mc_sip;
+		r[2] = e->rvid; // BUG see above already ored ????
 	}
 }
 
-static u64 rtl839x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl838x_l2_entry *e)
+/*
+ * Read an L2 UC or MC entry out of a hash bucket of the L2 forwarding table
+ * hash is the id of the bucket and pos is the position of the entry in that bucket
+ * The data read from the SoC is filled into rtl838x_l2_entry
+ */
+static u64 rtl839x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
 {
 	u64 entry;
 	u32 r[3];
+	struct table_reg *q = rtl_table_get(RTL8390_TBL_L2, 0);
+	u32 idx = (0 << 14) | (hash << 2) | pos; // Search SRAM, with hash and at pos in bucket
+	int i;
 
-	/* Search in SRAM, with hash and at position in hash bucket (0-3) */
-	u32 idx = (0 << 14) | (hash << 2) | position;
+	rtl_table_read(q, idx);
+	for (i= 0; i < 3; i++)
+		r[i] = sw_r32(rtl_table_data(q, i));
 
-	u32 cmd = 1 << 17 /* Execute cmd */
-		| 0 << 16 /* Read */
-		| 0 << 14 /* Table type 0b00 */
-		| (idx & 0x3fff);
-
-	sw_w32(cmd, RTL839X_TBL_ACCESS_L2_CTRL);
-	do { }  while (sw_r32(RTL839X_TBL_ACCESS_L2_CTRL) & (1 << 17));
-	r[0] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(0));
-	r[1] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(1));
-	r[2] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(2));
+	rtl_table_release(q);
 
 	rtl839x_fill_l2_entry(r, e);
+	if (!e->valid)
+		return 0;
 
-	entry = (((u64) r[0]) << 12) | ((r[1] & 0xfffffff0) << 12) | ((r[2] >> 4) & 0xfff);
+	entry = (((u64) r[1]) << 32) | (r[2] & 0xfffff000) | (r[0] & 0xfff);
 	return entry;
+}
+
+static void rtl839x_write_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
+{
+	u32 r[3];
+	struct table_reg *q = rtl_table_get(RTL8390_TBL_L2, 0);
+	int i;
+
+	u32 idx = (0 << 14) | (hash << 2) | pos; // Access SRAM, with hash and at pos in bucket
+
+	rtl839x_fill_l2_row(r, e);
+
+	for (i= 0; i < 3; i++)
+		sw_w32(r[i], rtl_table_data(q, i));
+
+	rtl_table_write(q, idx);
+	rtl_table_release(q);
 }
 
 static u64 rtl839x_read_cam(int idx, struct rtl838x_l2_entry *e)
@@ -231,7 +318,6 @@ static u64 rtl839x_read_cam(int idx, struct rtl838x_l2_entry *e)
 	r[0] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(0));
 	r[1] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(1));
 	r[2] = sw_r32(RTL839X_TBL_ACCESS_L2_DATA(2));
-
 
 	rtl839x_fill_l2_entry(r, e);
 	if (e->valid)
@@ -641,6 +727,7 @@ const struct rtl838x_reg rtl839x_reg = {
 	.mac_tx_pause_sts = RTL839X_MAC_TX_PAUSE_STS,
 	.read_l2_entry_using_hash = rtl839x_read_l2_entry_using_hash,
 	.read_cam = rtl839x_read_cam,
+	.write_l2_entry_using_hash = rtl839x_write_l2_entry_using_hash,
 	.vlan_port_egr_filter = RTL839X_VLAN_PORT_EGR_FLTR(0),
 	.vlan_port_igr_filter = RTL839X_VLAN_PORT_IGR_FLTR(0),
 	.vlan_port_pb = RTL839X_VLAN_PORT_PB_VLAN,
@@ -651,4 +738,6 @@ const struct rtl838x_reg rtl839x_reg = {
 	.init_eee = rtl839x_init_eee,
 	.port_eee_set = rtl839x_port_eee_set,
 	.eee_port_ability = rtl839x_eee_port_ability,
+	.l2_hash_seed = rtl839x_l2_hash_seed, 
+	.l2_hash_key = rtl839x_l2_hash_key,
 };

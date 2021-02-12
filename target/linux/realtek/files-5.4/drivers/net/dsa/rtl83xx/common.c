@@ -2,6 +2,8 @@
 
 #include <linux/of_mdio.h>
 #include <linux/of_platform.h>
+#include <net/netevent.h>
+#include <net/arp.h>
 
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
 #include "rtl83xx.h"
@@ -550,6 +552,38 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+static int rtl83xx_netevent_event(struct notifier_block *this,
+				 unsigned long event, void *ptr)
+{
+	struct rtl838x_switch_priv *priv;
+	struct net_device *dev;
+	struct neighbour *n = ptr;
+	int err, port;
+
+	priv = container_of(this, struct rtl838x_switch_priv, ne_nb);
+
+	/* Check whether SoC supports L3 offloading */
+	if (!priv->r->port_dev_lower_find)
+		return NOTIFY_DONE;
+
+	switch (event) {
+	case NETEVENT_NEIGH_UPDATE:
+		if (n->tbl != &arp_tbl)
+			return NOTIFY_DONE;
+		dev = n->dev;
+		port = priv->r->port_dev_lower_find(dev, priv);
+		if (port < 0)
+			return NOTIFY_DONE;
+		pr_info("%s: updating neighbour on port %d\n", __func__, port);
+		if (err)
+			netdev_warn(dev, "failed to handle neigh update (err %d)\n",
+				    err);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
 struct rtl83xx_fib_event_work {
 	struct work_struct work;
 	union {
@@ -705,6 +739,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->fib_entries = 8192;
 		rtl8380_get_version(priv);
 		priv->n_lags = 8;
+		priv->l2_bucket_size = 4;
 		break;
 	case RTL8390_FAMILY_ID:
 		priv->ds->ops = &rtl83xx_switch_ops;
@@ -717,6 +752,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->fib_entries = 16384;
 		rtl8390_get_version(priv);
 		priv->n_lags = 16;
+		priv->l2_bucket_size = 4;
 		break;
 	case RTL9300_FAMILY_ID:
 		priv->ds->ops = &rtl930x_switch_ops;
@@ -730,6 +766,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->version = RTL8390_VERSION_A;
 		priv->n_lags = 16;
 		sw_w32(1, RTL930X_ST_CTRL);
+		priv->l2_bucket_size = 8;
 		break;
 	case RTL9310_FAMILY_ID:
 		priv->ds->ops = &rtl930x_switch_ops;
@@ -742,6 +779,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->fib_entries = 16384;
 		priv->version = RTL8390_VERSION_A;
 		priv->n_lags = 16;
+		priv->l2_bucket_size = 8;
 		break;
 	}
 	pr_debug("Chip version %c\n", priv->version);
@@ -805,6 +843,9 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	for (i = 0; i < 4; i++)
 		priv->mirror_group_ports[i] = -1;
 
+	/*
+	 * Register netdevice event callback to catch changes in link aggregation groups
+	 */
 	priv->nb.notifier_call = rtl83xx_netdevice_event;
 	if (register_netdevice_notifier(&priv->nb)) {
 		priv->nb.notifier_call = NULL;
@@ -812,8 +853,24 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		goto err_register_nb;
 	}
 
+	/* 
+	 * Register netevent notifier callback to catch notifications about neighboring
+	 * changes to update nexthop entries for L3 routing.
+	 */
+	priv->ne_nb.notifier_call = rtl83xx_netevent_event;
+	if (register_netevent_notifier(&priv->ne_nb)) {
+		priv->ne_nb.notifier_call = NULL;
+		dev_err(dev, "Failed to register netevent notifier\n");
+		goto err_register_ne_nb;
+	}
+
+	/*
+	 * Register Forwarding Information Base notifier to offload routes where
+	 * where possible
+	 */
 	priv->fib_nb.notifier_call = rtl83xx_fib_event;
-	/* Only FIBs pointing to our own netdevs are programmed into
+	/*
+	 * Only FIBs pointing to our own netdevs are programmed into
 	 * the device, so no need to pass a callback.
 	 */
 	// TODO 5.9: err = register_fib_notifier(&init_net, &priv->fib_nb, NULL, NULL);
@@ -835,6 +892,8 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	return 0;
 
 err_register_fib_nb:
+	unregister_netevent_notifier(&priv->ne_nb);
+err_register_ne_nb:
 	unregister_netdevice_notifier(&priv->nb);
 err_register_nb:
 	return err;

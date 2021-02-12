@@ -354,6 +354,7 @@
 #define MAX_ROUTES 100
 #define MAX_ROUTE_CAM_ENTRIES 512
 #define RTL83XX_MAX_PORTS 57
+#define RTL930X_PORT_IGNORE 0x3f
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -409,8 +410,14 @@ struct rtl838x_l2_entry {
 	bool next_hop;
 	int age;
 	u8 trunk;
-	u8 stackDev;
+	bool is_trunk;
+	u8 stack_dev;
 	u16 mc_portmask_index;
+	u32 mc_gip;
+	u32 mc_sip;
+	u16 mc_mac_index;
+	bool nh_vlan_target;
+	u16 nh_route_id;
 };
 
 struct rtl838x_route_info {
@@ -454,6 +461,14 @@ struct rtl838x_rt_mac {
 	u16 vid_mask;
 	u64 mac;
 	u64 mac_mask;
+};
+
+struct rtl838x_nexthop {
+	u32 dev_id;
+	u16 port;
+	u16 vid;
+	u16 fid;
+	u64 mac;
 };
 
 struct rtl838x_switch_priv;
@@ -505,6 +520,7 @@ struct rtl838x_reg {
 	int mac_tx_pause_sts;
 	u64 (*read_l2_entry_using_hash)(u32 hash, u32 position, struct rtl838x_l2_entry *e);
 	u64 (*read_cam)(int idx, struct rtl838x_l2_entry *e);
+	void (*write_l2_entry_using_hash)(u32 hash, u32 pos, struct rtl838x_l2_entry *e);
 	int vlan_port_egr_filter;
 	int vlan_port_igr_filter;
 	int vlan_port_pb;
@@ -519,6 +535,9 @@ struct rtl838x_reg {
 				struct ethtool_eee *e, int port);
 	int (*fib4_del)(struct rtl838x_switch_priv *, struct fib_entry_notifier_info *);
 	int (*fib4_add)(struct rtl838x_switch_priv *, struct fib_entry_notifier_info *);
+	u64 (*l2_hash_seed)(u64 mac, u32 vid);
+	u64 (*l2_hash_key)(struct rtl838x_switch_priv *priv, u64 mac, u32 vid);
+	int (*port_dev_lower_find)(struct net_device *dev, struct rtl838x_switch_priv *priv);
 };
 
 struct rtl838x_switch_priv {
@@ -539,11 +558,13 @@ struct rtl838x_switch_priv {
 	u8 port_width;
 	u64 irq_mask;
 	u32 fib_entries;
+	int l2_bucket_size;
 	struct dentry *dbgfs_dir;
 	int n_lags;
 	u64 lags_port_members[MAX_LAGS];
 	struct net_device *lag_devs[MAX_LAGS];
 	struct notifier_block nb;
+	struct notifier_block ne_nb;
 	struct notifier_block fib_nb;
 	bool eee_enabled;
 	u16 intf_mtus[MAX_INTF_MTUS];
