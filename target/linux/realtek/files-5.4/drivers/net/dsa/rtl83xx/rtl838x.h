@@ -336,7 +336,6 @@
 /* L3 Features */
 #define RTL930X_L3_HOST_TBL_CTRL		(0xAB48)
 #define RTL930X_L3_IPUC_ROUTE_CTRL		(0xAB4C)
-#define RTL930X_L3_IPUC_ROUTE_CTRL		(0xAB4C)
 #define RTL930X_L3_IP6UC_ROUTE_CTRL		(0xAB50)
 #define RTL930X_L3_IPMC_ROUTE_CTRL		(0xAB54)
 #define RTL930X_L3_IP6MC_ROUTE_CTRL		(0xAB58)
@@ -422,6 +421,7 @@ struct rtl838x_l2_entry {
 
 struct rtl838x_route_info {
 	bool valid;
+	int id;
 	u8 type;
 	struct in6_addr ip6_r;
 	u32 ip4_r;
@@ -464,11 +464,22 @@ struct rtl838x_rt_mac {
 };
 
 struct rtl838x_nexthop {
+	u16 id;		// ID in HW Nexthop table
+	u32 ip;		// IP Addres of nexthop
 	u32 dev_id;
 	u16 port;
 	u16 vid;
 	u16 fid;
 	u64 mac;
+	u16 mac_id;
+	u16 l2_id;	// Index of this next hop forwarding entry in L2 FIB table
+	u16 if_id;
+};
+
+struct rtl838x_route {
+	struct rtl838x_route_info rt;
+	struct rtl838x_nexthop nh;
+	struct list_head list;
 };
 
 struct rtl838x_switch_priv;
@@ -538,6 +549,8 @@ struct rtl838x_reg {
 	u64 (*l2_hash_seed)(u64 mac, u32 vid);
 	u64 (*l2_hash_key)(struct rtl838x_switch_priv *priv, u64 mac, u32 vid);
 	int (*port_dev_lower_find)(struct net_device *dev, struct rtl838x_switch_priv *priv);
+	int (*l3_nexthop_update)(struct rtl838x_switch_priv *priv, __be32 ip_addr,
+				 u64 mac, u16 vlan);
 };
 
 struct rtl838x_switch_priv {
@@ -572,6 +585,7 @@ struct rtl838x_switch_priv {
 	struct rtl838x_l3_intf *interfaces[MAX_INTERFACES];
 	unsigned long int prefix_ip4route_use_bm[MAX_ROUTE_CAM_ENTRIES >> 6];
 	unsigned long int prefix_ip6route_use_bm[MAX_ROUTE_CAM_ENTRIES >> 6];
+	struct rtl838x_route routes;
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);

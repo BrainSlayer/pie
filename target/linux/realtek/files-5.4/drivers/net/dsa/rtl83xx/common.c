@@ -158,8 +158,6 @@ void rtl_table_write(struct table_reg *r, int idx)
 	u32 cmd = r->rmode ? 0 : BIT(r->c_bit);
 
 	cmd |= BIT(r->c_bit + 1) | (r->tbl << r->t_bit) | (idx & (BIT(r->t_bit) - 1));
-	pr_debug("Writing %08x to %x for write, value %08x\n",
-		cmd, r->addr, sw_r32(0xb344));
 	sw_w32(cmd, r->addr);
 	do { } while (sw_r32(r->addr) & BIT(r->c_bit + 1));
 }
@@ -552,6 +550,23 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+struct net_event_work {
+	struct work_struct work;
+	struct rtl838x_switch_priv *priv;
+	u64 mac;
+	u32 gw_addr;
+	u32 vlan;
+};
+
+static void rtl83xx_net_event_work_do(struct work_struct *work)
+{
+	struct net_event_work *net_work =
+		container_of(work, struct net_event_work, work);
+	struct rtl838x_switch_priv *priv = net_work->priv;
+
+	priv->r->l3_nexthop_update(priv, net_work->gw_addr, net_work->mac, net_work->vlan);
+}
+
 static int rtl83xx_netevent_event(struct notifier_block *this,
 				 unsigned long event, void *ptr)
 {
@@ -559,6 +574,7 @@ static int rtl83xx_netevent_event(struct notifier_block *this,
 	struct net_device *dev;
 	struct neighbour *n = ptr;
 	int err, port;
+	struct net_event_work *net_work;
 
 	priv = container_of(this, struct rtl838x_switch_priv, ne_nb);
 
@@ -566,15 +582,32 @@ static int rtl83xx_netevent_event(struct notifier_block *this,
 	if (!priv->r->port_dev_lower_find)
 		return NOTIFY_DONE;
 
+	net_work = kzalloc(sizeof(*net_work), GFP_ATOMIC);
+	if (!net_work)
+		return NOTIFY_BAD;
+
+	INIT_WORK(&net_work->work, rtl83xx_net_event_work_do);
+	net_work->priv = priv;
+
 	switch (event) {
 	case NETEVENT_NEIGH_UPDATE:
 		if (n->tbl != &arp_tbl)
 			return NOTIFY_DONE;
 		dev = n->dev;
 		port = priv->r->port_dev_lower_find(dev, priv);
-		if (port < 0)
+		if (port < 0 || !(n->nud_state & NUD_VALID)) {
+			pr_debug("%s: Neigbour invalid, not updating\n", __func__);
+			kfree(net_work);
 			return NOTIFY_DONE;
-		pr_info("%s: updating neighbour on port %d\n", __func__, port);
+		}
+
+		net_work->mac = ether_addr_to_u64(n->ha);
+		net_work->gw_addr = *(__be32 *) n->primary_key;
+		net_work->vlan = 0;
+
+		pr_info("%s: updating neighbour on port %d, mac %016llx\n",
+			__func__, port, net_work->mac);
+		schedule_work(&net_work->work);
 		if (err)
 			netdev_warn(dev, "failed to handle neigh update (err %d)\n",
 				    err);
@@ -784,6 +817,9 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	}
 	pr_debug("Chip version %c\n", priv->version);
 
+	// Initialize list or offloadable routes
+	INIT_LIST_HEAD(&priv->routes.list);
+
 	err = rtl83xx_mdio_probe(priv);
 	if (err) {
 		/* Probing fails the 1st time because of missing ethernet driver
@@ -864,19 +900,22 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		goto err_register_ne_nb;
 	}
 
+	priv->fib_nb.notifier_call = rtl83xx_fib_event;
+
 	/*
 	 * Register Forwarding Information Base notifier to offload routes where
 	 * where possible
 	 */
-	priv->fib_nb.notifier_call = rtl83xx_fib_event;
+	if (priv->r->fib4_add) {
 	/*
-	 * Only FIBs pointing to our own netdevs are programmed into
-	 * the device, so no need to pass a callback.
-	 */
+	* Only FIBs pointing to our own netdevs are programmed into
+	* the device, so no need to pass a callback.
+	*/
 	// TODO 5.9: err = register_fib_notifier(&init_net, &priv->fib_nb, NULL, NULL);
-	err = register_fib_notifier(&priv->fib_nb, NULL);
-	if (err)
-		goto err_register_fib_nb;
+		err = register_fib_notifier(&priv->fib_nb, NULL);
+		if (err)
+			goto err_register_fib_nb;
+	}
 
 	// Flood BPDUs to all ports including cpu-port
 	if (soc_info.family != RTL9300_FAMILY_ID) { // TODO: Port this functionality

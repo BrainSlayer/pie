@@ -430,6 +430,7 @@ static void dump_l2_entry(struct rtl838x_l2_entry *e)
  * Use VID and MAC in rtl838x_l2_entry to identify either a free slot in the L2 hash table
  * or mark an existing entry as a nexthop by setting it's nexthop bit
  * Called from the L3 layer
+ * The index in the L2 hash table is filled into nh->l2_id;
  */
 static int rtl930x_l2_nexthop_add(struct rtl838x_switch_priv *priv, struct rtl838x_nexthop *nh)
 {
@@ -465,6 +466,8 @@ static int rtl930x_l2_nexthop_add(struct rtl838x_switch_priv *priv, struct rtl83
 
 	pr_info("%s BEFORE -> key %d, pos: %d, index: %d\n", __func__, key, i, idx);
 	dump_l2_entry(&e);
+	nh->l2_id = idx;
+
 	// Found an existing (e->valid is true) or empty entry, make it a nexthop entry
 	if (e.valid) {
 		nh->port = e.port;
@@ -479,6 +482,8 @@ static int rtl930x_l2_nexthop_add(struct rtl838x_switch_priv *priv, struct rtl83
 		u64_to_ether_addr(nh->mac, &e.mac[0]);
 	}
 	e.next_hop = true;
+	// For nexthop entries, the vid field in the table is used to denote the dest mac_id
+	e.vid = nh->mac_id;
 	pr_info("%s AFTER\n", __func__);
 	dump_l2_entry(&e);
 
@@ -849,7 +854,7 @@ static void rtl930x_prefix_route_read(u32 idx, struct rtl838x_route_info *info)
 	// The table has a size of 11 registers
 	info->valid = !!(sw_r32(rtl_table_data(r, 0)) & BIT(31));
 	if (!info->valid)
-		return;
+		goto out;
 
 	info->type = (sw_r32(rtl_table_data(r, 0)) >> 29) & 0x3;
 
@@ -885,10 +890,8 @@ static void rtl930x_prefix_route_read(u32 idx, struct rtl838x_route_info *info)
 	case 1: // IPv4 Multicast route
 	case 3: // IPv6 Multicast route
 		pr_warn("%s: route type not supported\n", __func__);
-		rtl_table_release(r);
-		return;
+		goto out;
 	}
-	rtl_table_release(r);
 
 	info->hit = !!(v & BIT(22));
 	info->action = (v >> 18) & 3;
@@ -898,6 +901,8 @@ static void rtl930x_prefix_route_read(u32 idx, struct rtl838x_route_info *info)
 	info->dst_null = !!(v & BIT(4));
 	info->qos_as = !!(v & BIT(3));
 	info->qos_prio =  v & 0x7;
+out:
+	rtl_table_release(r);
 }
 
 static void rtl930x_net6_mask(int prefix_len, struct in6_addr *ip6_m)
@@ -919,21 +924,28 @@ static void rtl930x_prefix_route_write(u32 idx, struct rtl838x_route_info *info)
 	u32 v, ip4_m;
 	struct in6_addr ip6_m;
 	// Read L3_PREFIX_ROUTE_IPUC table (2) via register RTL9300_TBL_1
+		// The table has a size of 11 registers
 	struct table_reg *r = rtl_table_get(RTL9300_TBL_1, 2);
 
-	pr_info("%s: index %d\n", __func__, idx);
-	// The table has a size of 11 registers
-	sw_w32(BIT(31) | (info->type << 29), rtl_table_data(r, 0));
+	pr_info("%s: index %d is valid: %d\n", __func__, idx, info->valid);
+	v = info->valid ? BIT(31) : 0;
+	v |= (info->type & 0x3) << 29;
+	sw_w32(v, rtl_table_data(r, 0));
+
 	v = info->hit ? BIT(22) : 0;
-	v |= info->action << 18;
-	v |= info->next_hop << 7;
+	v |= (info->action & 0x3) << 18;
+	v |= (info->next_hop & 0x7ff) << 7;
 	v |= info->ttl_dec ? BIT(6) : 0;
 	v |= info->ttl_check ? BIT(5) : 0;
 	v |= info->dst_null ? BIT(6) : 0;
 	v |= info->qos_as ? BIT(6) : 0;
-	v |= info->qos_prio;
+	v |= info->qos_prio & 0x7;
 	v |= info->prefix_len == 0 ? BIT(20) : 0; // set default route bit
-	
+
+	// 320 0, 288 1, 256 2, 224 3, 192 4
+	// set bit mask for entry type always to 0x3
+	sw_w32(0x3 << 29, rtl_table_data(r, 5));
+
 	switch (info->type) {
 	case 0: // IPv4 Unicast route
 		sw_w32(info->ip4_r, rtl_table_data(r, 4));
@@ -984,7 +996,7 @@ static void rtl930x_host_route_read(u32 idx, struct rtl838x_route_info *info)
 	v = sw_r32(rtl_table_data(r, 0));
 	info->valid = !!(v & BIT(31));
 	if (!info->valid)
-		return;
+		goto out;
 	info->type = (v >> 29) & 0x3;
 	switch (info->type) {
 	case 0: // IPv4 Unicast route
@@ -998,10 +1010,8 @@ static void rtl930x_host_route_read(u32 idx, struct rtl838x_route_info *info)
 	case 1: // IPv4 Multicast route
 	case 3: // IPv6 Multicast route
 		pr_warn("%s: route type not supported\n", __func__);
-		rtl_table_release(r);
-		return;
+		goto out;
 	}
-	rtl_table_release(r);
 
 	info->action = (v >> 17) & 3;
 	info->next_hop = (v >> 6) & 0x7ff;
@@ -1009,6 +1019,8 @@ static void rtl930x_host_route_read(u32 idx, struct rtl838x_route_info *info)
 	info->ttl_check = !!(v & BIT(4));
 	info->qos_as = !!(v & BIT(3));
 	info->qos_prio =  v & 0x7;
+out:
+	rtl_table_release(r);
 }
 
 /*
@@ -1058,6 +1070,7 @@ int rtl930x_prefix_route_alloc(struct rtl838x_switch_priv *priv, bool is_ip6)
 	unsigned long int *use_bm = is_ip6 ? &priv->prefix_ip6route_use_bm[0]
 					: &priv->prefix_ip4route_use_bm[0];
 	int i = find_first_zero_bit((unsigned long int *)use_bm, MAX_ROUTE_CAM_ENTRIES / 2);
+	struct rtl838x_route *r;
 
 	pr_info("%s: found index %d\n", __func__, i);
 	if (i >= MAX_ROUTE_CAM_ENTRIES / 2)
@@ -1069,6 +1082,13 @@ int rtl930x_prefix_route_alloc(struct rtl838x_switch_priv *priv, bool is_ip6)
 	// We saparate the IPv4 and IPv6 routes into different halves of the CAM memory
 	if (is_ip6)
 		i += MAX_ROUTE_CAM_ENTRIES / 2;
+
+	// Add a route entry into the list of routes
+	r = kzalloc(sizeof *r, GFP_KERNEL);
+	if (!r)
+		return -ENOMEM;
+	r->rt.id = i;
+	list_add(&r->list, &priv->routes.list);
 
 	pr_info("%s Returning index %d\n", __func__, i);
 	return i;
@@ -1089,6 +1109,58 @@ int rtl930x_prefix_route_free(struct rtl838x_switch_priv *priv, int index)
 	clear_bit(index, use_bm);
 
 	return 0;
+}
+
+/*
+ * Returns the route list entry with matchin hw id
+ */
+struct rtl838x_route *rtl930x_prefix_route_find_id(struct rtl838x_switch_priv *priv, int id)
+{
+	struct list_head *i;
+	struct rtl838x_route *r;
+
+	list_for_each(i, &priv->routes.list) {
+		r = list_entry(i, struct rtl838x_route, list);
+		if (r->rt.id == id)
+			return r;
+	}
+
+	return NULL;
+}
+
+/*
+ * Returns the route list entry with matchin given gateway ip
+ */
+struct rtl838x_route *rtl930x_prefix_route_find_gw(struct rtl838x_switch_priv *priv, __be32 ip)
+{
+	struct list_head *i;
+	struct rtl838x_route *r;
+
+	list_for_each(i, &priv->routes.list) {
+		r = list_entry(i, struct rtl838x_route, list);
+		pr_debug("Looking at %pI4 for %pI4\n", &r->nh.ip, &ip);
+		if (r->nh.ip == ip)
+			return r;
+	}
+
+	return NULL;
+}
+
+/*
+ * Returns the route list entry with matchin given network ip
+ */
+struct rtl838x_route *rtl930x_prefix_route_find_ip(struct rtl838x_switch_priv *priv, __be32 ip)
+{
+	struct list_head *i;
+	struct rtl838x_route *r;
+
+	list_for_each(i, &priv->routes.list) {
+		r = list_entry(i, struct rtl838x_route, list);
+		if (r->rt.ip4_r == ip)
+			return r;
+	}
+
+	return NULL;
 }
 
 /*
@@ -1160,6 +1232,10 @@ static void rtl930x_set_l3_nexthop(int idx, u16 dmac_id, u16 interface)
 	rtl_table_release(r);
 }
 
+/*
+ * Reads a source MAC entry for L3 routing out of the hardware table
+ * idx is the index into the L3_ROUTER_MAC table
+ */
 static void rtl930x_get_l3_router_mac(u32 idx, struct rtl838x_rt_mac *m)
 {
 	u32 v, w;
@@ -1177,8 +1253,8 @@ static void rtl930x_get_l3_router_mac(u32 idx, struct rtl838x_rt_mac *m)
 	m->p_type = !!(v & BIT(19));
 	m->p_id = (v >> 13) & 0x3f;  // trunk id of port
 	m->vid = v & 0xfff;
-	m->vid_mask = w & 1;
-	m->action = sw_r32(rtl_table_data(r, 3)) & 0x7;
+	m->vid_mask = w & 0xfff;
+	m->action = sw_r32(rtl_table_data(r, 6)) & 0x7;
 	m->mac_mask = ((((u64)sw_r32(rtl_table_data(r, 5))) << 32) & 0xffffffffffffULL) 
 			| (sw_r32(rtl_table_data(r, 4)));
 	m->mac = ((((u64)sw_r32(rtl_table_data(r, 2))) << 32) & 0xffffffffffffULL) 
@@ -1188,6 +1264,10 @@ static void rtl930x_get_l3_router_mac(u32 idx, struct rtl838x_rt_mac *m)
 	rtl_table_release(r);
 }
 
+/*
+ * Writes a source MAC entry for L3 routing into the hardware table
+ * idx is the index into the L3_ROUTER_MAC table
+ */
 static void rtl930x_set_l3_router_mac(u32 idx, struct rtl838x_rt_mac *m)
 {
 	u32 v, w;
@@ -1195,15 +1275,19 @@ static void rtl930x_set_l3_router_mac(u32 idx, struct rtl838x_rt_mac *m)
 	struct table_reg *r = rtl_table_get(RTL9300_TBL_1, 0);
 
 	// The table has a size of 7 registers, 64 entries
-	v = BIT(20); // mac entry valid
+	v = BIT(20); // mac entry valid, port type is 0: individual
 	v |= m->p_id << 13;
 	v |= m->vid;
-	w = m->vid_mask ? BIT(0) : 0;
-	w |= m->action;
+	w = m->vid_mask;
+	sw_w32(v, rtl_table_data(r, 0));
+	sw_w32(w, rtl_table_data(r, 3));
 	sw_w32((u32)(m->mac >> 32), rtl_table_data(r, 2));
+	// Bit L3_INTF (bit 12 in register 1) needs to be 0
 	sw_w32((u32)m->mac, rtl_table_data(r, 1));
-	sw_w32((u32)(m->mac_mask >> 32), rtl_table_data(r, 5));
-	sw_w32((u32)m->mac_mask, rtl_table_data(r, 6));
+	// Bit BMSK_L3_INTF (bit 12 in register 5) needs to be 0
+	sw_w32((u32)(m->mac_mask >> 32), rtl_table_data(r, 4));
+	sw_w32((u32)m->mac_mask, rtl_table_data(r, 5));
+	sw_w32(m->action & 0x7, rtl_table_data(r, 6));
 
 	rtl_table_write(r, idx);
 	rtl_table_release(r);
@@ -1220,10 +1304,15 @@ static void rtl930x_setup_port_macs(struct rtl838x_switch_priv *priv)
 			continue;
 		pr_info("%s: got port %08x\n", __func__, (u32)priv->ports[i].dp);
 		dev = priv->ports[i].dp->slave;
+		m.valid = true;
 		m.mac = ether_addr_to_u64(dev->dev_addr) + i + 1; // BUG: VRRP for testing
-		m.vid = 1;
+
+		// TODO: For now we do not care about the VID
+		m.vid = 0;
+		m.vid_mask = 0;
+
 		m.mac_mask = 0xffffffffffffULL;
-		// we use as index the port number, TODO: what about vlans?
+		m.action = 0; // Forward routed package
 		rtl930x_set_l3_router_mac(i, &m);
 	}
 }
@@ -1253,27 +1342,34 @@ static void rtl930x_get_l3_egress_intf(int idx, struct rtl838x_l3_intf *intf)
 	intf->ip6_pbr_icmp_redirect = v & 0x3;
 }
 
+/*
+ * Sets up an egress interface for L3 actions
+ * Actions for ip4/6_icmp_redirect, ip4/6_pbr_icmp_redirect are:
+ * 0: FORWARD, 1: DROP, 2: TRAP2CPU, 3: COPY2CPU, 4: TRAP2MASTERCPU 5: COPY2MASTERCPU
+ * 6: HARDDROP
+ * idx is the index in the HW interface table: idx < 0x80
+ */
 static void rtl930x_set_l3_egress_intf(int idx, struct rtl838x_l3_intf *intf)
 {
 	u32 u, v;
 	// Read L3_EGR_INTF table (4) via register RTL9300_TBL_1
 	struct table_reg *r = rtl_table_get(RTL9300_TBL_1, 4);
 
-	u = intf->vid << 9;
-	u |= intf->smac_idx << 3;
-	u |= intf->ip4_mtu_id;
+	u = (intf->vid & 0xfff) << 9;
+	u |= (intf->smac_idx & 0x3f) << 3;
+	u |= (intf->ip4_mtu_id & 0x7);
 
-	v = intf->ip6_mtu_id << 28;
-	v |= intf->ttl_scope << 20;
-	v |= intf->hl_scope << 12;
-	v |= intf->ip4_icmp_redirect << 9;
-	v |= intf->ip6_icmp_redirect << 6;
-	v |= intf->ip4_pbr_icmp_redirect << 3;
-	v |= intf->ip6_pbr_icmp_redirect;
+	v = (intf->ip6_mtu_id & 0x7) << 28;
+	v |= (intf->ttl_scope & 0xff) << 20;
+	v |= (intf->hl_scope & 0xff) << 12;
+	v |= (intf->ip4_icmp_redirect & 0x7) << 9;
+	v |= (intf->ip6_icmp_redirect & 0x7)<< 6;
+	v |= (intf->ip4_pbr_icmp_redirect & 0x7) << 3;
+	v |= (intf->ip6_pbr_icmp_redirect & 0x7);
 
 	sw_w32(u, rtl_table_data(r, 0));
 	sw_w32(v, rtl_table_data(r, 1));
-	rtl_table_write(r, idx);
+	rtl_table_write(r, idx & 0x7f);
 	rtl_table_release(r);
 }
 
@@ -1363,14 +1459,64 @@ static int rtl930x_l3_intf_add(struct rtl838x_switch_priv *priv, struct rtl838x_
 static void rtl930x_l3_dump(void)
 {
 	pr_info("L3 UC Routing enabled: %d\n", sw_r32(RTL930X_L3_IPUC_ROUTE_CTRL) & 0x1);
-	pr_info("RTL930X_L3_IPUC_ROUTE_CTRL: %08x\n", sw_r32(RTL930X_L3_IPUC_ROUTE_CTRL));	
+	pr_info("RTL930X_L3_IPUC_ROUTE_CTRL: %08x\n", sw_r32(RTL930X_L3_IPUC_ROUTE_CTRL));
 }
-
 
 #define DMAC_ID_DROP 0x7FFF
 #define DMAC_ID_TRAP2CPU 0x7FFE
 #define DMAC_ID_TRAP2MASTER 0x7FFD
 
+static int rtl930x_l3_nexthop_update(struct rtl838x_switch_priv *priv,  __be32 ip_addr,
+				     u64 mac, u16 vlan)
+{
+	struct rtl838x_route *r;
+	int index;
+
+	pr_info("%s: Setting up forwarding rule for ip %pI4\n", __func__, &ip_addr);
+	// TODO: Lock while updating internal data structures and route configuration on SoC
+
+	r = rtl930x_prefix_route_find_gw(priv, ip_addr);
+	if (!r) {
+		pr_info("Could not find route with GW-IP: %pI4\n", &ip_addr);
+		return -1;
+	}
+
+	pr_info("B\n");
+	rtl930x_prefix_route_read(r->rt.id, &r->rt);
+	pr_info("Found route valid: %d\n", r->rt.valid);
+	pr_info("Route to %pI4, len %d\n", &r->rt.ip4_r, r->rt.prefix_len);
+
+//	r = rtl930x_prefix_route_find_id(priv, route_id);
+//	pr_info("A: %08x\n", (u32)r);
+
+	r->rt.valid = true;
+	r->rt.next_hop = r->rt.id + 1;snagitsnagit
+	r->nh.mac = mac;
+	r->nh.vid = vlan;
+	r->nh.if_id = 1; // Default interface
+	// Use 1-to-1 mapping between route-id, nexthop ID and mac index for now. TODO
+	r->nh.id = r->rt.id + 1;
+	r->nh.mac_id = r->rt.id + 1;
+
+	// r->nh.mac set to hash index, L3 mac index from mac_idx
+	rtl930x_l2_nexthop_add(priv, &r->nh);
+
+	//RT_ERR_HDL(_dal_longan_l3_nhDmac_set(unit, dstIdx, nh_mac_addr), errL3NhSet, ret);
+	rtl930x_set_l3_egress_mac(r->nh.if_id, mac);
+
+	// Use dmac_id from nhEntry.dmac_idx = l2_dmac_idx = l2ucEntry.l2_idx;
+	pr_info("%s: dmac_id %d, interface %d\n", __func__, r->nh.l2_id, r->nh.if_id);
+	rtl930x_set_l3_nexthop(r->nh.id, r->nh.l2_id, r->nh.if_id);
+
+	pr_info("%s: calling rtl930x_prefix_route_write\n", __func__);
+	rtl930x_prefix_route_write(r->rt.id, &r->rt);
+	pr_info("%s: calling rtl930x_route_lookup_hw\n", __func__);
+
+	index = rtl930x_route_lookup_hw(&r->rt);
+	pr_info("Found route with index: %d\n", index);
+
+	return 0;
+}
 
 // dmac_idx l3_egr_intf_idx RTK_L3_FLAG_WITH_NH_DMAC
 static int rtl930x_l3_nexthop_add(struct rtl838x_switch_priv *priv, u64 mac, u16 vlan)
@@ -1381,15 +1527,16 @@ static int rtl930x_l3_nexthop_add(struct rtl838x_switch_priv *priv, u64 mac, u16
 	nh.vid = vlan;
 
 	rtl930x_l2_nexthop_add(priv, &nh);
-	
+
 	return 0;
 }
 
-
-static int rtl930x_port_ipv4_resolve(struct net_device *dev, __be32 ip_addr, u64 *mac)
+static int rtl930x_port_ipv4_resolve(struct rtl838x_switch_priv *priv,
+				     struct net_device *dev, __be32 ip_addr)
 {
 	struct neighbour *n = neigh_lookup(&arp_tbl, &ip_addr, dev);
 	int err = 0;
+	u64 mac;
 
 	pr_info("%s: neighbour %08x\n", __func__, (u32)n);
 	if (!n) {
@@ -1406,7 +1553,9 @@ static int rtl930x_port_ipv4_resolve(struct net_device *dev, __be32 ip_addr, u64
 	 */
 	if (n->nud_state & NUD_VALID) {
 		pr_info("%s: already valid\n", __func__);
-		*mac = ether_addr_to_u64(n->ha);
+		mac = ether_addr_to_u64(n->ha);
+		pr_info("%s: resolved mac: %016llx\n", __func__, mac);
+		rtl930x_l3_nexthop_update(priv, ip_addr, mac, 0);
 	} else {
 		pr_info("%s: need to wait\n", __func__);
 		neigh_event_send(n, NULL);
@@ -1451,7 +1600,7 @@ static int rtl930x_port_lower_walk(struct net_device *lower, void *_data)
 	index = rtl930x_port_is_under(lower, priv);
 	data->port = index;
 	if (index >= 0) {
-		pr_info("Found DSA-port, index %d\n", index);
+		pr_debug("Found DSA-port, index %d\n", index);
 		ret = 1;
 	}
 
@@ -1462,7 +1611,6 @@ int rtl930x_port_dev_lower_find(struct net_device *dev, struct rtl838x_switch_pr
 {
 	struct rtl930x_walk_data data;
 
-	pr_info("In %s\n", __func__);
 	data.priv = priv;
 	data.port = 0;
 
@@ -1478,9 +1626,7 @@ static int rtl930x_fib4_del(struct rtl838x_switch_priv *priv,
 	struct dsa_port *dp = dev->dsa_ptr;
 	u64 mac;
 
-	pr_info("In %s, ip %d.%d.%d.%d, len %d\n", __func__,
-		info->dst >> 24, (info->dst >> 16) & 0xff, (info->dst >> 8) & 0xff, info->dst & 0xff,
-		info->dst_len);
+	pr_info("In %s, ip %pI4, len %d\n", __func__, &info->dst, info->dst_len);
 	if (dp) {
 		mac = ether_addr_to_u64(dev->dev_addr);
 		pr_info("DSA-port: %08x, mac: %016llx\n", (u32)dp, mac);
@@ -1501,12 +1647,16 @@ int rtl930x_fib4_add(struct rtl838x_switch_priv *priv,
 	struct dsa_port *dp = dev->dsa_ptr;
 	u64 mac;
 	int port;
-	struct rtl838x_route_info rt;
-	int index, route_id, nh_id;
+	struct rtl838x_route *r;
+//	struct rtl838x_route_info rt;
+	int route_id;
 
-	pr_info("In %s, ip %d.%d.%d.%d, len %d\n", __func__,
-		info->dst >> 24, (info->dst >> 16) & 0xff, (info->dst >> 8) & 0xff, info->dst & 0xff,
-		info->dst_len);
+	pr_info("In %s, ip %pI4, len %d\n", __func__, &info->dst, info->dst_len);
+	if (!info->dst) {
+		pr_info("Not offloading default route for now\n");
+		return 0;
+	}
+
 	if (dp) {
 		mac = ether_addr_to_u64(dev->dev_addr);
 		pr_info("DSA-port: %08x, mac: %016llx\n", (u32)dp, mac);
@@ -1515,8 +1665,7 @@ int rtl930x_fib4_add(struct rtl838x_switch_priv *priv,
 		mac = ether_addr_to_u64(dev->dev_addr);
 		pr_info("DEV mac: %016llx\n", mac);
 	}
-	pr_info("GW: %d.%d.%d.%d\n", nh->fib_nh_gw4 >> 24, (nh->fib_nh_gw4 >> 16) & 0xff,
-					(nh->fib_nh_gw4 >> 8) & 0xff, nh->fib_nh_gw4 & 0xff);
+	pr_info("GW: %pI4\n", &nh->fib_nh_gw4);
 
 	pr_info("interface name: %s\n", dev->name);
 	port = rtl930x_port_dev_lower_find(dev, priv);
@@ -1527,45 +1676,34 @@ int rtl930x_fib4_add(struct rtl838x_switch_priv *priv,
 	if (!nh->fib_nh_gw4)
 		return 0;
 
-	// We need to resolve the mac address of the GW
-	rtl930x_port_ipv4_resolve(dev, nh->fib_nh_gw4, &mac);
-
-	pr_info("%s: resolved mac: %016llx\n", __func__, mac);
-	// Allocate next-hop entry
-	nh_id = rtl930x_l3_nexthop_add(priv, mac, 0);
-	
-	pr_info("%s: Setting up forwarding rule for port %d\n", __func__, port);
-	// TODO: Lock while updating internal data structures and route configuration on SoC
-
-	// Write route entry to HW
+	// Allocate route entry
 	route_id = rtl930x_prefix_route_alloc(priv, false);
 	if (route_id < 0) {
 		pr_err("%s: No more free route entries\n", __func__);
 		return -1;
 	}
-	rt.type = 0; // IPv4 Unicast route
-	rt.ip4_r = info->dst;
-	rt.prefix_len = info->dst_len;
 
-	if (!info->dst)
-		return 0;
+	// Configure route entry in route list
+	r = rtl930x_prefix_route_find_id(priv, route_id);
+	r->rt.type = 0; // IPv4 Unicast route
+	r->rt.ip4_r = info->dst;
+	r->rt.prefix_len = info->dst_len;
+	r->nh.ip = nh->fib_nh_gw4;
 
-	rtl930x_prefix_route_write(route_id, &rt);
+	// Allocate next-hop entry
+//	nh_id = rtl930x_l3_nexthop_add(priv, mac, 0);
 
-	index = rtl930x_route_lookup_hw(&rt);
-	pr_info("Found route with index: %d\n", index);
+	// We need to resolve the mac address of the GW
+	rtl930x_port_ipv4_resolve(priv, dev, nh->fib_nh_gw4);
 
-	rtl930x_prefix_route_read(route_id, &rt);
-	pr_info("Found route valid: %d\n", rt.valid);
-	pr_info("Route to %d.%d.%d.%d, len %d\n",
-		rt.ip4_r >> 24, (rt.ip4_r >> 16) & 0xff, (rt.ip4_r >> 8) & 0xff, rt.ip4_r & 0xff,
-		rt.prefix_len);
-
+/*
+	// test with ip route add 192.168.3.0/24 via 192.168.2.150
 	rt.type = 0; // IPv4 Unicast route
 	rt.ip4_r = 0xc0a80500; // 192.168.5.0
 	rt.prefix_len = 24;
 	index = rtl930x_route_lookup_hw(&rt);
 	pr_info("Found 192.168.5.0 route with index: %d\n", index);
+*/
 
 	nh->fib_nh_flags |= RTNH_F_OFFLOAD;
 
@@ -1575,16 +1713,17 @@ int rtl930x_fib4_add(struct rtl838x_switch_priv *priv,
 int rtl930x_l3_setup(struct rtl838x_switch_priv *priv)
 {
 	int i;
+	struct rtl838x_l3_intf intf;
 
 	// Setup MTU with id 0 for default interface
 	for (i = 0; i < MAX_INTF_MTUS; i++)
 		priv->intf_mtu_count[i] = priv->intf_mtus[i] = 0;
 	priv->intf_mtu_count[0] = 0; // Needs to stay forever
-	priv->intf_mtus[i] = DEFAULT_MTU;
+	priv->intf_mtus[0] = DEFAULT_MTU;
 	sw_w32_mask(0xffff, DEFAULT_MTU, RTL930X_L3_IP_MTU_CTRL(0));
 	sw_w32_mask(0xffff, DEFAULT_MTU, RTL930X_L3_IP6_MTU_CTRL(0));
 
-	// Set up MACs for the ports
+	// Set up source MACs for the ports
 	rtl930x_setup_port_macs(priv);
 
 	// Configure the default hash algorithm
@@ -1592,10 +1731,22 @@ int rtl930x_l3_setup(struct rtl838x_switch_priv *priv)
 	sw_w32_mask(BIT(2), 0, RTL930X_L3_HOST_TBL_CTRL);  // Algorithm selection 0
 	sw_w32_mask(0, BIT(3), RTL930X_L3_HOST_TBL_CTRL);  // Algorithm selection 1
 
-	// Setup routing actions:
-//	sw_w32(RTL930X_L3_IPUC_ROUTE_CTRL);
+	// Set up default egress interface 1
+	intf.vid = 1;
+	intf.smac_idx = 1;
+	intf.ip4_mtu_id = 0;
+	intf.ip6_mtu_id = 0;
+	intf.ttl_scope = 20; // TTL
+	intf.hl_scope = 20;
+	intf.ip4_icmp_redirect = intf.ip6_icmp_redirect = 0;
+	intf.ip4_pbr_icmp_redirect = intf.ip6_pbr_icmp_redirect = 0;
+	rtl930x_set_l3_egress_intf(1, &intf);
+
+	// look at : dal_longan_l3_nullIntf_nhEntry_init
 
 	// Enable IPv4 UC routing
+	pr_info("%s: RTL930X_L3_IPUC_ROUTE_CTRL was: %08x\n", 
+		__func__, sw_r32(RTL930X_L3_IPUC_ROUTE_CTRL));
 	sw_w32_mask(0, 1, RTL930X_L3_IPUC_ROUTE_CTRL);
 	// Enable IPv6 UC routing
 	sw_w32_mask(0, 1, RTL930X_L3_IP6UC_ROUTE_CTRL);
@@ -1668,4 +1819,5 @@ const struct rtl838x_reg rtl930x_reg = {
 	.l2_hash_seed = rtl930x_l2_hash_seed, 
 	.l2_hash_key = rtl930x_l2_hash_key,
 	.port_dev_lower_find = rtl930x_port_dev_lower_find,
+	.l3_nexthop_update = rtl930x_l3_nexthop_update,
 };
