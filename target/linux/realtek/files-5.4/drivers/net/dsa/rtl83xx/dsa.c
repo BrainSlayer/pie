@@ -471,9 +471,11 @@ static int rtl83xx_port_enable(struct dsa_switch *ds, int port,
 	v |= priv->ports[port].pm;
 	priv->r->traffic_set(port, v);
 
-	sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_SABLK_CTRL);
-	sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_DABLK_CTRL);
-
+	// TODO: Figure out if this is necessary
+	if (priv->family_id == RTL9300_FAMILY_ID) {
+		sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_SABLK_CTRL);
+		sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_DABLK_CTRL);
+	}
 	return 0;
 }
 
@@ -617,8 +619,6 @@ static int rtl83xx_port_bridge_join(struct dsa_switch *ds, int port,
 	}
 	priv->ports[port].pm |= port_bitmap;
 	mutex_unlock(&priv->reg_mutex);
-
-	rtl930x_print_matrix();
 
 	return 0;
 }
@@ -798,12 +798,17 @@ static int rtl83xx_vlan_prepare(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 
 	pr_info("%s: port %d, VLAN_FID_CTRL %08x\n", __func__, port, sw_r32(RTL838X_VLAN_FID_CTRL));
-	sw_w32(0, RTL838X_VLAN_FID_CTRL);
-	pr_info("%s: port %d, VLAN_FID_CTRL %08x\n", __func__, port, sw_r32(RTL838X_VLAN_FID_CTRL));
+	if (priv->id == RTL8380_FAMILY_ID)
+		sw_w32(0, RTL838X_VLAN_FID_CTRL);
 
 	mutex_lock(&priv->reg_mutex);
 
-	priv->fid_offset = sw_r32(RTL838X_VLAN_FID_CTRL);
+	// Offsetting of forwarding IDs by the SoC is only done on RTL8380
+	if (priv->id == RTL8380_FAMILY_ID)
+		priv->fid_offset = sw_r32(RTL838X_VLAN_FID_CTRL);
+	else
+		priv->fid_offset = 0;
+
 	priv->r->vlan_profile_dump(0);
 	priv->r->vlan_profile_dump(1);
 	priv->r->vlan_tables_read(0, &info);
@@ -1139,9 +1144,11 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 			cb(e.mac, e.vid, e.is_static, data);
 		}
 		if (e.type == L2_MULTICAST) {
-			dump_l2_entry(&e);
 			u64 portmask = priv->r->read_mcast_pmask(e.mc_portmask_index);
-			pr_info("  PM: %016llx\n", portmask);
+			if (portmask & BIT_ULL(port)) {
+				dump_l2_entry(&e);
+				pr_info("  PM: %016llx\n", portmask);
+			}
 		}
 	}
 
