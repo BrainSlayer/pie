@@ -99,11 +99,33 @@ static u64 rtl838x_l2_hash_seed(u64 mac, u32 vid)
 	return mac << 12 | vid;
 }
 
-static u64 rtl838x_l2_hash_key(struct rtl838x_switch_priv *priv, u64 mac, u32 vid)
+/*
+ * Applies the same hash algorithm as the one used currently by the ASIC to the seed
+ * and returns a key into the L2 hash table
+ */
+static u32 rtl838x_l2_hash_key(struct rtl838x_switch_priv *priv, u64 seed)
 {
-	u64 seed = rtl838x_l2_hash_seed(mac, vid);
+	u32 h1, h2, h3, h;
 
-	return rtl838x_hash(priv, seed);
+	if (sw_r32(priv->r->l2_ctrl_0) & 1) {
+		h1 = (seed >> 11) & 0x7ff;
+		h1 = ((h1 & 0x1f) << 6) | ((h1 >> 5) & 0x3f);
+
+		h2 = (seed >> 33) & 0x7ff;
+		h2 = ((h2 & 0x3f) << 5) | ((h2 >> 6) & 0x1f);
+
+		h3 = (seed >> 44) & 0x7ff;
+		h3 = ((h3 & 0x7f) << 4) | ((h3 >> 7) & 0xf);
+
+		h = h1 ^ h2 ^ h3 ^ ((seed >> 55) & 0x1ff);
+		h ^= ((seed >> 22) & 0x7ff) ^ (seed & 0x7ff);
+	} else {
+		h = ((seed >> 55) & 0x1ff) ^ ((seed >> 44) & 0x7ff)
+			^ ((seed >> 33) & 0x7ff) ^ ((seed >> 22) & 0x7ff)
+			^ ((seed >> 11) & 0x7ff) ^ (seed & 0x7ff);
+	}
+
+	return h;
 }
 
 static inline int rtl838x_mac_force_mode_ctrl(int p)
@@ -184,6 +206,7 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 			else
 				e->type = L2_UNICAST;
 		} else { // L2 multicast
+			pr_info("Got L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
 			e->valid = true;
 			e->type = L2_MULTICAST;
 			e->mc_portmask_index = (r[0] >> 12) & 0x1ff;
@@ -217,8 +240,8 @@ static void rtl838x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 	r[0] |= e->is_ipv6_mc ? BIT(21) : 0;
 
 	if (!e->is_ip_mc && !e->is_ipv6_mc) {
-		r[1] = mac >> 16;
-		r[2] = (mac & 0xffff) << 12;
+		r[1] = mac >> 20;
+		r[2] = (mac & 0xfffff) << 12;
 
 		/* Is it a unicast entry? check multicast bit */
 		if (!(e->mac[0] & 1)) {
@@ -239,6 +262,7 @@ static void rtl838x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 			r[0] |= (e->mc_portmask_index & 0x1ff) << 12;
 			r[2] |= e->rvid & 0xfff;
 			r[0] |= e->vid & 0xfff;
+			pr_info("FILL MC: %08x %08x %08x\n", r[0], r[1], r[2]);
 		}
 	} else { // IPv4 and IPv6 multicast
 		r[1] = e->mc_gip;
@@ -277,7 +301,7 @@ static u64 rtl838x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2
 static void rtl838x_write_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
 {
 	u32 r[3];
-	struct table_reg *q = rtl_table_get(RTL8390_TBL_L2, 0);
+	struct table_reg *q = rtl_table_get(RTL8380_TBL_L2, 0);
 	int i;
 
 	u32 idx = (0 << 14) | (hash << 2) | pos; // Access SRAM, with hash and at pos in bucket
@@ -305,14 +329,54 @@ static u64 rtl838x_read_cam(int idx, struct rtl838x_l2_entry *e)
 	rtl_table_release(q);
 
 	rtl838x_fill_l2_entry(r, e);
-	e->valid = true;
 	if (!e->valid)
 		return 0;
 
 	pr_debug("Found in CAM: R1 %x R2 %x R3 %x\n", r[0], r[1], r[2]);
 
+	// Return MAC with concatenated VID ac concatenated ID
 	entry = (((u64) r[1]) << 32) | (r[2] & 0xfffff000) | (r[0] & 0xfff);
 	return entry;
+}
+
+static void rtl838x_write_cam(int idx, struct rtl838x_l2_entry *e)
+{
+	u32 r[3];
+	struct table_reg *q = rtl_table_get(RTL8380_TBL_L2, 1); // Access L2 Table 1
+	int i;
+
+	rtl838x_fill_l2_row(r, e);
+
+	for (i= 0; i < 3; i++)
+		sw_w32(r[i], rtl_table_data(q, i));
+
+	rtl_table_write(q, idx);
+	rtl_table_release(q);
+}
+
+static u64 rtl838x_read_mcast_pmask(int idx)
+{
+	u32 portmask;
+	// Read MC_PMSK (2) via register RTL8380_TBL_L2
+	struct table_reg *q = rtl_table_get(RTL8380_TBL_L2, 2);
+
+	rtl_table_read(q, idx);
+	portmask = sw_r32(rtl_table_data(q, 0));
+	rtl_table_release(q);
+
+	pr_info("%s: Index idx %d has portmask %08x\n", __func__, idx, portmask);
+	return portmask;
+}
+
+static void rtl838x_write_mcast_pmask(int idx, u64 portmask)
+{
+	// Access MC_PMSK (2) via register RTL8380_TBL_L2
+	struct table_reg *q = rtl_table_get(RTL8380_TBL_L2, 2);
+
+	pr_info("%s: Index idx %d has portmask %08x\n", __func__, idx, (u32)portmask);
+	sw_w32(((u32)portmask) & 0x1fffffff, rtl_table_data(q, 0));
+	rtl_table_write(q, idx);
+	rtl_table_release(q);
 }
 
 static inline int rtl838x_vlan_profile(int profile)
@@ -500,8 +564,9 @@ const struct rtl838x_reg rtl838x_reg = {
 	.mac_rx_pause_sts = RTL838X_MAC_RX_PAUSE_STS,
 	.mac_tx_pause_sts = RTL838X_MAC_TX_PAUSE_STS,
 	.read_l2_entry_using_hash = rtl838x_read_l2_entry_using_hash,
-	.read_cam = rtl838x_read_cam,
 	.write_l2_entry_using_hash = rtl838x_write_l2_entry_using_hash,
+	.read_cam = rtl838x_read_cam,
+	.write_cam = rtl838x_write_cam,
 	.vlan_port_egr_filter = RTL838X_VLAN_PORT_EGR_FLTR,
 	.vlan_port_igr_filter = RTL838X_VLAN_PORT_IGR_FLTR(0),
 	.vlan_port_pb = RTL838X_VLAN_PORT_PB_VLAN,
@@ -514,6 +579,8 @@ const struct rtl838x_reg rtl838x_reg = {
 	.eee_port_ability = rtl838x_eee_port_ability,
 	.l2_hash_seed = rtl838x_l2_hash_seed, 
 	.l2_hash_key = rtl838x_l2_hash_key,
+	.read_mcast_pmask = rtl838x_read_mcast_pmask,
+	.write_mcast_pmask = rtl838x_write_mcast_pmask,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
@@ -526,7 +593,12 @@ irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
 
 	/* Clear status */
 	sw_w32(ports, RTL838X_ISR_PORT_LINK_STS_CHG);
-	pr_info("RTL8380 Link change: status: %x, ports %x\n", status, ports);
+	pr_info("RTL8380 IRQ: link %x, ports %x, media %x, salrn %x, time %x, fid %x, acl %x\n",
+		status, ports,
+		sw_r32(RTL838X_ISR_PORT_MEDIA_CHG), sw_r32(RTL838X_ISR_PORT_SALRN_CONSTRT),
+		sw_r32(RTL838X_ISR_PORT_TIMESTAMP_LATCH), sw_r32(RTL838X_ISR_FID_SALRN_CONSTRT),
+		sw_r32(RTL838X_ISR_ACL_HIT_31_0)
+	);
 
 	for (i = 0; i < 28; i++) {
 		if (ports & BIT(i)) {
@@ -729,34 +801,6 @@ void rtl8380_get_version(struct rtl838x_switch_priv *priv)
 	}
 }
 
-/*
- * Applies the same hash algorithm as the one used currently by the ASIC
- */
-u32 rtl838x_hash(struct rtl838x_switch_priv *priv, u64 seed)
-{
-	u32 h1, h2, h3, h;
-
-	if (sw_r32(priv->r->l2_ctrl_0) & 1) {
-		h1 = (seed >> 11) & 0x7ff;
-		h1 = ((h1 & 0x1f) << 6) | ((h1 >> 5) & 0x3f);
-
-		h2 = (seed >> 33) & 0x7ff;
-		h2 = ((h2 & 0x3f) << 5) | ((h2 >> 6) & 0x1f);
-
-		h3 = (seed >> 44) & 0x7ff;
-		h3 = ((h3 & 0x7f) << 4) | ((h3 >> 7) & 0xf);
-
-		h = h1 ^ h2 ^ h3 ^ ((seed >> 55) & 0x1ff);
-		h ^= ((seed >> 22) & 0x7ff) ^ (seed & 0x7ff);
-	} else {
-		h = ((seed >> 55) & 0x1ff) ^ ((seed >> 44) & 0x7ff)
-			^ ((seed >> 33) & 0x7ff) ^ ((seed >> 22) & 0x7ff)
-			^ ((seed >> 11) & 0x7ff) ^ (seed & 0x7ff);
-	}
-
-	return h;
-}
-
 void rtl838x_vlan_profile_dump(int index)
 {
 	u32 profile;
@@ -766,8 +810,8 @@ void rtl838x_vlan_profile_dump(int index)
 
 	profile = sw_r32(RTL838X_VLAN_PROFILE(index));
 
-	pr_info("VLAN %d: L2 learning: %d, L2 Unknown MultiCast Field %x, \
-		IPv4 Unknown MultiCast Field %x, IPv6 Unknown MultiCast Field: %x",
+	pr_info("VLAN profile %d: L2 learning: %d, UNKN L2MC FLD PMSK %d, \
+		UNKN IPMC FLD PMSK %d, UNKN IPv6MC FLD PMSK: %d",
 		index, profile & 1, (profile >> 1) & 0x1ff, (profile >> 10) & 0x1ff,
 		(profile >> 19) & 0x1ff);
 }

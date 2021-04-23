@@ -217,6 +217,16 @@
 #define RTL931X_RMA_BPDU_FLD_PMSK		(0x8950)
 #define RTL839X_RMA_BPDU_FLD_PMSK		(0x125C)
 
+#define RTL838X_L2_PORT_LM_ACT(p)		(0x3208 + ((p) << 2))
+#define RTL838X_VLAN_PORT_FWD			(0x3A78)
+#define RTL838X_VLAN_FID_CTRL			(0x3aa8)
+/* L2 IRQs */
+#define RTL838X_ISR_PORT_MEDIA_CHG		(0x1150)
+#define RTL838X_ISR_PORT_SALRN_CONSTRT		(0x1154)
+#define RTL838X_ISR_PORT_TIMESTAMP_LATCH	(0x1158)
+#define RTL838X_ISR_FID_SALRN_CONSTRT		(0x116C)
+#define RTL838X_ISR_ACL_HIT_31_0		(0x1170)
+
 /* Port Mirroring */
 #define RTL838X_MIR_CTRL			(0x5D00)
 #define RTL838X_MIR_DPM_CTRL			(0x5D20)
@@ -354,6 +364,7 @@
 #define MAX_ROUTE_CAM_ENTRIES 512
 #define RTL83XX_MAX_PORTS 57
 #define RTL930X_PORT_IGNORE 0x3f
+#define MAX_MC_GROUPS 512
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -415,8 +426,8 @@ struct rtl838x_l2_entry {
 	u32 mc_gip;
 	u32 mc_sip;
 	u16 mc_mac_index;
-	bool nh_vlan_target;
 	u16 nh_route_id;
+	bool nh_vlan_target;  // Only RTL83xx: VLAN used for next hop
 };
 
 struct rtl838x_route_info {
@@ -530,8 +541,9 @@ struct rtl838x_reg {
 	int mac_rx_pause_sts;
 	int mac_tx_pause_sts;
 	u64 (*read_l2_entry_using_hash)(u32 hash, u32 position, struct rtl838x_l2_entry *e);
-	u64 (*read_cam)(int idx, struct rtl838x_l2_entry *e);
 	void (*write_l2_entry_using_hash)(u32 hash, u32 pos, struct rtl838x_l2_entry *e);
+	u64 (*read_cam)(int idx, struct rtl838x_l2_entry *e);
+	void (*write_cam)(int idx, struct rtl838x_l2_entry *e);
 	int vlan_port_egr_filter;
 	int vlan_port_igr_filter;
 	int vlan_port_pb;
@@ -547,10 +559,12 @@ struct rtl838x_reg {
 	int (*fib4_del)(struct rtl838x_switch_priv *, struct fib_entry_notifier_info *);
 	int (*fib4_add)(struct rtl838x_switch_priv *, struct fib_entry_notifier_info *);
 	u64 (*l2_hash_seed)(u64 mac, u32 vid);
-	u64 (*l2_hash_key)(struct rtl838x_switch_priv *priv, u64 mac, u32 vid);
+	u32 (*l2_hash_key)(struct rtl838x_switch_priv *priv, u64 seed);
 	int (*port_dev_lower_find)(struct net_device *dev, struct rtl838x_switch_priv *priv);
 	int (*l3_nexthop_update)(struct rtl838x_switch_priv *priv, __be32 ip_addr,
 				 u64 mac, u16 vlan);
+	u64 (*read_mcast_pmask)(int idx);
+	void (*write_mcast_pmask)(int idx, u64 portmask);
 };
 
 struct rtl838x_switch_priv {
@@ -571,6 +585,7 @@ struct rtl838x_switch_priv {
 	u8 port_width;
 	u64 irq_mask;
 	u32 fib_entries;
+	u16 fid_offset;
 	int l2_bucket_size;
 	struct dentry *dbgfs_dir;
 	int n_lags;
@@ -585,6 +600,7 @@ struct rtl838x_switch_priv {
 	struct rtl838x_l3_intf *interfaces[MAX_INTERFACES];
 	unsigned long int prefix_ip4route_use_bm[MAX_ROUTE_CAM_ENTRIES >> 6];
 	unsigned long int prefix_ip6route_use_bm[MAX_ROUTE_CAM_ENTRIES >> 6];
+	unsigned long int mc_group_bm[MAX_MC_GROUPS >> 5];
 	struct rtl838x_route routes;
 };
 
