@@ -91,7 +91,6 @@ void rtl838x_set_port_reg(u64 set, int reg);
 u64 rtl838x_get_port_reg(int reg);
 
 /* RTL838x-specific */
-u32 rtl838x_hash(struct rtl838x_switch_priv *priv, u64 seed);
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id);
 void rtl8380_get_version(struct rtl838x_switch_priv *priv);
 void rtl838x_vlan_profile_dump(int index);
