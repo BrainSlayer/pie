@@ -12,10 +12,10 @@ void rtl838x_print_matrix(void)
 
 	ptr8 = RTL838X_SW_BASE + RTL838X_PORT_ISO_CTRL(0);
 	for (i = 0; i < 28; i += 8)
-		pr_info("> %8x %8x %8x %8x %8x %8x %8x %8x\n",
+		pr_debug("> %8x %8x %8x %8x %8x %8x %8x %8x\n",
 			ptr8[i + 0], ptr8[i + 1], ptr8[i + 2], ptr8[i + 3],
 			ptr8[i + 4], ptr8[i + 5], ptr8[i + 6], ptr8[i + 7]);
-	pr_info("CPU_PORT> %8x\n", ptr8[28]);
+	pr_debug("CPU_PORT> %8x\n", ptr8[28]);
 }
 
 static inline int rtl838x_port_iso_ctrl(int p)

@@ -375,7 +375,6 @@ static u64 rtl839x_read_mcast_pmask(int idx)
 	portmask >>= 11;  // LSB is bit 11 in data registers
 	rtl_table_release(q);
 
-	pr_info("%s: Index idx %d has portmask %016llx\n", __func__, idx, portmask);
 	return portmask;
 }
 

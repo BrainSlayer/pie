@@ -20,7 +20,7 @@ void rtl930x_print_matrix(void)
 
 	for (i = 0; i < 29; i++) {
 		rtl_table_read(r, i);
-		pr_info("> %08x\n", sw_r32(rtl_table_data(r, 0)));
+		pr_info("%s: > %08x\n", __func__, sw_r32(rtl_table_data(r, 0)));
 	}
 	rtl_table_release(r);
 }
