@@ -883,7 +883,7 @@ static int rtl838x_eth_open(struct net_device *ndev)
 	switch (priv->family_id) {
 	case RTL8380_FAMILY_ID:
 		rtl838x_hw_en_rxtx(priv);
-		/* Trap IGMP traffic to CPU-Port */
+		/* Trap IGMP/MDD traffic to CPU-Port */
 		sw_w32(0x3, RTL838X_SPCL_TRAP_IGMP_CTRL);
 		/* Flush learned FDB entries on link down of a port */
 		sw_w32_mask(0, BIT(7), RTL838X_L2_CTRL_0);
