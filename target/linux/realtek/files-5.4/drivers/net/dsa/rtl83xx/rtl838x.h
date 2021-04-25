@@ -355,6 +355,7 @@
 #define RTL930X_L3_HW_LU_KEY_IP_CTRL		(0xACA0)
 #define RTL930X_L3_HW_LU_CTRL			(0xACC0)
 
+#define MAX_VLANS 4096
 #define MAX_LAGS 16
 #define MAX_PRIOS 8
 #define MAX_INTF_MTUS 8
@@ -365,6 +366,7 @@
 #define RTL83XX_MAX_PORTS 57
 #define RTL930X_PORT_IGNORE 0x3f
 #define MAX_MC_GROUPS 512
+#define UNKNOWN_MC_PMASK (MAX_MC_GROUPS - 1)
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -526,6 +528,7 @@ struct rtl838x_reg {
 	void (*vlan_set_tagged)(u32 vlan, struct rtl838x_vlan_info *info);
 	void (*vlan_set_untagged)(u32 vlan, u64 portmask);
 	void (*vlan_profile_dump)(int index);
+	void (*vlan_profile_setup)(int profile);
 	void (*stp_get)(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[]);
 	void (*stp_set)(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[]);
 	int  (*mac_force_mode_ctrl)(int port);
@@ -585,7 +588,6 @@ struct rtl838x_switch_priv {
 	u8 port_width;
 	u64 irq_mask;
 	u32 fib_entries;
-	u16 fid_offset;
 	int l2_bucket_size;
 	struct dentry *dbgfs_dir;
 	int n_lags;

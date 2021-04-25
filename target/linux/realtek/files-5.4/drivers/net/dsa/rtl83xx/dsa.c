@@ -109,6 +109,46 @@ static enum dsa_tag_protocol rtl83xx_get_tag_protocol(struct dsa_switch *ds, int
 	return DSA_TAG_PROTO_TRAILER;
 }
 
+/*
+ * Initialize all VLANS
+ */
+static void rtl83xx_vlan_setup(struct rtl838x_switch_priv *priv)
+{
+	struct rtl838x_vlan_info info;
+	int i;
+
+	pr_info("In %s\n", __func__);
+
+	priv->r->vlan_profile_setup(0);
+	priv->r->vlan_profile_setup(1);
+	pr_info("UNKNOWN_MC_PMASK: %016llx\n", priv->r->read_mcast_pmask(UNKNOWN_MC_PMASK));
+	priv->r->vlan_profile_dump(0);
+
+	info.fid = 0;			// Default Forwarding ID / MSTI
+	info.hash_uc_fid = false;	// Do not build the L2 lookup hash with FID, but VID
+	info.hash_mc_fid = false;	// Do the same for Multicast packets
+	info.profile_id = 0;		// Use default Vlan Profile 0
+	info.tagged_ports = 0;		// Initially no port members
+	// Initialize all vlans 0-4095
+	for (i = 0; i < MAX_VLANS; i ++)
+		priv->r->vlan_set_tagged(i, &info);
+
+	for (i = 0; i < priv->cpu_port; i++) {
+		switch (priv->id) {
+		case RTL8380_FAMILY_ID:
+			pr_info("L2_PORT_LM_ACT: %08x\n", sw_r32(RTL838X_L2_PORT_LM_ACT(i)));
+			// Drop unknown multicast traffic:
+			// sw_w32_mask(0x3 << 2, 1 << 2, sw_r32(RTL838X_L2_PORT_LM_ACT(i)));
+			if (!i)
+				pr_info("RTL838X_VLAN_PORT_FWD: %08x\n",
+					sw_r32(RTL838X_VLAN_PORT_FWD));
+			// Set forwarding action based on inner VLAN tag
+			sw_w32_mask(BIT(i), 0, RTL838X_VLAN_PORT_FWD);
+		}
+	}
+
+}
+
 static int rtl83xx_setup(struct dsa_switch *ds)
 {
 	int i;
@@ -143,6 +183,8 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 		rtl839x_print_matrix();
 
 	rtl83xx_init_stats(priv);
+
+	rtl83xx_vlan_setup(priv);
 
 	ds->configure_vlan_while_not_filtering = true;
 
@@ -183,6 +225,8 @@ static int rtl930x_setup(struct dsa_switch *ds)
 	rtl930x_print_matrix();
 
 	// TODO: Initialize statistics
+
+	rtl83xx_vlan_setup(priv);
 
 	ds->configure_vlan_while_not_filtering = true;
 
@@ -761,7 +805,7 @@ static int rtl83xx_vlan_filtering(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 
-	pr_debug("%s: port %d\n", __func__, port);
+	pr_info("%s: port %d\n", __func__, port);
 	mutex_lock(&priv->reg_mutex);
 
 	if (vlan_filtering) {
@@ -797,28 +841,14 @@ static int rtl83xx_vlan_prepare(struct dsa_switch *ds, int port,
 	struct rtl838x_vlan_info info;
 	struct rtl838x_switch_priv *priv = ds->priv;
 
-	pr_info("%s: port %d, VLAN_FID_CTRL %08x\n", __func__, port, sw_r32(RTL838X_VLAN_FID_CTRL));
-	if (priv->id == RTL8380_FAMILY_ID)
-		sw_w32(0, RTL838X_VLAN_FID_CTRL);
-
-	mutex_lock(&priv->reg_mutex);
-
-	// Offsetting of forwarding IDs by the SoC is only done on RTL8380
-	if (priv->id == RTL8380_FAMILY_ID)
-		priv->fid_offset = sw_r32(RTL838X_VLAN_FID_CTRL);
-	else
-		priv->fid_offset = 0;
-
-	priv->r->vlan_profile_dump(0);
-	priv->r->vlan_profile_dump(1);
 	priv->r->vlan_tables_read(0, &info);
 
-	pr_info("VLAN 0: Tagged ports %llx, untag %llx, profile %d, MC# %d, UC# %d, FID %x\n",
+	pr_debug("VLAN 0: Tagged ports %llx, untag %llx, profile %d, MC# %d, UC# %d, FID %x\n",
 		info.tagged_ports, info.untagged_ports, info.profile_id,
 		info.hash_mc_fid, info.hash_uc_fid, info.fid);
 
 	priv->r->vlan_tables_read(1, &info);
-	pr_info("VLAN 1: Tagged ports %llx, untag %llx, profile %d, MC# %d, UC# %d, FID %x\n",
+	pr_debug("VLAN 1: Tagged ports %llx, untag %llx, profile %d, MC# %d, UC# %d, FID %x\n",
 		info.tagged_ports, info.untagged_ports, info.profile_id,
 		info.hash_mc_fid, info.hash_uc_fid, info.fid);
 	priv->r->vlan_set_untagged(1, info.untagged_ports);
@@ -883,10 +913,10 @@ static void rtl83xx_vlan_add(struct dsa_switch *ds, int port,
 			info.untagged_ports |= BIT_ULL(port);
 
 		priv->r->vlan_set_untagged(v, info.untagged_ports);
-		pr_info("Untagged ports, VLAN %d: %llx\n", v, info.untagged_ports);
+		pr_debug("Untagged ports, VLAN %d: %llx\n", v, info.untagged_ports);
 
 		priv->r->vlan_set_tagged(v, &info);
-		pr_info("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
+		pr_debug("Tagged ports, VLAN %d: %llx\n", v, info.tagged_ports);
 	}
 
 	mutex_unlock(&priv->reg_mutex);
@@ -977,9 +1007,7 @@ static void rtl83xx_setup_l2_mc_entry(struct rtl838x_switch_priv *priv,
 	e->mc_portmask_index = mc_group;
 	e->type = L2_MULTICAST;
 	e->rvid = e->vid = vid;
-	if (!e->rvid)
-		e->rvid += priv->fid_offset;
-	pr_info("%s: vid: %d, rvid: %d, offset %d\n", __func__, e->vid, e->rvid, priv->fid_offset);
+	pr_info("%s: vid: %d, rvid: %d\n", __func__, e->vid, e->rvid);
 	u64_to_ether_addr(mac, e->mac);
 }
 
@@ -1170,17 +1198,10 @@ static int rtl83xx_port_mdb_prepare(struct dsa_switch *ds, int port,
 					const struct switchdev_obj_port_mdb *mdb)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	u64 portmask = priv->r->read_mcast_pmask(1);
 
-	pr_info("In %s, port %d, portmask 1: %016llx\n", __func__, port, portmask);
-	if (priv->id > 0x9310)
+	if (priv->id >= 0x9300)
 		return -EOPNOTSUPP;
-	switch (priv->id) {
-	case RTL8380_FAMILY_ID:
-		pr_debug("port setup: %08x\n", sw_r32(RTL838X_L2_PORT_LM_ACT(port)));
-		pr_info("RTL838X_VLAN_PORT_FWD: %08x\n", sw_r32(RTL838X_VLAN_PORT_FWD));
-		sw_w32_mask(0x3 << 2, 1 << 2, sw_r32(RTL838X_L2_PORT_LM_ACT(port)));
-	}
+
 	return 0;
 }
 
@@ -1230,7 +1251,7 @@ static void rtl83xx_port_mdb_add(struct dsa_switch *ds, int port,
 	u64 mac = ether_addr_to_u64(mdb->addr);
 	struct rtl838x_l2_entry e;
 	int err = 0, idx;
-	int vid = 0; // mdb->vid;
+	int vid = mdb->vid;
 	u64 seed = priv->r->l2_hash_seed(mac, vid);
 	int mc_group;
 
@@ -1293,7 +1314,7 @@ int rtl83xx_port_mdb_del(struct dsa_switch *ds, int port,
 	u64 mac = ether_addr_to_u64(mdb->addr);
 	struct rtl838x_l2_entry e;
 	int err = 0, idx;
-	int vid = 0; // mdb->vid;
+	int vid = mdb->vid;
 	u64 seed = priv->r->l2_hash_seed(mac, vid);
 	u64 portmask;
 
@@ -1325,7 +1346,7 @@ int rtl83xx_port_mdb_del(struct dsa_switch *ds, int port,
 		}
 		goto out;
 	}
-	err = -ENOENT;
+	// TODO: Re-enable with a newer kernel: err = -ENOENT;
 out:
 	mutex_unlock(&priv->reg_mutex);
 	return err;
