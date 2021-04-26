@@ -1253,7 +1253,7 @@ static void rtl83xx_port_mdb_add(struct dsa_switch *ds, int port,
 	u64 seed = priv->r->l2_hash_seed(mac, vid);
 	int mc_group;
 
-	pr_info("In %s port %d, mac %llx, vid: %d\n", __func__, port, mac, vid);
+	pr_debug("In %s port %d, mac %llx, vid: %d\n", __func__, port, mac, vid);
 	mutex_lock(&priv->reg_mutex);
 
 	idx = rtl83xx_find_l2_hash_entry(priv, seed, false, &e);
@@ -1316,7 +1316,7 @@ int rtl83xx_port_mdb_del(struct dsa_switch *ds, int port,
 	u64 seed = priv->r->l2_hash_seed(mac, vid);
 	u64 portmask;
 
-	pr_info("In %s, port %d, mac %llx, vid: %d\n", __func__, port, mac, vid);
+	pr_debug("In %s, port %d, mac %llx, vid: %d\n", __func__, port, mac, vid);
 	mutex_lock(&priv->reg_mutex);
 
 	idx = rtl83xx_find_l2_hash_entry(priv, seed, true, &e);
@@ -1561,4 +1561,9 @@ const struct dsa_switch_ops rtl930x_switch_ops = {
 	.port_fdb_add		= rtl83xx_port_fdb_add,
 	.port_fdb_del		= rtl83xx_port_fdb_del,
 	.port_fdb_dump		= rtl83xx_port_fdb_dump,
+
+	.port_mdb_prepare	= rtl83xx_port_mdb_prepare,
+	.port_mdb_add		= rtl83xx_port_mdb_add,
+	.port_mdb_del		= rtl83xx_port_mdb_del,
+
 };

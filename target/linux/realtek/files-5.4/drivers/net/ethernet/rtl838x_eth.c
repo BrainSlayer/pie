@@ -256,7 +256,7 @@ bool rtl839x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
 	t->reason = h->cpu_tag[4] & 0x1f;
 	if (t->reason != 31)
 	pr_debug("Reason: %d\n", t->reason);
-		t->queue = (h->cpu_tag[3] & 0xe000) >> 13;
+	t->queue = (h->cpu_tag[3] & 0xe000) >> 13;
 	if ((t->reason != 7) && (t->reason != 8)) // NIC_RX_REASON_RMA_USR
 		t->l2_offloaded = 1;
 	else
@@ -267,24 +267,32 @@ bool rtl839x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
 	return t->l2_offloaded;
 }
 
-bool rtl931x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
+bool rtl930x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
 {
 	t->reason = h->cpu_tag[7] & 0x3f;
-	pr_debug("Reason %d\n", t->reason);
 	t->queue =  (h->cpu_tag[2] >> 11) & 0x1f;
-	if (t->reason >= 19 && t->reason <= 27)
+	t->port = (h->cpu_tag[0] >> 8) & 0x1f;
+	pr_debug("Reason %d, port %d, queue %d\n", t->reason, t->port, t->queue);
+	if (t->reason >= 19 && t->reason <= 27) {
 		t->l2_offloaded = 0;
-	else
+		pr_debug("Reason: %d\n", t->reason);
+	} else
 		t->l2_offloaded = 1;
-	t->port = (h->cpu_tag[0] >> 8) & 0x3f;
 
 	return t->l2_offloaded;
 }
 
-bool rtl930x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
+bool rtl931x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
 {
-	rtl931x_decode_tag(h, t);
-	t->port &= 0x1f;
+	t->reason = h->cpu_tag[7] & 0x3f;
+	t->queue =  (h->cpu_tag[2] >> 11) & 0x1f;
+	t->port = (h->cpu_tag[0] >> 8) & 0x3f;
+	if (t->reason >= 19 && t->reason <= 27) {
+		t->l2_offloaded = 0;
+		pr_debug("Reason: %d\n", t->reason);
+	} else
+		t->l2_offloaded = 1;
+
 	return t->l2_offloaded;
 }
 
@@ -898,13 +906,14 @@ static int rtl838x_eth_open(struct net_device *ndev)
 		rtl93xx_hw_en_rxtx(priv);
 		/* Flush learned FDB entries on link down of a port */
 		sw_w32_mask(0, BIT(7), RTL930X_L2_CTRL);
-		sw_w32_mask(BIT(28), 0, RTL930X_L2_PORT_SABLK_CTRL);
-		sw_w32_mask(BIT(28), 0, RTL930X_L2_PORT_DABLK_CTRL);
+//		sw_w32_mask(BIT(28), 0, RTL930X_L2_PORT_SABLK_CTRL);
+//		sw_w32_mask(BIT(28), 0, RTL930X_L2_PORT_DABLK_CTRL);
+		// Trap MLD and IGMP messages to CPU_PORT
+		sw_w32((0x2 << 3) | 0x2,  RTL930X_VLAN_APP_PKT_CTRL);
 		break;
 
 	case RTL9310_FAMILY_ID:
 		rtl93xx_hw_en_rxtx(priv);
-//		TODO: Add trapping of IGMP frames to CPU-port
 		break;
 	}
 

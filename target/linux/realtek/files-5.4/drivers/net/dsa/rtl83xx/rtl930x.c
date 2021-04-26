@@ -20,7 +20,7 @@ void rtl930x_print_matrix(void)
 
 	for (i = 0; i < 29; i++) {
 		rtl_table_read(r, i);
-		pr_info("%s: > %08x\n", __func__, sw_r32(rtl_table_data(r, 0)));
+		pr_debug("%s: > %08x\n", __func__, sw_r32(rtl_table_data(r, 0)));
 	}
 	rtl_table_release(r);
 }
@@ -143,6 +143,7 @@ static void rtl930x_vlan_profile_setup(int profile)
 {
 	u32 p[5];
 
+	pr_info("In %s\n", __func__);
 	p[0] = sw_r32(RTL930X_VLAN_PROFILE_SET(profile));
 	p[1] = sw_r32(RTL930X_VLAN_PROFILE_SET(profile) + 4);
 
@@ -153,10 +154,11 @@ static void rtl930x_vlan_profile_setup(int profile)
 	p[4] = 0x0fffffff; // IPv6 unknwon MC flooding portmask
 
 	sw_w32(p[0], RTL930X_VLAN_PROFILE_SET(profile));
-	sw_w32(p[0], RTL930X_VLAN_PROFILE_SET(profile) + 4);
-	sw_w32(p[0], RTL930X_VLAN_PROFILE_SET(profile) + 8);
-	sw_w32(p[0], RTL930X_VLAN_PROFILE_SET(profile) + 12);
-	sw_w32(p[0], RTL930X_VLAN_PROFILE_SET(profile) + 16);
+	sw_w32(p[1], RTL930X_VLAN_PROFILE_SET(profile) + 4);
+	sw_w32(p[2], RTL930X_VLAN_PROFILE_SET(profile) + 8);
+	sw_w32(p[3], RTL930X_VLAN_PROFILE_SET(profile) + 12);
+	sw_w32(p[4], RTL930X_VLAN_PROFILE_SET(profile) + 16);
+	pr_info("Leaving %s\n", __func__);
 }
 
 static void rtl930x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
@@ -561,15 +563,15 @@ static int rtl930x_l2_nexthop_add(struct rtl838x_switch_priv *priv, struct rtl83
 static u64 rtl930x_read_mcast_pmask(int idx)
 {
 	u32 portmask;
-	// Read MC_PMSK (2) via register RTL8380_TBL_L2
-	struct table_reg *q = rtl_table_get(RTL8380_TBL_L2, 2);
+	// Read MC_PORTMASK (2) via register RTL9300_TBL_L2
+	struct table_reg *q = rtl_table_get(RTL9300_TBL_L2, 2);
 
 	rtl_table_read(q, idx);
 	portmask = sw_r32(rtl_table_data(q, 0));
 	portmask >>= 3;
 	rtl_table_release(q);
 
-	pr_info("%s: Index idx %d has portmask %08x\n", __func__, idx, portmask);
+	pr_debug("%s: Index idx %d has portmask %08x\n", __func__, idx, portmask);
 	return portmask;
 }
 
@@ -577,10 +579,10 @@ static void rtl930x_write_mcast_pmask(int idx, u64 portmask)
 {
 	u32 pm = portmask;
 
-	// Access MC_PMSK (2) via register RTL8380_TBL_L2
-	struct table_reg *q = rtl_table_get(RTL8380_TBL_L2, 2);
+	// Access MC_PORTMASK (2) via register RTL9300_TBL_L2
+	struct table_reg *q = rtl_table_get(RTL9300_TBL_L2, 2);
 
-	pr_info("%s: Index idx %d has portmask %08x\n", __func__, idx, pm);
+	pr_debug("%s: Index idx %d has portmask %08x\n", __func__, idx, pm);
 	pm <<= 3;
 	sw_w32(pm, rtl_table_data(q, 0));
 	rtl_table_write(q, idx);
