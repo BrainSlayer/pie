@@ -868,7 +868,7 @@ static void rtl83xx_vlan_add(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int v;
 
-	pr_info("%s port %d, vid_end %d, vid_end %d, flags %x\n", __func__,
+	pr_debug("%s port %d, vid_end %d, vid_end %d, flags %x\n", __func__,
 		port, vlan->vid_begin, vlan->vid_end, vlan->flags);
 
 	if (vlan->vid_begin > 4095 || vlan->vid_end > 4095) {
@@ -1007,7 +1007,7 @@ static void rtl83xx_setup_l2_mc_entry(struct rtl838x_switch_priv *priv,
 	e->mc_portmask_index = mc_group;
 	e->type = L2_MULTICAST;
 	e->rvid = e->vid = vid;
-	pr_info("%s: vid: %d, rvid: %d\n", __func__, e->vid, e->rvid);
+	pr_debug("%s: vid: %d, rvid: %d\n", __func__, e->vid, e->rvid);
 	u64_to_ether_addr(mac, e->mac);
 }
 
@@ -1025,6 +1025,7 @@ static int rtl83xx_find_l2_hash_entry(struct rtl838x_switch_priv *priv, u64 seed
 	u32 key = priv->r->l2_hash_key(priv, seed);
 	u64 entry;
 
+	pr_debug("%s: using key %x, for seed %016llx\n", __func__, key, seed);
 	// Loop over all entries in the hash-bucket and over the second block on 93xx SoCs
 	for (i = 0; i < priv->l2_bucket_size; i++) {
 		entry = priv->r->read_l2_entry_using_hash(key, i, e);
@@ -1163,11 +1164,8 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 			pr_info("-> index %d, key %x, bucket %d, dmac %016llx, fid: %x rvid: %x\n",
 				i, i >> 2, i & 0x3, mac, fid, e.rvid);
 			dump_l2_entry(&e);
-			u64 seed = priv->r->l2_hash_seed(mac, e.vid);
+			u64 seed = priv->r->l2_hash_seed(mac, e.rvid);
 			u32 key = priv->r->l2_hash_key(priv, seed);
-			pr_info("seed: %016llx, key based on vid: %08x\n", seed, key);
-			seed = priv->r->l2_hash_seed(mac, e.rvid);
-			key = priv->r->l2_hash_key(priv, seed);
 			pr_info("seed: %016llx, key based on rvid: %08x\n", seed, key);
 			cb(e.mac, e.vid, e.is_static, data);
 		}
@@ -1267,7 +1265,7 @@ static void rtl83xx_port_mdb_add(struct dsa_switch *ds, int port,
 				ether_addr_to_u64(e.mac), e.mc_portmask_index);
 			rtl83xx_mc_group_add_port(priv, e.mc_portmask_index, port);
 		} else {
-			pr_debug("New entry\n");
+			pr_debug("New entry for seed %016llx\n", seed);
 			mc_group = rtl83xx_mc_group_alloc(priv, port);
 			if (mc_group < 0) {
 				err = -ENOTSUPP;

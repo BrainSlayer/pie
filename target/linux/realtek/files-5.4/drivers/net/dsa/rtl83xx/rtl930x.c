@@ -200,6 +200,7 @@ static inline int rtl930x_mac_link_spd_sts(int p)
 {
 	return RTL930X_MAC_LINK_SPD_STS(p);
 }
+
 static u64 rtl930x_l2_hash_seed(u64 mac, u32 vid)
 {
 	u64 v = vid;

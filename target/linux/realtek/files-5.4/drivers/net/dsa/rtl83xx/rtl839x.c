@@ -56,7 +56,6 @@ static void rtl839x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	u = sw_r32(rtl_table_data(r, 0));
 	v = sw_r32(rtl_table_data(r, 1));
 	w = sw_r32(rtl_table_data(r, 2));
-	pr_info("VLAN_READ %d: %08x %08x %08x\n", vlan, u, v, w);
 	rtl_table_release(r);
 
 	info->tagged_ports = u;
@@ -116,9 +115,17 @@ static void rtl839x_vlan_set_untagged(u32 vlan, u64 portmask)
 	rtl_table_release(r);
 }
 
+/*
+ * Hash seed is vid (actually rvid) concatenated with the MAC address
+ */
 static u64 rtl839x_l2_hash_seed(u64 mac, u32 vid)
 {
-	return mac << 12 | vid;
+	u64 v = vid;
+
+	v <<= 48;
+	v |= mac;
+
+	return v;
 }
 
 /*
@@ -219,6 +226,7 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 			e->type = L2_MULTICAST;
 			e->mc_portmask_index = (r[2] >> 6) & 0xfff;
 			e->rvid = (r[0] >> 20) & 0xfff;
+			pr_debug("Got L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
 		}
 	} else { // IPv4 or IPv6 MC entry
 		e->valid = true;
@@ -270,9 +278,9 @@ static void rtl839x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 			}
 			r[2] |= ((u32)e->age) << 21;
 		} else {  // L2 Multicast
-			pr_info("Got L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
 			r[0] |= ((u32)e->rvid) << 20;
 			r[2] |= ((u32)e->mc_portmask_index) << 6;
+			pr_debug("Write L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
 		}
 	} else { // IPv4 or IPv6 MC entry
 		r[0] = ((u32)e->rvid) << 20;
@@ -288,7 +296,6 @@ static void rtl839x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
  */
 static u64 rtl839x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
 {
-	u64 entry;
 	u32 r[3];
 	struct table_reg *q = rtl_table_get(RTL8390_TBL_L2, 0);
 	u32 idx = (0 << 14) | (hash << 2) | pos; // Search SRAM, with hash and at pos in bucket
@@ -304,8 +311,7 @@ static u64 rtl839x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2
 	if (!e->valid)
 		return 0;
 
-	entry = (((u64) r[1]) << 32) | (r[2] & 0xfffff000) | (r[0] & 0xfff);
-	return entry;
+	return rtl839x_l2_hash_seed(ether_addr_to_u64(&e->mac[0]), e->rvid);
 }
 
 static void rtl839x_write_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
@@ -327,7 +333,6 @@ static void rtl839x_write_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_
 
 static u64 rtl839x_read_cam(int idx, struct rtl838x_l2_entry *e)
 {
-	u64 entry;
 	u32 r[3];
 	struct table_reg *q = rtl_table_get(RTL8390_TBL_L2, 1); // Access L2 Table 1
 	int i;
@@ -345,8 +350,7 @@ static u64 rtl839x_read_cam(int idx, struct rtl838x_l2_entry *e)
 	pr_debug("Found in CAM: R1 %x R2 %x R3 %x\n", r[0], r[1], r[2]);
 
 	// Return MAC with concatenated VID ac concatenated ID
-	entry = (((u64) r[0]) << 12) | ((r[1] & 0xfffffff0) << 12) | ((r[2] >> 4) & 0xfff);
-	return entry;
+	return rtl839x_l2_hash_seed(ether_addr_to_u64(&e->mac[0]), e->rvid);
 }
 
 static void rtl839x_write_cam(int idx, struct rtl838x_l2_entry *e)
