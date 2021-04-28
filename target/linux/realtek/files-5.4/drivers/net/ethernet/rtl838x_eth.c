@@ -739,8 +739,8 @@ static void rtl838x_hw_en_rxtx(struct rtl838x_eth_priv *priv)
 	 * | MEDIA_SEL
 	 */
 	sw_w32(0x6192F, priv->r->mac_force_mode_ctrl + priv->cpu_port * 4);
-	/* allow CRC errors on CPU-port */
-	sw_w32_mask(0, 0x8, priv->r->mac_port_ctrl(priv->cpu_port));
+	/* enable CRC checks on CPU-port */
+	sw_w32_mask(0, BIT(3), priv->r->mac_port_ctrl(priv->cpu_port));
 }
 
 static void rtl839x_hw_en_rxtx(struct rtl838x_eth_priv *priv)
@@ -754,8 +754,8 @@ static void rtl839x_hw_en_rxtx(struct rtl838x_eth_priv *priv)
 	/* Enable DMA */
 	sw_w32_mask(0, RX_EN | TX_EN, priv->r->dma_if_ctrl);
 
-	/* Restart TX/RX to CPU port */
-	sw_w32_mask(0x0, 0x3, priv->r->mac_port_ctrl(priv->cpu_port));
+	/* Restart TX/RX to CPU port, enable CRC checking */
+	sw_w32_mask(0x0, 0x3 | BIT(3), priv->r->mac_port_ctrl(priv->cpu_port));
 
 	/* CPU port joins Lookup Miss Flooding Portmask */
 	// TODO: The code below should also work for the RTL838x
@@ -792,8 +792,8 @@ static void rtl93xx_hw_en_rxtx(struct rtl838x_eth_priv *priv)
 	/* Enable DMA */
 	sw_w32_mask(0, RX_EN_93XX | TX_EN_93XX, priv->r->dma_if_ctrl);
 
-	/* Restart TX/RX to CPU port */
-	sw_w32_mask(0x0, 0x3, priv->r->mac_port_ctrl(priv->cpu_port));
+	/* Restart TX/RX to CPU port, enable CRC checking */
+	sw_w32_mask(0x0, 0x3 | BIT(4), priv->r->mac_port_ctrl(priv->cpu_port));
 
 	sw_w32_mask(0, BIT(priv->cpu_port), RTL930X_L2_UNKN_UC_FLD_PMSK);
 	sw_w32(0x217, priv->r->mac_force_mode_ctrl + priv->cpu_port * 4);
@@ -1132,7 +1132,8 @@ static int rtl838x_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		len = ETH_ZLEN;
 
 	/* ASIC expects that packet includes CRC, so we extend by 4 bytes */
-	len += 4;
+	if (!(dev->hw_features & NETIF_F_IP_CSUM))
+		len += 4;
 
 	if (skb_padto(skb, len)) {
 		ret = NETDEV_TX_OK;
@@ -1289,6 +1290,7 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 					 tag.queue, len, tag.reason, tag.port);
 
 			skb->protocol = eth_type_trans(skb, dev);
+			skb->ip_summed = CHECKSUM_UNNECESSARY;
 			dev->stats.rx_packets++;
 			dev->stats.rx_bytes += len;
 
@@ -1985,6 +1987,7 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 	dev->ethtool_ops = &rtl838x_ethtool_ops;
 	dev->min_mtu = ETH_ZLEN;
 	dev->max_mtu = 1536;
+	dev->hw_features = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
 
 	priv->id = soc_info.id;
 	priv->family_id = soc_info.family;
