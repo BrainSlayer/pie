@@ -487,7 +487,6 @@ int rtl8390_sds_power(int mac, int val)
 	return 0;
 }
 
-
 int rtl839x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 {
 	u32 v;
