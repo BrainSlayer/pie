@@ -1232,7 +1232,7 @@ static int rtl83xx_mc_group_alloc(struct rtl838x_switch_priv *priv, int port)
 	pr_debug("Using MC group %d\n", mc_group);
 	set_bit(mc_group, priv->mc_group_bm);
 	mc_group++;  // We cannot use group 0, as this is used for lookup miss flooding
-	portmask = BIT_ULL(port);
+	portmask = BIT_ULL(port) | BIT_ULL(priv->cpu_port); 
 	priv->r->write_mcast_pmask(mc_group, portmask);
 
 	return mc_group;
@@ -1254,8 +1254,11 @@ static u64 rtl83xx_mc_group_del_port(struct rtl838x_switch_priv *priv, int mc_gr
 
 	portmask &= ~BIT_ULL(port);
 	priv->r->write_mcast_pmask(mc_group, portmask);
-	if (!portmask)
+	if (portmask == BIT_ULL(priv->cpu_port)) {
+		portmask &= ~BIT_ULL(priv->cpu_port);
+		priv->r->write_mcast_pmask(mc_group, portmask);
 		clear_bit(mc_group, priv->mc_group_bm);
+	}
 
 	return portmask;
 }
