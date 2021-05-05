@@ -331,12 +331,20 @@
 #define RTL838X_PRI_DSCP_INVLD_CTRL0		(0x5FE8)
 #define RTL838X_RMK_IPRI_CTRL			(0xA460)
 #define RTL838X_RMK_OPRI_CTRL			(0xA464)
-#define RTL838X_SCHED_P_TYPE_CTRL(p)		(0xC04C + (((p) << 7)))
-#define RTL838X_SCHED_LB_CTRL(p)		(0xC004 + (((p) << 7)))
-#define RTL838X_FC_P_EGR_DROP_CTRL(p)		(0x6B1C + (((p) << 2)))
+#define RTL838X_SCHED_P_TYPE_CTRL(p)		(0xC04C + ((p) << 7))
+#define RTL838X_SCHED_LB_CTRL(p)		(0xC004 + ((p) << 7))
+#define RTL838X_FC_P_EGR_DROP_CTRL(p)		(0x6B1C + ((p) << 2))
 
 /* Debug features */
 #define RTL930X_STAT_PRVTE_DROP_COUNTER0	(0xB5B8)
+
+/* Packet Inspection Engine */
+#define RTL838X_METER_GLB_CTRL			(0x4B08)
+#define RTL838X_ACL_BLK_LOOKUP_CTRL		(0x6100)
+#define RTL838X_ACL_BLK_PWR_CTRL		(0x6104)
+#define RTL838X_ACL_BLK_TMPLTE_CTRL(block)	(0x6108 + ((block) << 2))
+#define RTL838X_ACL_CLR_CTRL			(0x6168)
+#define RTL838X_DMY_REG27			(0x3378)
 
 #define MAX_VLANS 4096
 #define MAX_LAGS 16
@@ -344,6 +352,7 @@
 #define RTL930X_PORT_IGNORE 0x3f
 #define MAX_MC_GROUPS 512
 #define UNKNOWN_MC_PMASK (MAX_MC_GROUPS - 1)
+#define N_PIE_BLOCKS 12
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -407,6 +416,93 @@ struct rtl838x_l2_entry {
 	u16 mc_mac_index;
 	u16 nh_route_id;
 	bool nh_vlan_target;  // Only RTL83xx: VLAN used for next hop
+};
+
+enum fwd_rule_action {
+	FWD_RULE_ACTION_NONE = 0,
+	FWD_RULE_ACTION_FWD = 1,
+};
+
+// Packet Inspection Engine Rules
+struct pie_rule {
+	u8 spmmask_fix;
+	u8 spn;
+	bool mgnt_vlan;
+	bool dmac_hit_sw;
+	bool not_first_frag;
+	u8 frame_type_l4;
+	u8 frame_type;
+	bool otag_fmt;
+	bool itag_fmt;
+	bool otag_exist;
+	bool itag_exit;
+	bool frame_type_l2;
+	bool tid;
+
+	u8 spmmask_fix_m;
+	u8 spn_m;
+	bool mgnt_vlan_m;
+	bool dmac_hit_sw_m;
+	bool not_first_frag_m;
+	u8 frame_type_l4_m;
+	u8 frame_type_m;
+	bool otag_fmt_m;
+	bool itag_fmt_m;
+	bool otag_exist_m;
+	bool itag_exit_m;
+	bool frame_type_l2_m;
+	bool tid_m;
+
+	bool valid;
+	bool cond_not;
+	bool cond_and1;
+	bool cond_and2;
+	bool ivalid;
+
+	u8 drop;
+	bool fwd_sel;
+	bool ovid_sel;
+	bool ivid_sel;
+	bool flt_sel;
+	bool log_sel;
+	bool rmk_sel;
+	bool meter_sel;
+	bool tagst_sel;
+	bool mir_sel;
+	bool nopri_sel;
+	bool cpupri_sel;
+	bool otpid_sel;
+	bool itpid_sel;
+	bool shaper_sel;
+
+	// Fields used in predefined templates 0-2
+	u32 spm;
+	u16 otag;
+	u8 smac[6];
+	u8 dmac[6];
+	u8 ethertype;
+	u16 itag;
+	u16 field_range_check;
+	u32 sip;
+	u32 dip;
+	u16 tos_proto;
+	u16 sport;
+	u16 dport;
+	u16 icmp_igmp;
+
+	u32 spm_m;
+	u16 otag_m;
+	u8 smac_m[6];
+	u8 dmac_m[6];
+	u8 ethertype_m;
+	u16 itag_m;
+	u16 field_range_check_m;
+	u32 sip_m;
+	u32 dip_m;
+	u16 tos_proto_m;
+	u16 sport_m;
+	u16 dport_m;
+	u16 icmp_igmp_m;
 };
 
 struct rtl838x_nexthop {
