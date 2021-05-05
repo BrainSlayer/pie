@@ -5,6 +5,97 @@
 
 extern struct mutex smi_lock;
 
+/* Lock for the Packet Inspection Engine */
+struct mutex pie_lock;
+
+// see_dal_maple_acl_log2PhyTmplteField
+/* Definition of the RTL838X-specific template field IDs */
+enum template_field_id {
+	TEMPLATE_FIELD_SPMMASK = 0,
+	TEMPLATE_FIELD_SPM0 = 1,
+	TEMPLATE_FIELD_SPM1 = 2,
+	TEMPLATE_FIELD_RANGE_CHK = 3,
+	TEMPLATE_FIELD_DMAC0 = 4,
+	TEMPLATE_FIELD_DMAC1 = 5,
+	TEMPLATE_FIELD_DMAC2 = 6,
+	TEMPLATE_FIELD_SMAC0 = 7,
+	TEMPLATE_FIELD_SMAC1 = 8,
+	TEMPLATE_FIELD_SMAC2 = 9,
+	TEMPLATE_FIELD_ETHERTYPE = 10,
+	TEMPLATE_FIELD_OTAG = 11,
+	TEMPLATE_FIELD_ITAG = 12,
+	TEMPLATE_FIELD_SIP0 = 13,
+	TEMPLATE_FIELD_SIP1 = 14,
+	TEMPLATE_FIELD_DIP0 = 15,
+	TEMPLATE_FIELD_DIP1 = 16,
+	TEMPLATE_FIELD_IP_TOS_PROTO = 17,
+	TEMPLATE_FIELD_L34_HEADER = 18,
+	TEMPLATE_FIELD_L4_SPORT = 19,
+	TEMPLATE_FIELD_L4_DPORT = 20,
+	TEMPLATE_FIELD_ICMP_IGMP = 21,
+	TEMPLATE_FIELD_IP_RANGE = 22,
+	TEMPLATE_FIELD_FIELD_SELECTOR_VALID = 23,
+	TEMPLATE_FIELD_FIELD_SELECTOR_0 = 24,
+	TEMPLATE_FIELD_FIELD_SELECTOR_1 = 25,
+	TEMPLATE_FIELD_FIELD_SELECTOR_2 = 26,
+	TEMPLATE_FIELD_FIELD_SELECTOR_3 = 27,
+	TEMPLATE_FIELD_SIP2 = 28,
+	TEMPLATE_FIELD_SIP3 = 29,
+	TEMPLATE_FIELD_SIP4 = 30,
+	TEMPLATE_FIELD_SIP5 = 31,
+	TEMPLATE_FIELD_SIP6 = 32,
+	TEMPLATE_FIELD_SIP7 = 33,
+	TEMPLATE_FIELD_DIP2 = 34,
+	TEMPLATE_FIELD_DIP3 = 35,
+	TEMPLATE_FIELD_DIP4 = 36,
+	TEMPLATE_FIELD_DIP5 = 37,
+	TEMPLATE_FIELD_DIP6 = 38,
+	TEMPLATE_FIELD_DIP7 = 39,
+	TEMPLATE_FIELD_FWD_VID = 40,
+	TEMPLATE_FIELD_FLOW_LABEL = 41,
+};
+
+/*
+ * The RTL838X SoCs use 5 fixed templates with definitions for which data fields are to
+ * be copied from the Ethernet Frame header into the 12 User-definable fields of the Packet
+ * Inspection Engine's buffer. The following defines the field contents for each of the fixed
+ * templates. Additionally, 3 user-definable templates can be set up via the definitions
+ * in RTL838X_ACL_TMPLTE_CTRL control registers.
+ */
+
+#define N_FIXED_TEMPLATES 5
+#define N_FIXED_FIELDS 12
+
+enum template_field_id fixed_templates[N_FIXED_TEMPLATES][N_FIXED_FIELDS] =
+{
+	{
+	  TEMPLATE_FIELD_SPM0, TEMPLATE_FIELD_SPM1, TEMPLATE_FIELD_OTAG,
+	  TEMPLATE_FIELD_SMAC0, TEMPLATE_FIELD_SMAC1, TEMPLATE_FIELD_SMAC2,
+	  TEMPLATE_FIELD_DMAC0, TEMPLATE_FIELD_DMAC1, TEMPLATE_FIELD_DMAC2,
+	  TEMPLATE_FIELD_ETHERTYPE, TEMPLATE_FIELD_ITAG, TEMPLATE_FIELD_RANGE_CHK
+	}, {
+	  TEMPLATE_FIELD_SIP0, TEMPLATE_FIELD_SIP1, TEMPLATE_FIELD_DIP0,
+	  TEMPLATE_FIELD_DIP1,TEMPLATE_FIELD_IP_TOS_PROTO, TEMPLATE_FIELD_L4_SPORT,
+	  TEMPLATE_FIELD_L4_DPORT, TEMPLATE_FIELD_ICMP_IGMP, TEMPLATE_FIELD_ITAG,
+	  TEMPLATE_FIELD_RANGE_CHK, TEMPLATE_FIELD_SPM0, TEMPLATE_FIELD_SPM1
+	}, {
+	  TEMPLATE_FIELD_DMAC0, TEMPLATE_FIELD_DMAC1, TEMPLATE_FIELD_DMAC2,
+	  TEMPLATE_FIELD_ITAG, TEMPLATE_FIELD_ETHERTYPE, TEMPLATE_FIELD_IP_TOS_PROTO,
+	  TEMPLATE_FIELD_L4_DPORT, TEMPLATE_FIELD_L4_SPORT, TEMPLATE_FIELD_SIP0,
+	  TEMPLATE_FIELD_SIP1, TEMPLATE_FIELD_DIP0, TEMPLATE_FIELD_DIP1
+	}, {
+	  TEMPLATE_FIELD_DIP0, TEMPLATE_FIELD_DIP1, TEMPLATE_FIELD_DIP2,
+	  TEMPLATE_FIELD_DIP3, TEMPLATE_FIELD_DIP4, TEMPLATE_FIELD_DIP5,
+	  TEMPLATE_FIELD_DIP6, TEMPLATE_FIELD_DIP7, TEMPLATE_FIELD_L4_DPORT,
+	  TEMPLATE_FIELD_L4_SPORT, TEMPLATE_FIELD_ICMP_IGMP, TEMPLATE_FIELD_IP_TOS_PROTO
+        }, {
+	  TEMPLATE_FIELD_SIP0, TEMPLATE_FIELD_SIP1, TEMPLATE_FIELD_SIP2,
+	  TEMPLATE_FIELD_SIP3, TEMPLATE_FIELD_SIP4, TEMPLATE_FIELD_SIP5,
+	  TEMPLATE_FIELD_SIP6, TEMPLATE_FIELD_SIP7, TEMPLATE_FIELD_ITAG,
+	  TEMPLATE_FIELD_RANGE_CHK, TEMPLATE_FIELD_SPM0, TEMPLATE_FIELD_SPM1
+	},
+};
+
 void rtl838x_print_matrix(void)
 {
 	unsigned volatile int *ptr8;
@@ -533,6 +624,212 @@ static void rtl838x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 			rtl838x_port_eee_set(priv, i, enable);
 	}
 	priv->eee_enabled = enable;
+}
+
+static void rtl838x_pie_init(void)
+{
+	int i;
+
+	mutex_init(&pie_lock);
+
+	mutex_lock(&pie_lock);
+
+	// Power on all PIE blocks
+	for (i = 0; i < N_PIE_BLOCKS; i++)
+		sw_w32_mask(0, BIT(i), RTL838X_ACL_BLK_PWR_CTRL);
+
+	// Include IPG in metering
+	sw_w32(1, RTL838X_METER_GLB_CTRL);
+
+	// Routing bypasses source port filter
+	sw_w32_mask(0, 3, RTL838X_INT_RW_CTRL);
+	sw_w32_mask(0, 1, RTL838X_DMY_REG27);
+	sw_w32_mask(3, 0, RTL838X_INT_RW_CTRL);
+
+	mutex_unlock(&pie_lock);
+}
+
+static int rtl838x_pie_rule_install(struct rtl838x_switch_priv *priv, int index,
+				    struct pie_rule *rule)
+{
+	int block = index / 128;
+	u32 block_state = sw_r32(RTL838X_ACL_BLK_LOOKUP_CTRL);
+
+	mutex_lock(&pie_lock);
+	// Make sure rule-lookup is enabled in the block
+	if (!(block_state & BIT(block)))
+		sw_w32(block_state | BIT(block), RTL838X_ACL_BLK_LOOKUP_CTRL);
+
+	mutex_unlock(&pie_lock);
+	return 0;
+}
+
+static int rtl838x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from, int index_to)
+{
+	int block_from = index_from / 128;
+	int block_to = index_to / 128;
+	u32 v = (index_from << 1)| (index_to << 11 ) | BIT(0);
+	int block;
+	u32 block_state;
+
+	mutex_lock(&pie_lock);
+
+	block_state = sw_r32(RTL838X_ACL_BLK_LOOKUP_CTRL);
+
+	// Make sure rule-lookup is disabled in the relevant blocks
+	for (block = block_from; block <= block_to; block++) {
+	if (block_state & BIT(block))
+		sw_w32(block_state & (~BIT(block)), RTL838X_ACL_BLK_LOOKUP_CTRL);
+	}
+
+	sw_w32(v, RTL838X_ACL_CLR_CTRL);
+
+	do {
+	} while (sw_r32(RTL838X_ACL_CLR_CTRL) & BIT(0));
+
+	// Re-enable rule lookup
+	for (block = block_from; block <= block_to; block++) {
+		if (!(block_state & BIT(block)))
+			sw_w32(block_state | BIT(block), RTL838X_ACL_BLK_LOOKUP_CTRL);
+	}
+
+	mutex_unlock(&pie_lock);
+	return 0;
+}
+
+void rtl838x_read_pie_templated(u32 r[], struct pie_rule *pr, enum template_field_id t[])
+{
+	int i;
+	enum template_field_id field_type;
+	u16 data, data_m;
+
+	for (i = 0; i < N_FIXED_FIELDS; i++) {
+		field_type = t[i];
+		if (i % 2) {
+			data = r[5 - i / 2];
+			data = r[12 - i / 2];
+		} else {
+			data_m = r[5 - i / 2] >> 16;
+			data_m = r[12 - i / 2] >> 16;
+		}
+
+		switch (field_type) {
+		case TEMPLATE_FIELD_SPM0:
+			pr->spn = data;
+			pr->spn_m = data_m;
+			break;
+		case TEMPLATE_FIELD_SPM1:
+			pr->spn = (pr->spn << 16) | data;
+			pr->spn_m = (pr->spn << 16) | data_m;
+			break;
+		case TEMPLATE_FIELD_OTAG:
+			pr->otag = data;
+			pr->otag_m = data_m;
+			break;
+		case TEMPLATE_FIELD_SMAC0:
+			
+		case TEMPLATE_FIELD_SMAC1:
+		case TEMPLATE_FIELD_SMAC2:
+		case TEMPLATE_FIELD_DMAC0:
+		case TEMPLATE_FIELD_DMAC1:
+		case TEMPLATE_FIELD_DMAC2:
+		case TEMPLATE_FIELD_ETHERTYPE:
+		case TEMPLATE_FIELD_ITAG:
+		case TEMPLATE_FIELD_RANGE_CHK:
+		case TEMPLATE_FIELD_SIP0:
+		case TEMPLATE_FIELD_SIP1:
+		case TEMPLATE_FIELD_DIP0:
+		case TEMPLATE_FIELD_DIP1:
+		case TEMPLATE_FIELD_IP_TOS_PROTO:
+		case TEMPLATE_FIELD_L4_SPORT:
+		case TEMPLATE_FIELD_L4_DPORT:
+		case TEMPLATE_FIELD_ICMP_IGMP:
+		default:
+			pr_info("%s: unknown field %d\n", __func__, field_type);
+		}
+	}
+}
+
+void rtl838x_read_pie_fixed_fields(u32 r[], struct pie_rule *pr)
+{
+	pr->spmmask_fix = (r[6] >> 22) & 0x3;
+	pr->spn = (r[6] >> 16) & 0x3f;
+	pr->mgnt_vlan = (r[6] >> 15) & 1;
+	pr->dmac_hit_sw = (r[6] >> 14) & 1;
+	pr->not_first_frag = (r[6] >> 13) & 1;
+	pr->frame_type_l4 = (r[6] >> 10) & 7;
+	pr->frame_type = (r[6] >> 8) & 3;
+	pr->otag_fmt = (r[6] >> 7) & 1;
+	pr->itag_fmt = (r[6] >> 6) & 1;
+	pr->otag_exist = (r[6] >> 5) & 1;
+	pr->itag_exit = (r[6] >> 4) & 1;
+	pr->frame_type_l2 = (r[6] >> 2) & 3;
+	pr->tid = r[6] & 3;
+
+	pr->spmmask_fix_m = (r[13] >> 22) & 0x3;
+	pr->spn_m = (r[13] >> 16) & 0x3f;
+	pr->mgnt_vlan_m = (r[13] >> 15) & 1;
+	pr->dmac_hit_sw_m = (r[13] >> 14) & 1;
+	pr->not_first_frag_m = (r[13] >> 13) & 1;
+	pr->frame_type_l4_m = (r[13] >> 10) & 7;
+	pr->frame_type_m = (r[13] >> 8) & 3;
+	pr->otag_fmt_m = (r[13] >> 7) & 1;
+	pr->itag_fmt_m = (r[13] >> 6) & 1;
+	pr->otag_exist_m = (r[13] >> 5) & 1;
+	pr->itag_exit_m = (r[13] >> 4) & 1;
+	pr->frame_type_l2_m = (r[13] >> 2) & 3;
+	pr->tid_m = r[13] & 3;
+
+	pr->valid = r[14] & BIT(31);
+	pr->cond_not = r[14] & BIT(30);
+	pr->cond_and1 = r[14] & BIT(29);
+	pr->cond_and2 = r[14] & BIT(28);
+	pr->ivalid = r[14] & BIT(27);
+
+	pr->drop = (r[17] >> 14) & 3;
+	pr->fwd_sel = r[17] & BIT(13);
+	pr->ovid_sel = r[17] & BIT(12);
+	pr->ivid_sel = r[17] & BIT(11);
+	pr->flt_sel = r[17] & BIT(10);
+	pr->log_sel = r[17] & BIT(9);
+	pr->rmk_sel = r[17] & BIT(8);
+	pr->meter_sel = r[17] & BIT(7);
+	pr->tagst_sel = r[17] & BIT(6);
+	pr->mir_sel = r[17] & BIT(5);
+	pr->nopri_sel = r[17] & BIT(4);
+	pr->cpupri_sel = r[17] & BIT(3);
+	pr->otpid_sel = r[17] & BIT(2);
+	pr->itpid_sel = r[17] & BIT(1);
+	pr->shaper_sel = r[17] & BIT(0);
+}
+
+static int rtl838x_pie_rule_read(struct rtl838x_switch_priv *priv, int idx,struct  pie_rule *pr)
+{
+	// Read IACL table (1) via register 0
+	struct table_reg *q = rtl_table_get(RTL8380_TBL_0, 1);
+	u32 r[18];
+	int i;
+	int block = idx / 128;
+	u32 template_selectors;
+
+	rtl_table_read(q, idx);
+	for (i= 0; i < 18; i++)
+		r[i] = sw_r32(rtl_table_data(q, i));
+
+	rtl_table_release(q);
+
+	rtl838x_read_pie_fixed_fields(r, pr);
+	if (!pr->valid)
+		return 0;
+
+	template_selectors = sw_r32(RTL838X_ACL_BLK_TMPLTE_CTRL(block));
+	pr_info("%s: template_selectors %08x, tid: %d\n", __func__, template_selectors, pr->tid);
+
+	rtl838x_read_pie_templated(r, pr,
+				   fixed_templates[(template_selectors >> (pr->tid * 3)) & 0x7]);
+
+
+	return 0;
 }
 
 const struct rtl838x_reg rtl838x_reg = {
