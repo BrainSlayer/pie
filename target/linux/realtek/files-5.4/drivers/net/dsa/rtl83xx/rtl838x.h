@@ -435,7 +435,7 @@ struct pie_rule {
 	bool otag_fmt;
 	bool itag_fmt;
 	bool otag_exist;
-	bool itag_exit;
+	bool itag_exist;
 	bool frame_type_l2;
 	bool tid;
 
@@ -449,7 +449,7 @@ struct pie_rule {
 	bool otag_fmt_m;
 	bool itag_fmt_m;
 	bool otag_exist_m;
-	bool itag_exit_m;
+	bool itag_exist_m;
 	bool frame_type_l2_m;
 	bool tid_m;
 
@@ -503,6 +503,21 @@ struct pie_rule {
 	u16 sport_m;
 	u16 dport_m;
 	u16 icmp_igmp_m;
+
+	u16 fwd_data;
+	u16 ovid_data;
+	u16 ivid_data;
+	u16 flt_data;
+	u16 log_data;
+	u16 rmk_data;
+	u16 meter_data;
+	u16 tagst_data;
+	u16 mir_data;
+	u16 nopri_data;
+	u16 cpupri_data;
+	u16 otpid_data;
+	u16 itpid_data;
+	u16 shaper_data;
 };
 
 struct rtl838x_nexthop {
@@ -587,6 +602,8 @@ struct rtl838x_reg {
 	u64 (*read_mcast_pmask)(int idx);
 	void (*write_mcast_pmask)(int idx, u64 portmask);
 	void (*vlan_fwd_on_inner)(int port, bool is_set);
+	void (*pie_init)(void);
+	int (*pie_rule_create_drop)(struct rtl838x_switch_priv *priv, u32 sip, u32 sip_mask);
 };
 
 struct rtl838x_switch_priv {
