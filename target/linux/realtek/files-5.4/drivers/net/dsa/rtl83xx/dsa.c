@@ -184,7 +184,7 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 	msleep(1000);
 
 	priv->r->pie_init();
-	priv->r->pie_rule_create_drop(priv, 0xc0a80163, 0xffffffff);
+	// priv->r->pie_rule_create_drop(priv, 0xc0a80163, 0xffffffff);
 	return 0;
 }
 

@@ -61,6 +61,18 @@ enum template_field_id {
  * Inspection Engine's buffer. The following defines the field contents for each of the fixed
  * templates. Additionally, 3 user-definable templates can be set up via the definitions
  * in RTL838X_ACL_TMPLTE_CTRL control registers.
+ * SIP0:	IPv4 or IPv6 source IP[15:0] or ARP/RARP source protocol address in header
+ * SIP1:	IPv4 or IPv6 source IP[31:16] or ARP/RARP source protocol address in header
+ * SPM0:	Source portmask ports 0-15
+ * SPM1:	Source portmask ports 16-31
+ * DMAC0:	Destination MAC [15:0]
+ * DMAC0:	Destination MAC [31:16]
+ * DMAC0:	Destination MAC [47:32]
+ * DMAC0:	Source MAC [15:0]
+ * DMAC0:	Source MAC [31:16]
+ * DMAC0:	Source MAC [47:32]
+ * IP_TOS_PROTO:IPv4 TOS/IPv6 traffic class and IPv4 protocold/IPv6 next header
+ * TODO: See all src/app/diag_v2/src/diag_pie.c
  */
 
 #define N_FIXED_TEMPLATES 5
@@ -710,25 +722,26 @@ void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum template_fie
 
 	for (i = 0; i < N_FIXED_FIELDS; i++) {
 		field_type = t[i];
+		data = data_m = 0;
 
 		switch (field_type) {
 		case TEMPLATE_FIELD_SPM0:
-			data = pr->spn >> 16;
-			data_m = pr->spn_m >> 16;
+			data = pr->spm;
+			data_m = pr->spm_m;
 			break;
 		case TEMPLATE_FIELD_SPM1:
-			data = pr->spn;
-			data_m = pr->spn_m;
+			data = pr->spm >> 16;
+			data_m = pr->spm_m >> 16;
 			break;
 		case TEMPLATE_FIELD_OTAG:
 			data = pr->otag;
 			data_m = pr->otag_m;
 			break;
 		case TEMPLATE_FIELD_SMAC0:
-			data = pr->smac[0];
-			data = (data << 8) | pr->smac[1];
-			data_m = pr->smac_m[0];
-			data_m = (data_m << 8) | pr->smac_m[1];
+			data = pr->smac[4];
+			data = (data << 8) | pr->smac[5];
+			data_m = pr->smac_m[4];
+			data_m = (data_m << 8) | pr->smac_m[5];
 			break;
 		case TEMPLATE_FIELD_SMAC1:
 			data = pr->smac[2];
@@ -737,16 +750,16 @@ void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum template_fie
 			data_m = (data_m << 8) | pr->smac_m[3];
 			break;
 		case TEMPLATE_FIELD_SMAC2:
-			data = pr->smac[4];
-			data = (data << 8) | pr->smac[5];
-			data_m = pr->smac_m[4];
-			data_m = (data_m << 8) | pr->smac_m[5];
+			data = pr->smac[0];
+			data = (data << 8) | pr->smac[1];
+			data_m = pr->smac_m[0];
+			data_m = (data_m << 8) | pr->smac_m[1];
 			break;
 		case TEMPLATE_FIELD_DMAC0:
-			data = pr->dmac[0];
-			data = (data << 8) | pr->dmac[1];
-			data_m = pr->dmac_m[0];
-			data_m = (data_m << 8) | pr->dmac_m[1];
+			data = pr->dmac[4];
+			data = (data << 8) | pr->dmac[5];
+			data_m = pr->dmac_m[4];
+			data_m = (data_m << 8) | pr->dmac_m[5];
 			break;
 		case TEMPLATE_FIELD_DMAC1:
 			data = pr->dmac[2];
@@ -755,10 +768,10 @@ void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum template_fie
 			data_m = (data_m << 8) | pr->dmac_m[3];
 			break;
 		case TEMPLATE_FIELD_DMAC2:
-			data = pr->dmac[4];
-			data = (data << 8) | pr->dmac[5];
-			data_m = pr->dmac_m[4];
-			data_m = (data_m << 8) | pr->dmac_m[5];
+			data = pr->dmac[0];
+			data = (data << 8) | pr->dmac[1];
+			data_m = pr->dmac_m[0];
+			data_m = (data_m << 8) | pr->dmac_m[1];
 			break;
 		case TEMPLATE_FIELD_ETHERTYPE:
 			data = pr->ethertype;
@@ -773,20 +786,22 @@ void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum template_fie
 			data_m = pr->field_range_check_m;
 			break;
 		case TEMPLATE_FIELD_SIP0:
-			data = pr->sip >> 16;
-			data_m = pr->sip_m >> 16;
-			break;
-		case TEMPLATE_FIELD_SIP1:
 			data = pr->sip;
 			data_m = pr->sip_m;
+			pr_info("%s SIP0 i: %d, data %04x\n", __func__, i, data);
+			break;
+		case TEMPLATE_FIELD_SIP1:
+			data = pr->sip >> 16;
+			data_m = pr->sip_m >> 16;
+			pr_info("%s SIP1 i: %d, data %04x\n", __func__, i, data);
 			break;
 		case TEMPLATE_FIELD_DIP0:
-			data = pr->dip >> 16;
-			data_m = pr->dip_m >> 16;
-			break;
-		case TEMPLATE_FIELD_DIP1:
 			data = pr->dip;
 			data_m = pr->dip_m;
+			break;
+		case TEMPLATE_FIELD_DIP1:
+			data = pr->dip >> 16;
+			data_m = pr->dip_m >> 16;
 			break;
 		case TEMPLATE_FIELD_IP_TOS_PROTO:
 			data = pr->tos_proto;
@@ -807,12 +822,12 @@ void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum template_fie
 		default:
 			pr_info("%s: unknown field %d\n", __func__, field_type);
 		}
-		if (i % 2) {
+		if (!(i % 2)) {
 			r[5 - i / 2] = data;
 			r[12 - i / 2] = data_m;
 		} else {
-			r[5 - i / 2] = ((u32) data) << 16;
-			r[12 - i / 2] = ((u32)data_m) << 16;
+			r[5 - i / 2] |= ((u32)data) << 16;
+			r[12 - i / 2] |= ((u32)data_m) << 16;
 		}
 	}
 }
@@ -825,7 +840,7 @@ void rtl838x_read_pie_templated(u32 r[], struct pie_rule *pr, enum template_fiel
 
 	for (i = 0; i < N_FIXED_FIELDS; i++) {
 		field_type = t[i];
-		if (i % 2) {
+		if (!(i % 2)) {
 			data = r[5 - i / 2];
 			data = r[12 - i / 2];
 		} else {
@@ -835,22 +850,22 @@ void rtl838x_read_pie_templated(u32 r[], struct pie_rule *pr, enum template_fiel
 
 		switch (field_type) {
 		case TEMPLATE_FIELD_SPM0:
-			pr->spn = data;
-			pr->spn_m = data_m;
+			pr->spm = (pr->spn << 16) | data;
+			pr->spm_m = (pr->spn << 16) | data_m;
 			break;
 		case TEMPLATE_FIELD_SPM1:
-			pr->spn = (pr->spn << 16) | data;
-			pr->spn_m = (pr->spn << 16) | data_m;
+			pr->spm = data;
+			pr->spm_m = data_m;
 			break;
 		case TEMPLATE_FIELD_OTAG:
 			pr->otag = data;
 			pr->otag_m = data_m;
 			break;
 		case TEMPLATE_FIELD_SMAC0:
-			pr->smac[0] = data >> 8;
-			pr->smac[1] = data;
-			pr->smac_m[0] = data >> 8;
-			pr->smac_m[1] = data;
+			pr->smac[4] = data >> 8;
+			pr->smac[5] = data;
+			pr->smac_m[4] = data >> 8;
+			pr->smac_m[5] = data;
 			break;
 		case TEMPLATE_FIELD_SMAC1:
 			pr->smac[2] = data >> 8;
@@ -859,16 +874,16 @@ void rtl838x_read_pie_templated(u32 r[], struct pie_rule *pr, enum template_fiel
 			pr->smac_m[3] = data;
 			break;
 		case TEMPLATE_FIELD_SMAC2:
-			pr->smac[4] = data >> 8;
-			pr->smac[5] = data;
-			pr->smac_m[4] = data >> 8;
-			pr->smac_m[5] = data;
+			pr->smac[0] = data >> 8;
+			pr->smac[1] = data;
+			pr->smac_m[0] = data >> 8;
+			pr->smac_m[1] = data;
 			break;
 		case TEMPLATE_FIELD_DMAC0:
-			pr->dmac[0] = data >> 8;
-			pr->dmac[1] = data;
-			pr->dmac_m[0] = data >> 8;
-			pr->dmac_m[1] = data;
+			pr->dmac[4] = data >> 8;
+			pr->dmac[5] = data;
+			pr->dmac_m[4] = data >> 8;
+			pr->dmac_m[5] = data;
 			break;
 		case TEMPLATE_FIELD_DMAC1:
 			pr->dmac[2] = data >> 8;
@@ -877,10 +892,10 @@ void rtl838x_read_pie_templated(u32 r[], struct pie_rule *pr, enum template_fiel
 			pr->dmac_m[3] = data;
 			break;
 		case TEMPLATE_FIELD_DMAC2:
-			pr->dmac[4] = data >> 8;
-			pr->dmac[5] = data;
-			pr->dmac_m[4] = data >> 8;
-			pr->dmac_m[5] = data;
+			pr->dmac[0] = data >> 8;
+			pr->dmac[1] = data;
+			pr->dmac_m[0] = data >> 8;
+			pr->dmac_m[1] = data;
 			break;
 		case TEMPLATE_FIELD_ETHERTYPE:
 			pr->ethertype = data;
@@ -1044,6 +1059,7 @@ int rtl838x_write_pie_action(u32 r[],  struct pie_rule *pr)
 
 	aif--;
 
+	pr_info("%s, at %08x\n", __func__, (u32)aif);
 	/* Multiple actions can be linked to a match of a PIE rule,
 	 * they have different precedence depending on their type and this precedence
 	 * defines which Action Information Field (0-4) in the IACL table stores
@@ -1091,6 +1107,7 @@ int rtl838x_read_pie_action(u32 r[],  struct pie_rule *pr)
 
 	aif--;
 
+	pr_info("%s, at %08x\n", __func__, (u32)aif);
 	if (pr->drop)
 		pr_info("%s: Action Drop: %d", __func__, pr->drop);
 
@@ -1155,6 +1172,7 @@ static int rtl838x_pie_rule_read(struct rtl838x_switch_priv *priv, int idx, stru
 
 void rtl838x_pie_rule_dump_raw(u32 r[])
 {
+	pr_info("Address: %08x\n", (u32)r);
 	pr_info("Match  : %08x %08x %08x %08x %08x %08x\n", r[0], r[1], r[2], r[3], r[4], r[5]);
 	pr_info("Fixed  : %08x\n", r[6]);
 	pr_info("Match M: %08x %08x %08x %08x %08x %08x\n", r[7], r[8], r[9], r[10], r[11], r[12]);
@@ -1173,6 +1191,8 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 	u32 t_select = sw_r32(RTL838X_ACL_BLK_TMPLTE_CTRL(block));
 
 	pr_info("%s: %d, t_select: %08x\n", __func__, idx, t_select);
+	rtl838x_pie_rule_dump_raw(r);
+
 	for (i = 0; i < 18; i++)
 		r[i] = 0;
 
@@ -1183,8 +1203,10 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 	}
 	rtl838x_write_pie_fixed_fields(r, pr);
 
+	pr_info("%s: template %d\n", __func__, (t_select >> (pr->tid * 3)) & 0x7);
 	rtl838x_write_pie_templated(r, pr, fixed_templates[(t_select >> (pr->tid * 3)) & 0x7]);
 
+	pr_info("%s: before pie_action\n", __func__);
 	rtl838x_write_pie_action(r, pr);
 
 	rtl838x_pie_rule_dump_raw(r);
@@ -1200,18 +1222,22 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 
 static int rtl838x_pie_rule_create_drop(struct rtl838x_switch_priv *priv, u32 sip, u32 sip_mask)
 {
-	struct pie_rule pr;
+	struct pie_rule *pr;
 	int idx = 0;
 
-	pr_info("%s: index%d\n", __func__, idx);
-	pr.valid = 0;
-	pr.tid = 1;  // Mapped to template #1
-	pr.sip = sip;
-	pr.sip_m = sip_mask;
-	pr.drop = 1;
+	pr = kzalloc(sizeof(*pr), GFP_KERNEL);
+	if (!pr)
+		return -ENOMEM;
+	pr_info("%s: index %d, pointer %08x\n", __func__, idx, (u32)pr);
+	pr->valid = true;
+	pr->tid = 1;  // Mapped to template #1
+	pr->tid_m = 3;
+	pr->sip = sip;
+	pr->sip_m = sip_mask;
+	pr->drop = 1;
 
 	rtl838x_pie_lookup_enable(priv, idx);
-	rtl838x_pie_rule_write(priv, idx, &pr);
+	rtl838x_pie_rule_write(priv, idx, pr);
 
 	return 0;
 }
