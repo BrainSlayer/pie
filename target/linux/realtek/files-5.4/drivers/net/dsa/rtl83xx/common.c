@@ -302,8 +302,6 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 		if (of_property_read_u32(dn, "reg", &pn))
 			continue;
 
-		priv->ports[pn].dp = dsa_to_port(priv->ds, pn);
-
 		// Check for the integrated SerDes of the RTL8380M first
 		if (of_property_read_bool(dn, "phy-is-integrated")
 			&& priv->id == 0x8380 && pn >= 24) {
@@ -570,6 +568,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		rtl8380_get_version(priv);
 		priv->n_lags = 8;
 		priv->l2_bucket_size = 4;
+		priv->n_pie_blocks = 12;
 		break;
 	case RTL8390_FAMILY_ID:
 		priv->ds->ops = &rtl83xx_switch_ops;
@@ -583,6 +582,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		rtl8390_get_version(priv);
 		priv->n_lags = 16;
 		priv->l2_bucket_size = 4;
+		priv->n_pie_blocks = 18;
 		break;
 	case RTL9300_FAMILY_ID:
 		priv->ds->ops = &rtl930x_switch_ops;
@@ -597,6 +597,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->n_lags = 16;
 		sw_w32(1, RTL930X_ST_CTRL);
 		priv->l2_bucket_size = 8;
+		priv->n_pie_blocks = 16;
 		break;
 	case RTL9310_FAMILY_ID:
 		priv->ds->ops = &rtl930x_switch_ops;
@@ -610,6 +611,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->version = RTL8390_VERSION_A;
 		priv->n_lags = 16;
 		priv->l2_bucket_size = 8;
+		priv->n_pie_blocks = 32;
 		break;
 	}
 	pr_debug("Chip version %c\n", priv->version);
@@ -626,6 +628,9 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		dev_err(dev, "Error registering switch: %d\n", err);
 		return err;
 	}
+
+	for (i = 0; i <= priv->cpu_port; i++)
+		priv->ports[i].dp = dsa_to_port(priv->ds, i);
 
 	/* Enable link and media change interrupts. Are the SERDES masks needed? */
 	sw_w32_mask(0, 3, priv->r->isr_glb_src);

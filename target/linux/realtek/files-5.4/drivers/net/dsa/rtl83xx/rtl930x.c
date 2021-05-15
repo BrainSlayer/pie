@@ -153,9 +153,9 @@ static void rtl930x_vlan_profile_setup(int profile)
 
 	// Enable routing of Ipv4/6 Unicast and IPv4/6 Multicast traffic
 	p[0] |= BIT(17) | BIT(16) | BIT(13) | BIT(12);
-	p[2] = 0x0fffffff; // L2 unknwon MC flooding portmask: all but the CPU-port
-	p[3] = 0x0fffffff; // IPv4 unknwon MC flooding portmask
-	p[4] = 0x0fffffff; // IPv6 unknwon MC flooding portmask
+	p[2] = 0x1fffffff; // L2 unknwon MC flooding portmask all ports, including the CPU-port
+	p[3] = 0x1fffffff; // IPv4 unknwon MC flooding portmask
+	p[4] = 0x1fffffff; // IPv6 unknwon MC flooding portmask
 
 	sw_w32(p[0], RTL930X_VLAN_PROFILE_SET(profile));
 	sw_w32(p[1], RTL930X_VLAN_PROFILE_SET(profile) + 4);
@@ -163,6 +163,18 @@ static void rtl930x_vlan_profile_setup(int profile)
 	sw_w32(p[3], RTL930X_VLAN_PROFILE_SET(profile) + 12);
 	sw_w32(p[4], RTL930X_VLAN_PROFILE_SET(profile) + 16);
 	pr_info("Leaving %s\n", __func__);
+}
+
+static void rtl930x_l2_learning_setup(void)
+{
+	// Portmask for flooding broadcast traffic
+	sw_w32(0x1fffffff, RTL930X_L2_BC_FLD_PMSK);
+
+	// Portmask for flooding unicast traffic with unknown destination
+	sw_w32(0x1fffffff, RTL930X_L2_UNKN_UC_FLD_PMSK);
+
+	// Limit learning to maximum: 32k entries, after that just flood (bits 0-1)
+	sw_w32((0x7fff << 2) | 0, RTL930X_L2_LRN_CONSTRT_CTRL);
 }
 
 static void rtl930x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
@@ -975,6 +987,50 @@ static void rtl930x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 	priv->eee_enabled = enable;
 }
 
+/*
+ * Delete a range of Packet Inspection Engine rules
+ */
+static int rtl930x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from, int index_to)
+{
+	u32 v = (index_from << 1)| (index_to << 12 ) | BIT(0);
+
+	pr_info("%s: from %d to %d\n", __func__, index_from, index_to);
+	mutex_lock(&priv->reg_mutex);
+
+	// Write from-to and execute bit into control register
+	sw_w32(v, RTL930X_PIE_CLR_CTRL);
+
+	// Wait until command has completed
+	do {
+	} while (sw_r32(RTL930X_PIE_CLR_CTRL) & BIT(0));
+
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+
+static void rtl930x_pie_init(struct rtl838x_switch_priv *priv)
+{
+	int i;
+	u32 template_selectors;
+
+	mutex_init(&priv->reg_mutex);
+
+	// Enable ACL lookup on all ports, including CPU_PORT
+	for (i = 0; i <= priv->cpu_port; i++)
+		sw_w32(1, RTL930X_ACL_PORT_LOOKUP_CTRL(i));
+
+	// Include IPG in metering
+	sw_w32_mask(0, 1, RTL930X_METER_GLB_CTRL);
+
+	// Delete all present rules, block size is 128 on all SoC families
+	rtl930x_pie_rule_del(priv, 0, priv->n_pie_blocks * 128 - 1);
+
+	// Enable predefined templates 0, 1 for all blocks
+	template_selectors = 0 | (1 << 4);
+	for (i = 0; i < priv->n_pie_blocks; i++)
+		sw_w32(template_selectors, RTL930X_PIE_BLK_TMPLTE_CTRL(i));
+}
+
 const struct rtl838x_reg rtl930x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -1036,4 +1092,6 @@ const struct rtl838x_reg rtl930x_reg = {
 	.eee_port_ability = rtl930x_eee_port_ability,
 	.read_mcast_pmask = rtl930x_read_mcast_pmask,
 	.write_mcast_pmask = rtl930x_write_mcast_pmask,
+	.l2_learning_setup = rtl930x_l2_learning_setup,
+	.pie_init = rtl930x_pie_init,
 };

@@ -178,13 +178,14 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 
 	ds->configure_vlan_while_not_filtering = true;
 
+	priv->r->l2_learning_setup();
+
 	/* Enable MAC Polling PHY again */
 	rtl83xx_enable_phy_polling(priv);
 	pr_debug("Please wait until PHY is settled\n");
 	msleep(1000);
 
-	priv->r->pie_init();
-	// priv->r->pie_rule_create_drop(priv, 0xc0a80163, 0xffffffff);
+	priv->r->pie_init(priv);
 	return 0;
 }
 

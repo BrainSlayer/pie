@@ -411,7 +411,7 @@ static void rtl839x_vlan_profile_setup(int profile)
 	sw_w32(p[0], RTL839X_VLAN_PROFILE(profile));
 	sw_w32(p[1], RTL839X_VLAN_PROFILE(profile) + 4);
 
-	rtl839x_write_mcast_pmask(UNKNOWN_MC_PMASK, 0x000fffffffffffff);
+	rtl839x_write_mcast_pmask(UNKNOWN_MC_PMASK, 0x001fffffffffffff);
 }
 
 static inline int rtl839x_vlan_port_egr_filter(int port)
@@ -442,6 +442,20 @@ void rtl839x_traffic_enable(int source, int dest)
 void rtl839x_traffic_disable(int source, int dest)
 {
 	rtl839x_mask_port_reg_be(BIT_ULL(dest), 0, rtl839x_port_iso_ctrl(source));
+}
+
+static void rtl839x_l2_learning_setup(void)
+{
+	/* Set portmask for broadcast (offset bit 12) and unknown unicast (offset 0)
+	 * address flooding to the reserved entry in the portmask table used
+	 * also for multicast flooding */
+	sw_w32(UNKNOWN_MC_PMASK << 12 | UNKNOWN_MC_PMASK, RTL839X_L2_FLD_PMSK);
+
+	// Limit learning to maximum: 32k entries, after that just flood (bits 0-1)
+	sw_w32((0x7fff << 2) | 0, RTL839X_L2_LRN_CONSTRT);
+
+	// Do not trap ARP packets to CPU_PORT
+	sw_w32(0, RTL839X_SPCL_TRAP_ARP_CTRL);
 }
 
 irqreturn_t rtl839x_switch_irq(int irq, void *dev_id)
@@ -739,6 +753,53 @@ static void rtl839x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 	priv->eee_enabled = enable;
 }
 
+/*
+ * Delete a range of Packet Inspection Engine rules
+ */
+static int rtl839x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from, int index_to)
+{
+	u32 v = (index_from << 1)| (index_to << 13 ) | BIT(0);
+
+	pr_info("%s: from %d to %d\n", __func__, index_from, index_to);
+	mutex_lock(&priv->reg_mutex);
+
+	// Write from-to and execute bit into control register
+	sw_w32(v, RTL839X_ACL_CLR_CTRL);
+
+	// Wait until command has completed
+	do {
+	} while (sw_r32(RTL839X_ACL_CLR_CTRL) & BIT(0));
+
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+
+static void rtl839x_pie_init(struct rtl838x_switch_priv *priv)
+{
+	int i;
+	u32 template_selectors;
+
+	mutex_init(&priv->reg_mutex);
+
+	// Power on all PIE blocks
+	for (i = 0; i < priv->n_pie_blocks; i++)
+		sw_w32_mask(0, BIT(i), RTL839X_PS_ACL_PWR_CTRL);
+
+	// Set separation between ingress and egress ACL blocks to 50/50: first Egress block is 8
+	sw_w32_mask(0x1f, 8, RTL839X_ACL_CTRL);  // Writes 8 to cutline field
+
+	// Include IPG in metering
+	sw_w32(1, RTL839X_METER_GLB_CTRL);
+
+	// Delete all present rules, block size is 128 on all SoC families
+	rtl839x_pie_rule_del(priv, 0, priv->n_pie_blocks * 128 - 1);
+
+	// Enable predefined templates 0, 1 for all blocks
+	template_selectors = 0 | (1 << 3);
+	for (i = 0; i < priv->n_pie_blocks; i++)
+		sw_w32(template_selectors, RTL839X_ACL_BLK_TMPLTE_CTRL(i));
+}
+
 const struct rtl838x_reg rtl839x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -804,4 +865,6 @@ const struct rtl838x_reg rtl839x_reg = {
 	.l2_hash_key = rtl839x_l2_hash_key,
 	.read_mcast_pmask = rtl839x_read_mcast_pmask,
 	.write_mcast_pmask = rtl839x_write_mcast_pmask,
+	.l2_learning_setup = rtl839x_l2_learning_setup,
+	.pie_init = rtl839x_pie_init,
 };

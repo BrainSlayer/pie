@@ -197,6 +197,15 @@
 #define RTL930X_L2_TBL_FLUSH_CTRL		(0x9404)
 #define RTL931X_L2_TBL_FLUSH_CTRL		(0xCD9C)
 
+#define RTL838X_L2_LRN_CONSTRT			(0x329C)
+#define RTL839X_L2_LRN_CONSTRT			(0x3910)
+#define RTL930X_L2_LRN_CONSTRT_CTRL		(0x909c)
+#define RTL838X_L2_FLD_PMSK			(0x3288)
+#define RTL839X_L2_FLD_PMSK			(0x38EC)
+#define RTL930X_L2_BC_FLD_PMSK			(0x9068)
+#define RTL930X_L2_UNKN_UC_FLD_PMSK		(0x9064)
+#define RTL838X_L2_LRN_CONSTRT_EN		(0x3368)
+
 #define RTL838X_L2_PORT_NEW_SALRN(p)		(0x328c + (((p >> 4) << 2)))
 #define RTL839X_L2_PORT_NEW_SALRN(p)		(0x38F0 + (((p >> 4) << 2)))
 #define RTL930X_L2_PORT_SALRN(p)		(0x8FEC + (((p >> 4) << 2)))
@@ -302,6 +311,8 @@
 /* 802.1X */
 #define RTL838X_SPCL_TRAP_EAPOL_CTRL		(0x6988)
 #define RTL839X_SPCL_TRAP_EAPOL_CTRL		(0x105C)
+#define RTL838X_SPCL_TRAP_ARP_CTRL		(0x698C)
+#define RTL839X_SPCL_TRAP_ARP_CTRL		(0x1060)
 
 /* QoS */
 #define RTL838X_QM_INTPRI2QID_CTRL		(0x5F00)
@@ -340,11 +351,23 @@
 
 /* Packet Inspection Engine */
 #define RTL838X_METER_GLB_CTRL			(0x4B08)
+#define RTL839X_METER_GLB_CTRL			(0x1300)
+#define RTL930X_METER_GLB_CTRL			(0xa0a0)
+#define RTL839X_ACL_CTRL			(0x1288)
 #define RTL838X_ACL_BLK_LOOKUP_CTRL		(0x6100)
+#define RTL839X_ACL_BLK_LOOKUP_CTRL		(0x1280)
+#define RTL930X_PIE_BLK_LOOKUP_CTRL		(0xa5a0)
 #define RTL838X_ACL_BLK_PWR_CTRL		(0x6104)
+#define RTL839X_PS_ACL_PWR_CTRL			(0x049c)
 #define RTL838X_ACL_BLK_TMPLTE_CTRL(block)	(0x6108 + ((block) << 2))
+#define RTL839X_ACL_BLK_TMPLTE_CTRL(block)	(0x128c + ((block) << 2))
+#define RTL930X_PIE_BLK_TMPLTE_CTRL(block)	(0xa5a8 + ((block) << 2))
 #define RTL838X_ACL_CLR_CTRL			(0x6168)
+#define RTL839X_ACL_CLR_CTRL			(0x12fc)
+#define RTL930X_PIE_CLR_CTRL			(0xa66c)
 #define RTL838X_DMY_REG27			(0x3378)
+#define RTL838X_ACL_PORT_LOOKUP_CTRL(p)		(0x616C + (((p) << 2)))
+#define RTL930X_ACL_PORT_LOOKUP_CTRL(p)		(0xA784 + (((p) << 2)))
 
 #define MAX_VLANS 4096
 #define MAX_LAGS 16
@@ -352,7 +375,6 @@
 #define RTL930X_PORT_IGNORE 0x3f
 #define MAX_MC_GROUPS 512
 #define UNKNOWN_MC_PMASK (MAX_MC_GROUPS - 1)
-#define N_PIE_BLOCKS 12
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -431,13 +453,13 @@ struct pie_rule {
 	bool dmac_hit_sw;
 	bool not_first_frag;
 	u8 frame_type_l4;
-	u8 frame_type;
+	u8 frame_type;   // 0: ARP, 1: L2 only, 2: IPv4, 3: IPv6
 	bool otag_fmt;
 	bool itag_fmt;
 	bool otag_exist;
 	bool itag_exist;
-	bool frame_type_l2;
-	bool tid;
+	bool frame_type_l2; // 0: Ethernet, 1: LLC_SNAP, 2: LLC_Other, 3: Reserved
+	u8 tid;
 
 	u8 spmmask_fix_m;
 	u8 spn_m;
@@ -451,7 +473,7 @@ struct pie_rule {
 	bool otag_exist_m;
 	bool itag_exist_m;
 	bool frame_type_l2_m;
-	bool tid_m;
+	u8 tid_m;
 
 	bool valid;
 	bool cond_not;
@@ -602,8 +624,9 @@ struct rtl838x_reg {
 	u64 (*read_mcast_pmask)(int idx);
 	void (*write_mcast_pmask)(int idx, u64 portmask);
 	void (*vlan_fwd_on_inner)(int port, bool is_set);
-	void (*pie_init)(void);
+	void (*pie_init)(struct rtl838x_switch_priv *priv);
 	int (*pie_rule_create_drop)(struct rtl838x_switch_priv *priv, u32 sip, u32 sip_mask);
+	void (*l2_learning_setup)(void);
 };
 
 struct rtl838x_switch_priv {
@@ -632,6 +655,7 @@ struct rtl838x_switch_priv {
 	struct notifier_block nb;
 	bool eee_enabled;
 	unsigned long int mc_group_bm[MAX_MC_GROUPS >> 5];
+	int n_pie_blocks;
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);

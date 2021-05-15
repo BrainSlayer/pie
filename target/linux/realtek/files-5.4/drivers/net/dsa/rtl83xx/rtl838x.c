@@ -5,9 +5,6 @@
 
 extern struct mutex smi_lock;
 
-/* Lock for the Packet Inspection Engine */
-struct mutex pie_lock;
-
 // see_dal_maple_acl_log2PhyTmplteField
 /* Definition of the RTL838X-specific template field IDs */
 enum template_field_id {
@@ -501,7 +498,7 @@ static void rtl838x_vlan_profile_setup(int profile)
 	 * On RTL93XX, the portmask is directly set in the profile,
 	 * see e.g. rtl9300_vlan_profile_setup
 	 */
-	rtl838x_write_mcast_pmask(UNKNOWN_MC_PMASK, 0xfffffff);
+	rtl838x_write_mcast_pmask(UNKNOWN_MC_PMASK, 0x1fffffff);
 }
 
 static inline int rtl838x_vlan_port_egr_filter(int port)
@@ -512,6 +509,24 @@ static inline int rtl838x_vlan_port_egr_filter(int port)
 static inline int rtl838x_vlan_port_igr_filter(int port)
 {
 	return RTL838X_VLAN_PORT_IGR_FLTR(port);
+}
+
+static void rtl838x_l2_learning_setup(void)
+{
+	/* Set portmask for broadcast traffic and unknown unicast address flooding
+	 * to the reserved entry in the portmask table used also for
+	 * multicast flooding */
+	sw_w32(UNKNOWN_MC_PMASK << 12 | UNKNOWN_MC_PMASK, RTL838X_L2_FLD_PMSK);
+
+	/* Enable learning constraint system-wide (bit 0), per-port (bit 1)
+	 * and per vlan (bit 2) */
+	sw_w32(0x7, RTL838X_L2_LRN_CONSTRT_EN);
+
+	// Limit learning to maximum: 16k entries, after that just flood (bits 0-1)
+	sw_w32((0x3fff << 2) | 0, RTL838X_L2_LRN_CONSTRT);
+
+	// Do not trap ARP packets to CPU_PORT
+	sw_w32(0, RTL838X_SPCL_TRAP_ARP_CTRL);
 }
 
 static void rtl838x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
@@ -638,46 +653,17 @@ static void rtl838x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 	priv->eee_enabled = enable;
 }
 
-static void rtl838x_pie_init(void)
-{
-	int i;
-	u32 template_selectors;
-
-	mutex_init(&pie_lock);
-
-	mutex_lock(&pie_lock);
-
-	// Power on all PIE blocks
-	for (i = 0; i < N_PIE_BLOCKS; i++)
-		sw_w32_mask(0, BIT(i), RTL838X_ACL_BLK_PWR_CTRL);
-
-	// Include IPG in metering
-	sw_w32(1, RTL838X_METER_GLB_CTRL);
-
-	// Routing bypasses source port filter
-	sw_w32_mask(0, 3, RTL838X_INT_RW_CTRL);
-	sw_w32_mask(0, 1, RTL838X_DMY_REG27);
-	sw_w32_mask(3, 0, RTL838X_INT_RW_CTRL);
-
-	// Enable predefined templates 0, 1 and 2 for all blocks
-	template_selectors = 0 | (1 << 3) | (2 << 6);
-	for (i = 0; i < N_PIE_BLOCKS; i++)
-		sw_w32(template_selectors, RTL838X_ACL_BLK_TMPLTE_CTRL(i));
-
-	mutex_unlock(&pie_lock);
-}
-
 static int rtl838x_pie_lookup_enable(struct rtl838x_switch_priv *priv, int index)
 {
 	int block = index / 128;
 	u32 block_state = sw_r32(RTL838X_ACL_BLK_LOOKUP_CTRL);
 
-	mutex_lock(&pie_lock);
+	mutex_lock(&priv->reg_mutex);
 	// Make sure rule-lookup is enabled in the block
 	if (!(block_state & BIT(block)))
 		sw_w32(block_state | BIT(block), RTL838X_ACL_BLK_LOOKUP_CTRL);
 
-	mutex_unlock(&pie_lock);
+	mutex_unlock(&priv->reg_mutex);
 	return 0;
 }
 
@@ -685,22 +671,26 @@ static int rtl838x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from
 {
 	int block_from = index_from / 128;
 	int block_to = index_to / 128;
-	u32 v = (index_from << 1)| (index_to << 11 ) | BIT(0);
+	u32 v = (index_from << 1)| (index_to << 12 ) | BIT(0);
 	int block;
 	u32 block_state;
 
-	mutex_lock(&pie_lock);
+	pr_info("%s: from %d to %d\n", __func__, index_from, index_to);
+	mutex_lock(&priv->reg_mutex);
 
+	// Remember currently active blocks
 	block_state = sw_r32(RTL838X_ACL_BLK_LOOKUP_CTRL);
 
 	// Make sure rule-lookup is disabled in the relevant blocks
 	for (block = block_from; block <= block_to; block++) {
-	if (block_state & BIT(block))
-		sw_w32(block_state & (~BIT(block)), RTL838X_ACL_BLK_LOOKUP_CTRL);
+		if (block_state & BIT(block))
+			sw_w32(block_state & (~BIT(block)), RTL838X_ACL_BLK_LOOKUP_CTRL);
 	}
 
+	// Write from-to and execute bit into control register
 	sw_w32(v, RTL838X_ACL_CLR_CTRL);
 
+	// Wait until command has completed
 	do {
 	} while (sw_r32(RTL838X_ACL_CLR_CTRL) & BIT(0));
 
@@ -710,7 +700,7 @@ static int rtl838x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from
 			sw_w32(block_state | BIT(block), RTL838X_ACL_BLK_LOOKUP_CTRL);
 	}
 
-	mutex_unlock(&pie_lock);
+	mutex_unlock(&priv->reg_mutex);
 	return 0;
 }
 
@@ -1143,6 +1133,27 @@ int rtl838x_read_pie_action(u32 r[],  struct pie_rule *pr)
 	return 0;
 }
 
+void rtl838x_pie_rule_dump_raw(u32 r[])
+{
+	pr_info("Address: %08x\n", (u32)r);
+	pr_info("Match  : %08x %08x %08x %08x %08x %08x\n", r[0], r[1], r[2], r[3], r[4], r[5]);
+	pr_info("Fixed  : %08x\n", r[6]);
+	pr_info("Match M: %08x %08x %08x %08x %08x %08x\n", r[7], r[8], r[9], r[10], r[11], r[12]);
+	pr_info("Fixed M: %08x\n", r[13]);
+	pr_info("AIF    : %08x %08x %08x\n", r[14], r[15], r[16]);
+	pr_info("Sel    : %08x\n", r[17]);
+}
+
+void rtl838x_pie_rule_dump(struct  pie_rule *pr)
+{
+	pr_info("Drop: %d, fwd: %d, ovid: %d, ivid: %d, flt: %d, log: %d, rmk: %d, meter: %d tagst: %d, mir: %d, nopri: %d, cpupri: %d, otpid: %d, itpid: %d, shape: %d\n",
+		pr->drop, pr->fwd_sel, pr->ovid_sel, pr->ivid_sel, pr->flt_sel, pr->log_sel, pr->rmk_sel, pr->log_sel, pr->tagst_sel, pr->mir_sel, pr->nopri_sel,
+		pr->cpupri_sel, pr->otpid_sel, pr->itpid_sel, pr->shaper_sel);
+	if (pr->fwd_sel)
+		pr_info("FWD: %08x\n", pr->fwd_data);
+	pr_info("TID: %x, %x\n", pr->tid, pr->tid_m);
+}
+
 static int rtl838x_pie_rule_read(struct rtl838x_switch_priv *priv, int idx, struct  pie_rule *pr)
 {
 	// Read IACL table (1) via register 0
@@ -1152,6 +1163,7 @@ static int rtl838x_pie_rule_read(struct rtl838x_switch_priv *priv, int idx, stru
 	int block = idx / 128;
 	u32 t_select = sw_r32(RTL838X_ACL_BLK_TMPLTE_CTRL(block));
 
+	memset(pr, 0, sizeof(*pr));
 	rtl_table_read(q, idx);
 	for (i = 0; i < 18; i++)
 		r[i] = sw_r32(rtl_table_data(q, i));
@@ -1163,22 +1175,13 @@ static int rtl838x_pie_rule_read(struct rtl838x_switch_priv *priv, int idx, stru
 		return 0;
 
 	pr_info("%s: template_selectors %08x, tid: %d\n", __func__, t_select, pr->tid);
+	rtl838x_pie_rule_dump_raw(r);
 
 	rtl838x_read_pie_templated(r, pr, fixed_templates[(t_select >> (pr->tid * 3)) & 0x7]);
 
+	rtl838x_read_pie_action(r, pr);
 
 	return 0;
-}
-
-void rtl838x_pie_rule_dump_raw(u32 r[])
-{
-	pr_info("Address: %08x\n", (u32)r);
-	pr_info("Match  : %08x %08x %08x %08x %08x %08x\n", r[0], r[1], r[2], r[3], r[4], r[5]);
-	pr_info("Fixed  : %08x\n", r[6]);
-	pr_info("Match M: %08x %08x %08x %08x %08x %08x\n", r[7], r[8], r[9], r[10], r[11], r[12]);
-	pr_info("Fixed M: %08x\n", r[13]);
-	pr_info("AIF    : %08x %08x %08x\n", r[14], r[15], r[16]);
-	pr_info("Sel    : %08x\n", r[17]);
 }
 
 static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, struct  pie_rule *pr)
@@ -1239,7 +1242,38 @@ static int rtl838x_pie_rule_create_drop(struct rtl838x_switch_priv *priv, u32 si
 	rtl838x_pie_lookup_enable(priv, idx);
 	rtl838x_pie_rule_write(priv, idx, pr);
 
+	kfree(pr);
 	return 0;
+}
+
+static void rtl838x_pie_init(struct rtl838x_switch_priv *priv)
+{
+	int i;
+	u32 template_selectors;
+
+	// Enable ACL lookup on all ports, including CPU_PORT
+	for (i = 0; i <= priv->cpu_port; i++)
+		sw_w32(1, RTL838X_ACL_PORT_LOOKUP_CTRL(i));
+
+	// Power on all PIE blocks
+	for (i = 0; i < priv->n_pie_blocks; i++)
+		sw_w32_mask(0, BIT(i), RTL838X_ACL_BLK_PWR_CTRL);
+
+	// Include IPG in metering
+	sw_w32(1, RTL838X_METER_GLB_CTRL);
+
+	// Delete all present rules, block size is 128 on all SoC families
+	rtl838x_pie_rule_del(priv, 0, priv->n_pie_blocks * 128 - 1);
+
+	// Routing bypasses source port filter: disable write-protection, first
+	sw_w32_mask(0, 3, RTL838X_INT_RW_CTRL);
+	sw_w32_mask(0, 1, RTL838X_DMY_REG27);
+	sw_w32_mask(3, 0, RTL838X_INT_RW_CTRL);
+
+	// Enable predefined templates 0, 1 and 2 for all blocks
+	template_selectors = 0 | (1 << 3) | (2 << 6);
+	for (i = 0; i < priv->n_pie_blocks; i++)
+		sw_w32(template_selectors, RTL838X_ACL_BLK_TMPLTE_CTRL(i));
 }
 
 const struct rtl838x_reg rtl838x_reg = {
@@ -1309,6 +1343,7 @@ const struct rtl838x_reg rtl838x_reg = {
 	.write_mcast_pmask = rtl838x_write_mcast_pmask,
 	.pie_rule_create_drop = rtl838x_pie_rule_create_drop,
 	.pie_init = rtl838x_pie_init,
+	.l2_learning_setup = rtl838x_l2_learning_setup,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
