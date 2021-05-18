@@ -614,6 +614,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->n_pie_blocks = 32;
 		break;
 	}
+
 	pr_debug("Chip version %c\n", priv->version);
 
 	err = rtl83xx_mdio_probe(priv);

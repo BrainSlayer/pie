@@ -4,6 +4,7 @@
 #define _RTL838X_H
 
 #include <net/dsa.h>
+#include <linux/rhashtable.h>
 
 /*
  * Register definition
@@ -375,6 +376,7 @@
 #define RTL930X_PORT_IGNORE 0x3f
 #define MAX_MC_GROUPS 512
 #define UNKNOWN_MC_PMASK (MAX_MC_GROUPS - 1)
+#define MAX_PIE_ENTRIES (18 * 128)
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -447,12 +449,13 @@ enum fwd_rule_action {
 
 // Packet Inspection Engine Rules
 struct pie_rule {
+	int id;
 	u8 spmmask_fix;
 	u8 spn;
 	bool mgnt_vlan;
 	bool dmac_hit_sw;
 	bool not_first_frag;
-	u8 frame_type_l4;
+	u8 frame_type_l4; // 0: UDP, 1: TCP, 2: ICMP/ICMPv6, 3: IGMP
 	u8 frame_type;   // 0: ARP, 1: L2 only, 2: IPv4, 3: IPv6
 	bool otag_fmt;
 	bool itag_fmt;
@@ -499,11 +502,11 @@ struct pie_rule {
 
 	// Fields used in predefined templates 0-2
 	u32 spm;
-	u16 otag;
-	u8 smac[6];
-	u8 dmac[6];
+	u16 otag;		// Outer VLAN-ID
+	u8 smac[ETH_ALEN];
+	u8 dmac[ETH_ALEN];
 	u8 ethertype;
-	u16 itag;
+	u16 itag;		// Inner VLAN-ID
 	u16 field_range_check;
 	u32 sip;
 	u32 dip;
@@ -514,8 +517,8 @@ struct pie_rule {
 
 	u32 spm_m;
 	u16 otag_m;
-	u8 smac_m[6];
-	u8 dmac_m[6];
+	u8 smac_m[ETH_ALEN];
+	u8 dmac_m[ETH_ALEN];
 	u8 ethertype_m;
 	u16 itag_m;
 	u16 field_range_check_m;
@@ -556,6 +559,17 @@ struct rtl838x_nexthop {
 };
 
 struct rtl838x_switch_priv;
+
+struct rtl83xx_flow {
+	unsigned long cookie;
+	struct rhash_head node;
+	struct rtl838x_switch_priv *priv;
+	struct pie_rule rule;
+	u32 flags;
+//	refcount_t refcnt;
+//	struct rcu_head rcu_head;
+	struct completion init_done;
+};
 
 struct rtl838x_reg {
 	void (*mask_port_reg_be)(u64 clear, u64 set, int reg);
@@ -625,7 +639,8 @@ struct rtl838x_reg {
 	void (*write_mcast_pmask)(int idx, u64 portmask);
 	void (*vlan_fwd_on_inner)(int port, bool is_set);
 	void (*pie_init)(struct rtl838x_switch_priv *priv);
-	int (*pie_rule_create_drop)(struct rtl838x_switch_priv *priv, u32 sip, u32 sip_mask);
+	int (*pie_flow_add)(struct rtl838x_switch_priv *priv, struct rtl83xx_flow *flow);
+	int (*pie_flow_del)(struct rtl838x_switch_priv *priv, struct rtl83xx_flow *flow);
 	void (*l2_learning_setup)(void);
 };
 
@@ -656,6 +671,8 @@ struct rtl838x_switch_priv {
 	bool eee_enabled;
 	unsigned long int mc_group_bm[MAX_MC_GROUPS >> 5];
 	int n_pie_blocks;
+	struct rhashtable tc_ht;
+	unsigned long int pie_use_bm[MAX_PIE_ENTRIES>> 6];
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);

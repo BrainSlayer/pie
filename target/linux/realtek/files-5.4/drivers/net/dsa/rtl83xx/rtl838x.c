@@ -6,7 +6,7 @@
 extern struct mutex smi_lock;
 
 // see_dal_maple_acl_log2PhyTmplteField
-/* Definition of the RTL838X-specific template field IDs */
+/* Definition of the RTL838X-specific template field IDs as used in the PIE */
 enum template_field_id {
 	TEMPLATE_FIELD_SPMMASK = 0,
 	TEMPLATE_FIELD_SPM0 = 1,
@@ -1194,7 +1194,6 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 	u32 t_select = sw_r32(RTL838X_ACL_BLK_TMPLTE_CTRL(block));
 
 	pr_info("%s: %d, t_select: %08x\n", __func__, idx, t_select);
-	rtl838x_pie_rule_dump_raw(r);
 
 	for (i = 0; i < 18; i++)
 		r[i] = 0;
@@ -1223,27 +1222,28 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 	return 0;
 }
 
-static int rtl838x_pie_rule_create_drop(struct rtl838x_switch_priv *priv, u32 sip, u32 sip_mask)
+static int rtl838x_pie_flow_add(struct rtl838x_switch_priv *priv, struct rtl83xx_flow *flow)
 {
-	struct pie_rule *pr;
-	int idx = 0;
+	int idx = find_first_zero_bit(priv->pie_use_bm, priv->n_pie_blocks * 128);
 
-	pr = kzalloc(sizeof(*pr), GFP_KERNEL);
-	if (!pr)
-		return -ENOMEM;
-	pr_info("%s: index %d, pointer %08x\n", __func__, idx, (u32)pr);
-	pr->valid = true;
-	pr->tid = 1;  // Mapped to template #1
-	pr->tid_m = 3;
-	pr->sip = sip;
-	pr->sip_m = sip_mask;
-	pr->drop = 1;
+	set_bit(idx, priv->pie_use_bm);
+
+	flow->rule.valid = true;
+	flow->rule.tid = 1;  // Mapped to template #1
+	flow->rule.tid_m = 0x3;
+	flow->rule.id = idx;
 
 	rtl838x_pie_lookup_enable(priv, idx);
-	rtl838x_pie_rule_write(priv, idx, pr);
+	rtl838x_pie_rule_write(priv, idx, &flow->rule);
 
-	kfree(pr);
 	return 0;
+}
+
+static int rtl838x_pie_flow_del(struct rtl838x_switch_priv *priv, struct rtl83xx_flow *flow)
+{
+	int idx = flow->rule.id;
+
+	return rtl838x_pie_rule_del(priv, idx, idx);
 }
 
 static void rtl838x_pie_init(struct rtl838x_switch_priv *priv)
@@ -1341,8 +1341,9 @@ const struct rtl838x_reg rtl838x_reg = {
 	.l2_hash_key = rtl838x_l2_hash_key,
 	.read_mcast_pmask = rtl838x_read_mcast_pmask,
 	.write_mcast_pmask = rtl838x_write_mcast_pmask,
-	.pie_rule_create_drop = rtl838x_pie_rule_create_drop,
 	.pie_init = rtl838x_pie_init,
+	.pie_flow_add = rtl838x_pie_flow_add,
+	.pie_flow_del = rtl838x_pie_flow_del,
 	.l2_learning_setup = rtl838x_l2_learning_setup,
 };
 
