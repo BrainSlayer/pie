@@ -8,12 +8,6 @@
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
 #include "rtl83xx.h"
 #include "rtl838x.h"
-/*
- * Test: tc qdisc add dev eth0 ingress
- * tc filter add dev eth0 protocol ip parent ffff: handle 2 flower src_ip 192.168.2.150 action drop
- * tc filter show dev eth0
- */
-
 
 /*
  * Parse the flow rule for the matching conditions
@@ -107,7 +101,7 @@ static int rtl83xx_parse_flow_rule(struct rtl838x_switch_priv *priv,
 	return 0;
 }
 
-static int rtl83xx_parse_redirect(const struct flow_action_entry *act, struct rtl83xx_flow *flow)
+static int rtl83xx_parse_fwd(const struct flow_action_entry *act, struct rtl83xx_flow *flow)
 {
 	struct net_device *dev = act->dev;
 
@@ -117,8 +111,8 @@ static int rtl83xx_parse_redirect(const struct flow_action_entry *act, struct rt
 	}
 
 	flow->rule.fwd_data = dev->dsa_ptr->index;
-	// Forwading action:  REDIRECT TO PORT, FORCE, Skip strom and STP filters
-	flow->rule.fwd_data |= 0x4 << 13 | BIT(12) | BIT(11) | BIT(10);
+	// Forwading action qualifiers: FORCE, Skip strom and STP filters
+	flow->rule.fwd_data |= BIT(12) | BIT(11) | BIT(10);
 
 	pr_info("%s: data: %04x\n", __func__, flow->rule.fwd_data);
 	return 0;
@@ -156,12 +150,17 @@ static int rtl83xx_add_flow(struct rtl838x_switch_priv *priv, struct flow_cls_of
 			break;
 		case FLOW_ACTION_REDIRECT:
 			pr_info("%s: REDIRECT\n", __func__);
-			err = rtl83xx_parse_redirect(act, flow);
+			err = rtl83xx_parse_fwd(act, flow);
 			if (err)
 				return err;
+			flow->rule.fwd_data |= 0x4 << 13;  // action: redirect to port-id
 			break;
 		case FLOW_ACTION_MIRRED:
 			pr_info("%s: MIRRED\n", __func__);
+			err = rtl83xx_parse_fwd(act, flow);
+			if (err)
+				return err;
+			flow->rule.fwd_data |= 0x2 << 13;  // action: copy to port-id
 			break;
 		default:
 			pr_info("%s: Flow action not supported: %d\n", __func__, act->id);
@@ -221,7 +220,7 @@ rcu_unlock:
 
 	rtl83xx_add_flow(priv, f, flow); // TODO: check error
 
-	return priv->r->pie_flow_add(priv, flow);
+	return priv->r->pie_rule_add(priv, &flow->rule);
 out_free:
 	kfree(flow);
 out:
@@ -238,7 +237,10 @@ static int rtl83xx_delete_flower(struct rtl838x_switch_priv *priv,
 	if (!flow)
 		return -EINVAL;
 
-	priv->r->pie_flow_del(priv, flow);
+	priv->r->pie_rule_rm(priv, &flow->rule);
+
+	// TODO: kfree
+	// TODO: Unlink entry from hash-table
 
 	return 0;
 }

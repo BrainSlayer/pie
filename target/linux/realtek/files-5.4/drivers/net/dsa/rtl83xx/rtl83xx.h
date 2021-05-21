@@ -74,6 +74,11 @@ inline u32 rtl_table_data_r(struct table_reg *r, int i);
 inline void rtl_table_data_w(struct table_reg *r, u32 v, int i);
 
 void __init rtl83xx_setup_qos(struct rtl838x_switch_priv *priv);
+
+int rtl83xx_l2_nexthop_rm(struct rtl838x_switch_priv *priv, struct rtl83xx_nexthop *nh);
+struct rtl83xx_route *rtl83xx_route_find_gw(struct rtl838x_switch_priv *priv, __be32 ip);
+struct rtl83xx_route *route_alloc(struct rtl838x_switch_priv *priv, u32 ip);
+
 int read_phy(u32 port, u32 page, u32 reg, u32 *val);
 int write_phy(u32 port, u32 page, u32 reg, u32 val);
 

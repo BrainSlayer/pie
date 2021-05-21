@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
+#include <net/nexthop.h>
+
 #include "rtl83xx.h"
 
 extern struct mutex smi_lock;
@@ -280,6 +282,7 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 	e->is_ipv6_mc = !!(r[0] & BIT(21));
 	e->type = L2_INVALID;
 
+	pr_debug("%s: REGISTERS %08x %08x %08x\n", __func__, r[0], r[1], r[2]);
 	if (!e->is_ip_mc && !e->is_ipv6_mc) {
 		e->mac[0] = (r[1] >> 20);
 		e->mac[1] = (r[1] >> 12);
@@ -303,6 +306,7 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 				pr_info("Found next hop entry, need to read extra data\n");
 				e->nh_vlan_target = !!(r[0] & BIT(9));
 				e->nh_route_id = r[0] & 0x1ff;
+				e->vid = e->rvid;
 			}
 			e->age = (r[0] >> 17) & 0x3;
 			e->valid = true;
@@ -314,7 +318,7 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 			else
 				e->type = L2_UNICAST;
 		} else { // L2 multicast
-			pr_info("Got L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
+			pr_debug("Got L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
 			e->valid = true;
 			e->type = L2_MULTICAST;
 			e->mc_portmask_index = (r[0] >> 12) & 0x1ff;
@@ -377,6 +381,7 @@ static void rtl838x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 		r[2] = e->mc_sip;
 		r[0] |= e->rvid;
 	}
+	pr_info("%s: REGISTERS %08x %08x %08x\n", __func__, r[0], r[1], r[2]);
 }
 
 /*
@@ -402,7 +407,7 @@ static u64 rtl838x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2
 	if (!e->valid)
 		return 0;
 
-	entry = (((u64) r[1]) << 32) | (r[2] & 0xfffff000) | (r[0] & 0xfff);
+	entry = (((u64) r[1]) << 32) | (r[2]);  // mac and vid concatenated as hash seed
 	return entry;
 }
 
@@ -443,7 +448,7 @@ static u64 rtl838x_read_cam(int idx, struct rtl838x_l2_entry *e)
 	pr_debug("Found in CAM: R1 %x R2 %x R3 %x\n", r[0], r[1], r[2]);
 
 	// Return MAC with concatenated VID ac concatenated ID
-	entry = (((u64) r[1]) << 32) | (r[2] & 0xfffff000) | (r[0] & 0xfff);
+	entry = (((u64) r[1]) << 32) | r[2];
 	return entry;
 }
 
@@ -461,6 +466,7 @@ static void rtl838x_write_cam(int idx, struct rtl838x_l2_entry *e)
 	rtl_table_write(q, idx);
 	rtl_table_release(q);
 }
+
 
 static u64 rtl838x_read_mcast_pmask(int idx)
 {
@@ -658,12 +664,10 @@ static int rtl838x_pie_lookup_enable(struct rtl838x_switch_priv *priv, int index
 	int block = index / 128;
 	u32 block_state = sw_r32(RTL838X_ACL_BLK_LOOKUP_CTRL);
 
-	mutex_lock(&priv->reg_mutex);
 	// Make sure rule-lookup is enabled in the block
 	if (!(block_state & BIT(block)))
 		sw_w32(block_state | BIT(block), RTL838X_ACL_BLK_LOOKUP_CTRL);
 
-	mutex_unlock(&priv->reg_mutex);
 	return 0;
 }
 
@@ -778,12 +782,10 @@ void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum template_fie
 		case TEMPLATE_FIELD_SIP0:
 			data = pr->sip;
 			data_m = pr->sip_m;
-			pr_info("%s SIP0 i: %d, data %04x\n", __func__, i, data);
 			break;
 		case TEMPLATE_FIELD_SIP1:
 			data = pr->sip >> 16;
 			data_m = pr->sip_m >> 16;
-			pr_info("%s SIP1 i: %d, data %04x\n", __func__, i, data);
 			break;
 		case TEMPLATE_FIELD_DIP0:
 			data = pr->dip;
@@ -1135,7 +1137,7 @@ int rtl838x_read_pie_action(u32 r[],  struct pie_rule *pr)
 
 void rtl838x_pie_rule_dump_raw(u32 r[])
 {
-	pr_info("Address: %08x\n", (u32)r);
+	pr_info("Raw IACL table entry:\n");
 	pr_info("Match  : %08x %08x %08x %08x %08x %08x\n", r[0], r[1], r[2], r[3], r[4], r[5]);
 	pr_info("Fixed  : %08x\n", r[6]);
 	pr_info("Match M: %08x %08x %08x %08x %08x %08x\n", r[7], r[8], r[9], r[10], r[11], r[12]);
@@ -1184,7 +1186,7 @@ static int rtl838x_pie_rule_read(struct rtl838x_switch_priv *priv, int idx, stru
 	return 0;
 }
 
-static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, struct  pie_rule *pr)
+static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, struct pie_rule *pr)
 {
 	// Access IACL table (1) via register 0
 	struct table_reg *q = rtl_table_get(RTL8380_TBL_0, 1);
@@ -1222,30 +1224,37 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 	return 0;
 }
 
-static int rtl838x_pie_flow_add(struct rtl838x_switch_priv *priv, struct rtl83xx_flow *flow)
+static int rtl838x_pie_rule_add(struct rtl838x_switch_priv *priv, struct pie_rule *pr)
 {
 	int idx = find_first_zero_bit(priv->pie_use_bm, priv->n_pie_blocks * 128);
 
 	set_bit(idx, priv->pie_use_bm);
 
-	flow->rule.valid = true;
-	flow->rule.tid = 1;  // Mapped to template #1
-	flow->rule.tid_m = 0x3;
-	flow->rule.id = idx;
+	pr->valid = true;
+	pr->tid = 1;  // Mapped to template #1
+	pr->tid_m = 0x3;
+	pr->id = idx;
 
 	rtl838x_pie_lookup_enable(priv, idx);
-	rtl838x_pie_rule_write(priv, idx, &flow->rule);
+	rtl838x_pie_rule_write(priv, idx, pr);
 
 	return 0;
 }
 
-static int rtl838x_pie_flow_del(struct rtl838x_switch_priv *priv, struct rtl83xx_flow *flow)
+static int rtl838x_pie_rule_rm(struct rtl838x_switch_priv *priv, struct pie_rule *pr)
 {
-	int idx = flow->rule.id;
+	int idx = pr->id;
+
+	clear_bit(idx, priv->pie_use_bm);
 
 	return rtl838x_pie_rule_del(priv, idx, idx);
 }
 
+/*
+ * Initializes the Packet Inspection Engine:
+ * powers it up, enables default matching templates for all blocks
+ * and clears all rules possibly installed by u-boot
+ */
 static void rtl838x_pie_init(struct rtl838x_switch_priv *priv)
 {
 	int i;
@@ -1274,6 +1283,43 @@ static void rtl838x_pie_init(struct rtl838x_switch_priv *priv)
 	template_selectors = 0 | (1 << 3) | (2 << 6);
 	for (i = 0; i < priv->n_pie_blocks; i++)
 		sw_w32(template_selectors, RTL838X_ACL_BLK_TMPLTE_CTRL(i));
+}
+
+static void rtl838x_route_read(struct rtl838x_switch_priv *priv, int idx,
+			       struct rtl83xx_route *rt)
+{
+	// Read ROUTING table (2) via register RTL8380_TBL_1
+	struct table_reg *r = rtl_table_get(RTL8380_TBL_1, 2);
+
+	pr_info("In %s, id %d\n", __func__, idx);
+	rtl_table_read(r, idx);
+
+	// The table has a size of 2 registers
+	rt->nh.gw = sw_r32(rtl_table_data(r, 0));
+	rt->nh.gw <<= 32;
+	rt->nh.gw |= sw_r32(rtl_table_data(r, 1));
+
+	rtl_table_release(r);
+}
+
+static void rtl838x_route_write(struct rtl838x_switch_priv *priv, int idx,
+			        struct rtl83xx_route *rt)
+{
+	// Read ROUTING table (2) via register RTL8380_TBL_1
+	struct table_reg *r = rtl_table_get(RTL8380_TBL_1, 2);
+
+	pr_info("In %s, id %d, gw: %016llx\n", __func__, idx, rt->nh.gw);
+	sw_w32(rt->nh.gw >> 32, rtl_table_data(r, 0));
+	sw_w32(rt->nh.gw, rtl_table_data(r, 1));
+	rtl_table_write(r, idx);
+
+	rtl_table_release(r);
+}
+
+int rtl838x_l3_setup(struct rtl838x_switch_priv *priv)
+{
+	// Nothing to be done
+	return 0;
 }
 
 const struct rtl838x_reg rtl838x_reg = {
@@ -1342,9 +1388,13 @@ const struct rtl838x_reg rtl838x_reg = {
 	.read_mcast_pmask = rtl838x_read_mcast_pmask,
 	.write_mcast_pmask = rtl838x_write_mcast_pmask,
 	.pie_init = rtl838x_pie_init,
-	.pie_flow_add = rtl838x_pie_flow_add,
-	.pie_flow_del = rtl838x_pie_flow_del,
+	.pie_rule_write = rtl838x_pie_rule_write,
+	.pie_rule_add = rtl838x_pie_rule_add,
+	.pie_rule_rm = rtl838x_pie_rule_rm,
 	.l2_learning_setup = rtl838x_l2_learning_setup,
+	.route_read = rtl838x_route_read,
+	.route_write = rtl838x_route_write,
+	.l3_setup = rtl838x_l3_setup,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)

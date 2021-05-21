@@ -220,8 +220,12 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 			e->block_sa = !!(r[2] & (1 << 20));
 			e->suspended = !!(r[2] & (1 << 17));
 			e->next_hop = !!(r[2] & (1 << 16));
-			if (e->next_hop)
+			if (e->next_hop) {
 				pr_info("Found next hop entry, need to read data\n");
+				e->nh_vlan_target = !!(r[2] & BIT(15));
+				e->nh_route_id = (r[2] >> 4) & 0x1ff;
+				e->vid = e->rvid;
+			}
 			e->age = (r[2] >> 21) & 3;
 			e->valid = true;
 			if (!(r[2] & 0xc0fd0000)) /* Check for valid entry */
@@ -232,6 +236,7 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 			e->valid = true;
 			e->type = L2_MULTICAST;
 			e->mc_portmask_index = (r[2]>>6) & 0xfff;
+			e->vid = e->rvid;
 		}
 	}
 	if (e->is_ip_mc) {
@@ -800,6 +805,72 @@ static void rtl839x_pie_init(struct rtl838x_switch_priv *priv)
 		sw_w32(template_selectors, RTL839X_ACL_BLK_TMPLTE_CTRL(i));
 }
 
+static void rtl839x_route_read(struct rtl838x_switch_priv *priv, int idx,
+			       struct rtl83xx_route *rt)
+{
+	u64 v;
+	// Read ROUTING table (2) via register RTL8390_TBL_1
+	struct table_reg *r = rtl_table_get(RTL8390_TBL_1, 2);
+
+	pr_info("In %s\n", __func__);
+	rtl_table_read(r, idx);
+
+	// The table has a size of 2 registers
+	v = sw_r32(rtl_table_data(r, 0));
+	v <<= 32;
+	v |= sw_r32(rtl_table_data(r, 1));
+	rt->switch_mac_id = (v >> 12) & 0xf;
+	rt->nh.gw = v >> 16;
+
+	rtl_table_release(r);
+}
+
+static void rtl839x_route_write(struct rtl838x_switch_priv *priv, int idx,
+			        struct rtl83xx_route *rt)
+{
+	u32 v;
+
+	// Read ROUTING table (2) via register RTL8390_TBL_1
+	struct table_reg *r = rtl_table_get(RTL8390_TBL_1, 2);
+
+	pr_info("In %s\n", __func__);
+	sw_w32(rt->nh.gw >> 16, rtl_table_data(r, 0));
+	v = rt->nh.gw << 16;
+	v |= rt->switch_mac_id << 12;
+	sw_w32(v, rtl_table_data(r, 1));
+	rtl_table_write(r, idx);
+
+	rtl_table_release(r);
+}
+
+/*
+ * Configure the switch's own MAC addresses used when routing packets
+ */
+static void rtl839x_setup_port_macs(struct rtl838x_switch_priv *priv)
+{
+	int i;
+	struct net_device *dev;
+	u64 mac;
+
+	pr_info("%s: got port %08x\n", __func__, (u32)priv->ports[priv->cpu_port].dp);
+	dev = priv->ports[priv->cpu_port].dp->slave;
+	mac = ether_addr_to_u64(dev->dev_addr);
+
+	for (i = 0; i < 15; i++) {
+		pr_info("%s: i: %d, MAC: %016llx\n", __func__, i, mac);
+		mac++;  // BUG: VRRP for testing
+		sw_w32(mac >> 32, RTL839X_ROUTING_SA_CTRL);
+		sw_w32(mac, RTL839X_ROUTING_SA_CTRL + 4);
+	}
+}
+
+int rtl839x_l3_setup(struct rtl838x_switch_priv *priv)
+{
+	rtl839x_setup_port_macs(priv);
+
+	return 0;
+}
+
 const struct rtl838x_reg rtl839x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -867,4 +938,7 @@ const struct rtl838x_reg rtl839x_reg = {
 	.write_mcast_pmask = rtl839x_write_mcast_pmask,
 	.l2_learning_setup = rtl839x_l2_learning_setup,
 	.pie_init = rtl839x_pie_init,
+	.route_read = rtl839x_route_read,
+	.route_write = rtl839x_route_write,
+	.l3_setup = rtl839x_l3_setup,
 };

@@ -180,6 +180,9 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 
 	priv->r->l2_learning_setup();
 
+	if (priv->r->l3_setup)
+		priv->r->l3_setup(priv);
+
 	/* Enable MAC Polling PHY again */
 	rtl83xx_enable_phy_polling(priv);
 	pr_debug("Please wait until PHY is settled\n");

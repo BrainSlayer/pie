@@ -370,6 +370,9 @@
 #define RTL838X_ACL_PORT_LOOKUP_CTRL(p)		(0x616C + (((p) << 2)))
 #define RTL930X_ACL_PORT_LOOKUP_CTRL(p)		(0xA784 + (((p) << 2)))
 
+/* Routing */
+#define RTL839X_ROUTING_SA_CTRL 		0x6afc
+
 #define MAX_VLANS 4096
 #define MAX_LAGS 16
 #define MAX_PRIOS 8
@@ -377,6 +380,7 @@
 #define MAX_MC_GROUPS 512
 #define UNKNOWN_MC_PMASK (MAX_MC_GROUPS - 1)
 #define MAX_PIE_ENTRIES (18 * 128)
+#define MAX_ROUTES 512
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -439,7 +443,7 @@ struct rtl838x_l2_entry {
 	u32 mc_sip;
 	u16 mc_mac_index;
 	u16 nh_route_id;
-	bool nh_vlan_target;  // Only RTL83xx: VLAN used for next hop
+	bool nh_vlan_target;  // Only RTL83xx: VLAN used for next hop: 0: inner, 1: outer
 };
 
 enum fwd_rule_action {
@@ -545,16 +549,15 @@ struct pie_rule {
 	u16 shaper_data;
 };
 
-struct rtl838x_nexthop {
-	u16 id;		// ID in HW Nexthop table
-	u32 ip;		// IP Addres of nexthop
+struct rtl83xx_nexthop {
+	u16 id;		// ID in HW L2_NEXT_HOP table
 	u32 dev_id;
 	u16 port;
-	u16 vid;
-	u16 fid;
-	u64 mac;
+	u16 vid;	// VLAN-ID for L2 table entry
+	u64 mac;	// The MAC address of the entry in the L2_NEXT_HOP table
 	u16 mac_id;
 	u16 l2_id;	// Index of this next hop forwarding entry in L2 FIB table
+	u64 gw;		// The gateway MAC address packets are forwarded to
 	u16 if_id;
 };
 
@@ -566,9 +569,17 @@ struct rtl83xx_flow {
 	struct rtl838x_switch_priv *priv;
 	struct pie_rule rule;
 	u32 flags;
-//	refcount_t refcnt;
-//	struct rcu_head rcu_head;
-	struct completion init_done;
+};
+
+struct rtl83xx_route {
+	u32 gw_ip;			// IP of the route's gateway
+	u32 dst_ip;			// IP of the destination net
+	u16 prefix_len;			// Network prefix len of the destination net
+	int id;				// ID number of this route
+	struct rhlist_head linkage;
+	u16 switch_mac_id;		// Index into switch's own MACs, RTL839X only
+	struct rtl83xx_nexthop nh;
+	struct pie_rule pr;
 };
 
 struct rtl838x_reg {
@@ -639,8 +650,12 @@ struct rtl838x_reg {
 	void (*write_mcast_pmask)(int idx, u64 portmask);
 	void (*vlan_fwd_on_inner)(int port, bool is_set);
 	void (*pie_init)(struct rtl838x_switch_priv *priv);
-	int (*pie_flow_add)(struct rtl838x_switch_priv *priv, struct rtl83xx_flow *flow);
-	int (*pie_flow_del)(struct rtl838x_switch_priv *priv, struct rtl83xx_flow *flow);
+	int (*pie_rule_write)(struct rtl838x_switch_priv *priv, int idx, struct pie_rule *pr);
+	int (*pie_rule_add)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
+	int (*pie_rule_rm)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
+	void (*route_read)(struct rtl838x_switch_priv *priv, int idx, struct rtl83xx_route *rt);
+	void (*route_write)(struct rtl838x_switch_priv *priv, int idx, struct rtl83xx_route *rt);
+	int (*l3_setup)(struct rtl838x_switch_priv *priv);
 	void (*l2_learning_setup)(void);
 };
 
@@ -660,6 +675,7 @@ struct rtl838x_switch_priv {
 	u8 cpu_port;
 	u8 port_mask;
 	u8 port_width;
+	u8 port_ignore;
 	u64 irq_mask;
 	u32 fib_entries;
 	int l2_bucket_size;
@@ -667,12 +683,16 @@ struct rtl838x_switch_priv {
 	int n_lags;
 	u64 lags_port_members[MAX_LAGS];
 	struct net_device *lag_devs[MAX_LAGS];
-	struct notifier_block nb;
+	struct notifier_block nb;  // TODO: change to different name
+	struct notifier_block ne_nb;
+	struct notifier_block fib_nb;
 	bool eee_enabled;
 	unsigned long int mc_group_bm[MAX_MC_GROUPS >> 5];
 	int n_pie_blocks;
 	struct rhashtable tc_ht;
-	unsigned long int pie_use_bm[MAX_PIE_ENTRIES>> 6];
+	unsigned long int pie_use_bm[MAX_PIE_ENTRIES >> 6];
+	struct rhltable routes;
+	unsigned long int route_use_bm[MAX_ROUTES >> 6];
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);
