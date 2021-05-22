@@ -220,6 +220,15 @@ rcu_unlock:
 
 	rtl83xx_add_flow(priv, f, flow); // TODO: check error
 
+	// Add log action to flow
+	flow->rule.packet_cntr = rtl83xx_packet_cntr_alloc(priv);
+	if (flow->rule.packet_cntr >= 0) {
+		pr_info("Using packet counter %d\n", flow->rule.packet_cntr);
+		flow->rule.log_sel = true;
+		// BUG: Fix for other SoCs than 8380
+		flow->rule.log_data = flow->rule.packet_cntr;
+	}
+
 	return priv->r->pie_rule_add(priv, &flow->rule);
 out_free:
 	kfree(flow);
@@ -240,7 +249,7 @@ static int rtl83xx_delete_flower(struct rtl838x_switch_priv *priv,
 	priv->r->pie_rule_rm(priv, &flow->rule);
 
 	// TODO: kfree
-	// TODO: Unlink entry from hash-table
+	// TODO: Unlink entry from hash-table, free rule-allocation
 
 	return 0;
 }
@@ -250,6 +259,7 @@ static int rtl83xx_stats_flower(struct rtl838x_switch_priv *priv,
 {
 	struct rtl83xx_flow *flow;
 	unsigned long lastused = 0;
+	int total_packets, new_packets;
 
 	pr_info("In %s\n", __func__);
 	
@@ -257,7 +267,15 @@ static int rtl83xx_stats_flower(struct rtl838x_switch_priv *priv,
 	if (!flow)
 		return -1;
 
-	flow_stats_update(&cls_flower->stats, 100, 10, lastused);
+	if (flow->rule.packet_cntr >= 0) {
+		total_packets = priv->r->packet_cntr_read(flow->rule.packet_cntr);
+		pr_info("Total packets: %d\n", total_packets);
+		new_packets = total_packets - flow->rule.last_packet_cnt;
+		flow->rule.last_packet_cnt = total_packets;
+	}
+
+	// TODO: We need a second PIE rule to count the bytes
+	flow_stats_update(&cls_flower->stats, 100 * new_packets, new_packets, lastused);
 	return 0;
 }
 
