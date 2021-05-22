@@ -381,6 +381,7 @@
 #define UNKNOWN_MC_PMASK (MAX_MC_GROUPS - 1)
 #define MAX_PIE_ENTRIES (18 * 128)
 #define MAX_ROUTES 512
+#define MAX_COUNTERS 2048
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -454,6 +455,11 @@ enum fwd_rule_action {
 // Packet Inspection Engine Rules
 struct pie_rule {
 	int id;
+	int packet_cntr;
+	int octet_cntr;
+	u32 last_packet_cnt;
+	u64 last_octet_cnt;
+
 	u8 spmmask_fix;
 	u8 spn;
 	bool mgnt_vlan;
@@ -652,11 +658,13 @@ struct rtl838x_reg {
 	void (*pie_init)(struct rtl838x_switch_priv *priv);
 	int (*pie_rule_write)(struct rtl838x_switch_priv *priv, int idx, struct pie_rule *pr);
 	int (*pie_rule_add)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
-	int (*pie_rule_rm)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
+	void (*pie_rule_rm)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
 	void (*route_read)(struct rtl838x_switch_priv *priv, int idx, struct rtl83xx_route *rt);
 	void (*route_write)(struct rtl838x_switch_priv *priv, int idx, struct rtl83xx_route *rt);
 	int (*l3_setup)(struct rtl838x_switch_priv *priv);
 	void (*l2_learning_setup)(void);
+	u32 (*packet_cntr_read)(int counter);
+	void (*packet_cntr_clear)(int counter);
 };
 
 struct rtl838x_switch_priv {
@@ -693,6 +701,9 @@ struct rtl838x_switch_priv {
 	unsigned long int pie_use_bm[MAX_PIE_ENTRIES >> 6];
 	struct rhltable routes;
 	unsigned long int route_use_bm[MAX_ROUTES >> 6];
+	int n_counters;
+	unsigned long int octet_cntr_use_bm[MAX_COUNTERS >> 6];
+	unsigned long int packet_cntr_use_bm[MAX_COUNTERS >> 5];
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);

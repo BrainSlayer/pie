@@ -455,6 +455,63 @@ int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port)
 }
 
 /*
+ * Allocate a 64 bit octet counter located in the LOG HW table
+ */
+static int rtl83xx_octet_cntr_alloc(struct rtl838x_switch_priv *priv)
+{
+	int idx;
+
+	mutex_lock(&priv->reg_mutex);
+
+	idx = find_first_zero_bit(priv->octet_cntr_use_bm, MAX_COUNTERS);
+	if (idx >= priv->n_counters) {
+		mutex_unlock(&priv->reg_mutex);
+		return -1;
+	}
+
+	set_bit(idx, priv->octet_cntr_use_bm);
+	mutex_unlock(&priv->reg_mutex);
+
+	return idx;
+}
+
+/*
+ * Allocate a 32-bit packet counter
+ * 2 32-bit packet counters share the location of a 64-bit octet counter
+ * Initially there are no free packet counters and 2 new ones need to be freed
+ * by allocating the corresponding octet counter
+ */
+int rtl83xx_packet_cntr_alloc(struct rtl838x_switch_priv *priv)
+{
+	int idx, j;
+
+	mutex_lock(&priv->reg_mutex);
+
+	/* Because initially no packet counters are free, the logic is reversed:
+	 * a 0-bit means the counter is already allocated (for octets)
+	 */
+	idx = find_first_bit(priv->packet_cntr_use_bm, MAX_COUNTERS * 2);
+	if (idx >= priv->n_counters * 2) {
+		j = find_first_zero_bit(priv->octet_cntr_use_bm, MAX_COUNTERS);
+		if (j >= priv->n_counters) {
+			mutex_unlock(&priv->reg_mutex);
+			return -1;
+		}
+		set_bit(j, priv->octet_cntr_use_bm);
+		idx = j * 2;
+		set_bit(j * 2 + 1, priv->packet_cntr_use_bm);
+
+	} else {
+		clear_bit(idx, priv->packet_cntr_use_bm);
+	}
+
+	mutex_unlock(&priv->reg_mutex);
+
+	return idx;
+}
+
+
+/*
  * Add an L2 nexthop entry for the L3 routing system / PIE forwarding in the SoC
  * Use VID and MAC in rtl838x_l2_entry to identify either a free slot in the L2 hash table
  * or mark an existing entry as a nexthop by setting it's nexthop bit
@@ -651,7 +708,6 @@ static int rtl83xx_l3_nexthop_update(struct rtl838x_switch_priv *priv,  __be32 i
 	list = rhltable_lookup(&priv->routes, &ip_addr, route_ht_params);
 	if (!list) {
 		rcu_read_unlock();
-		pr_err("%s: no such gateway: %pI4\n", __func__, &ip_addr);
 		return -ENOENT;
 	}
 
@@ -680,11 +736,20 @@ static int rtl83xx_l3_nexthop_update(struct rtl838x_switch_priv *priv,  __be32 i
 		r->pr.dip = ip_addr;
 		r->pr.dip_m = inet_make_mask(r->prefix_len);
 		// Forwarding action is routing (0x6) with the given L2 id
+		// BUG: Works only on 8380
 		r->pr.fwd_data = (0x6 << 13) | r->nh.l2_id;
-		if (r->pr.id < 0)
+		if (r->pr.id < 0) {
+			r->pr.packet_cntr = rtl83xx_packet_cntr_alloc(priv);
+			if (r->pr.packet_cntr >= 0) {
+				pr_info("Using packet counter %d\n", r->pr.packet_cntr);
+				r->pr.log_sel = true;
+				// BUG: Fix for other SoCs than 8380
+				r->pr.log_data = r->pr.packet_cntr;
+			}
 			priv->r->pie_rule_add(priv, &r->pr);
-		else
+		} else {
 			priv->r->pie_rule_write(priv, r->pr.id, &r->pr);
+		}
 	}
 	rcu_read_unlock();
 	return 0;
@@ -782,14 +847,18 @@ int rtl83xx_port_dev_lower_find(struct net_device *dev, struct rtl838x_switch_pr
 static struct rtl83xx_route *rtl83xx_route_alloc(struct rtl838x_switch_priv *priv, u32 ip)
 {
 	struct rtl83xx_route *r;
-	int idx = find_first_zero_bit(priv->route_use_bm, MAX_ROUTES);
-	int err;
+	int idx, err;
 
+	mutex_lock(&priv->reg_mutex);
+
+	idx = find_first_zero_bit(priv->route_use_bm, MAX_ROUTES);
 	pr_info("%s id: %d, ip %pI4\n", __func__, idx, &ip);
-	r = kzalloc(sizeof(*r), GFP_KERNEL);
-	if (!r)
-		return r;
 
+	r = kzalloc(sizeof(*r), GFP_KERNEL);
+	if (!r) {
+		mutex_unlock(&priv->reg_mutex);
+		return r;
+	}
 	r->id = idx;
 	r->gw_ip = ip;
 	r->pr.id = -1; // We still need to allocate a rule in HW
@@ -797,10 +866,12 @@ static struct rtl83xx_route *rtl83xx_route_alloc(struct rtl838x_switch_priv *pri
 	err = rhltable_insert(&priv->routes, &r->linkage, route_ht_params);
 	if (err) {
 		pr_err("Could not insert new rule\n");
+		mutex_unlock(&priv->reg_mutex);
 		goto out_free;
 	}
 
 	set_bit(idx, priv->route_use_bm);
+	mutex_unlock(&priv->reg_mutex);
 
 	return r;
 
@@ -1102,6 +1173,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	priv->id = soc_info.id;
 	switch(soc_info.family) {
 	case RTL8380_FAMILY_ID:
+		rtl8380_get_version(priv);  // TODO: Make this a function pointer call
 		priv->ds->ops = &rtl83xx_switch_ops;
 		priv->cpu_port = RTL838X_CPU_PORT;
 		priv->port_mask = 0x1f;
@@ -1110,13 +1182,14 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->r = &rtl838x_reg;
 		priv->ds->num_ports = 29;
 		priv->fib_entries = 8192;
-		rtl8380_get_version(priv);
 		priv->n_lags = 8;
 		priv->l2_bucket_size = 4;
 		priv->n_pie_blocks = 12;
 		priv->port_ignore = 0x1f;
+		priv->n_counters = 128;
 		break;
 	case RTL8390_FAMILY_ID:
+		rtl8390_get_version(priv);
 		priv->ds->ops = &rtl83xx_switch_ops;
 		priv->cpu_port = RTL839X_CPU_PORT;
 		priv->port_mask = 0x3f;
@@ -1125,13 +1198,14 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->r = &rtl839x_reg;
 		priv->ds->num_ports = 53;
 		priv->fib_entries = 16384;
-		rtl8390_get_version(priv);
 		priv->n_lags = 16;
 		priv->l2_bucket_size = 4;
 		priv->n_pie_blocks = 18;
 		priv->port_ignore = 0x3f;
+		priv->n_counters = 1024;
 		break;
 	case RTL9300_FAMILY_ID:
+		priv->version = RTL8390_VERSION_A; // TODO: Understand RTL9300 versions
 		priv->ds->ops = &rtl930x_switch_ops;
 		priv->cpu_port = RTL930X_CPU_PORT;
 		priv->port_mask = 0x1f;
@@ -1140,14 +1214,15 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->r = &rtl930x_reg;
 		priv->ds->num_ports = 29;
 		priv->fib_entries = 16384;
-		priv->version = RTL8390_VERSION_A;
 		priv->n_lags = 16;
 		sw_w32(1, RTL930X_ST_CTRL);
 		priv->l2_bucket_size = 8;
 		priv->n_pie_blocks = 16;
 		priv->port_ignore = 0x3f;
+		priv->n_counters = 2048;
 		break;
 	case RTL9310_FAMILY_ID:
+		priv->version = RTL8390_VERSION_A; // TODO: Fix me
 		priv->ds->ops = &rtl930x_switch_ops;
 		priv->cpu_port = RTL931X_CPU_PORT;
 		priv->port_mask = 0x3f;
@@ -1156,11 +1231,11 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->r = &rtl931x_reg;
 		priv->ds->num_ports = 57;
 		priv->fib_entries = 16384;
-		priv->version = RTL8390_VERSION_A;
 		priv->n_lags = 16;
 		priv->l2_bucket_size = 8;
 		priv->n_pie_blocks = 32;
 		priv->port_ignore = 0x3f;
+		priv->n_counters = 0; // TODO: Figure out logs on RTL9310
 		break;
 	}
 

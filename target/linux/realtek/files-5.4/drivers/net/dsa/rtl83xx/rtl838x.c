@@ -671,7 +671,7 @@ static int rtl838x_pie_lookup_enable(struct rtl838x_switch_priv *priv, int index
 	return 0;
 }
 
-static int rtl838x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from, int index_to)
+static void rtl838x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from, int index_to)
 {
 	int block_from = index_from / 128;
 	int block_to = index_to / 128;
@@ -705,7 +705,6 @@ static int rtl838x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from
 	}
 
 	mutex_unlock(&priv->reg_mutex);
-	return 0;
 }
 
 void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum template_field_id t[])
@@ -1224,6 +1223,7 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 	return 0;
 }
 
+// TODO: We need proper locking, here
 static int rtl838x_pie_rule_add(struct rtl838x_switch_priv *priv, struct pie_rule *pr)
 {
 	int idx = find_first_zero_bit(priv->pie_use_bm, priv->n_pie_blocks * 128);
@@ -1241,13 +1241,12 @@ static int rtl838x_pie_rule_add(struct rtl838x_switch_priv *priv, struct pie_rul
 	return 0;
 }
 
-static int rtl838x_pie_rule_rm(struct rtl838x_switch_priv *priv, struct pie_rule *pr)
+static void rtl838x_pie_rule_rm(struct rtl838x_switch_priv *priv, struct pie_rule *pr)
 {
 	int idx = pr->id;
 
+	rtl838x_pie_rule_del(priv, idx, idx);
 	clear_bit(idx, priv->pie_use_bm);
-
-	return rtl838x_pie_rule_del(priv, idx, idx);
 }
 
 /*
@@ -1305,7 +1304,7 @@ static void rtl838x_route_read(struct rtl838x_switch_priv *priv, int idx,
 static void rtl838x_route_write(struct rtl838x_switch_priv *priv, int idx,
 			        struct rtl83xx_route *rt)
 {
-	// Read ROUTING table (2) via register RTL8380_TBL_1
+	// Access ROUTING table (2) via register RTL8380_TBL_1
 	struct table_reg *r = rtl_table_get(RTL8380_TBL_1, 2);
 
 	pr_info("In %s, id %d, gw: %016llx\n", __func__, idx, rt->nh.gw);
@@ -1316,10 +1315,50 @@ static void rtl838x_route_write(struct rtl838x_switch_priv *priv, int idx,
 	rtl_table_release(r);
 }
 
-int rtl838x_l3_setup(struct rtl838x_switch_priv *priv)
+static int rtl838x_l3_setup(struct rtl838x_switch_priv *priv)
 {
 	// Nothing to be done
 	return 0;
+}
+
+static u32 rtl838x_packet_cntr_read(int counter)
+{
+	u32 v;
+
+	// Read LOG table (3) via register RTL8380_TBL_0
+	struct table_reg *r = rtl_table_get(RTL8380_TBL_0, 3);
+
+	pr_info("In %s, id %d\n", __func__, counter);
+	rtl_table_read(r, counter / 2);
+
+	pr_info("Registers: %08x %08x\n",
+		sw_r32(rtl_table_data(r, 0)), sw_r32(rtl_table_data(r, 1)));
+	// The table has a size of 2 registers
+	if (counter % 2)
+		v = sw_r32(rtl_table_data(r, 0));
+	else
+		v = sw_r32(rtl_table_data(r, 1));
+
+	rtl_table_release(r);
+
+	return v;
+}
+
+static void rtl838x_packet_cntr_clear(int counter)
+{
+	// Access LOG table (3) via register RTL8380_TBL_0
+	struct table_reg *r = rtl_table_get(RTL8380_TBL_0, 3);
+
+	pr_info("In %s, id %d\n", __func__, counter);
+	// The table has a size of 2 registers
+	if (counter % 2)
+		sw_w32(0, rtl_table_data(r, 0));
+	else
+		sw_w32(0, rtl_table_data(r, 1));
+
+	rtl_table_write(r, counter / 2);
+
+	rtl_table_release(r);
 }
 
 const struct rtl838x_reg rtl838x_reg = {
@@ -1395,6 +1434,8 @@ const struct rtl838x_reg rtl838x_reg = {
 	.route_read = rtl838x_route_read,
 	.route_write = rtl838x_route_write,
 	.l3_setup = rtl838x_l3_setup,
+	.packet_cntr_read = rtl838x_packet_cntr_read,
+	.packet_cntr_clear = rtl838x_packet_cntr_clear,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
