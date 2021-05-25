@@ -939,7 +939,7 @@ static void rtl930x_pie_init(struct rtl838x_switch_priv *priv)
 	int i;
 	u32 template_selectors;
 
-	mutex_init(&priv->reg_mutex);
+	mutex_init(&priv->pie_mutex);
 
 	// Enable ACL lookup on all ports, including CPU_PORT
 	for (i = 0; i <= priv->cpu_port; i++)

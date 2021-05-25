@@ -81,6 +81,8 @@ struct rtl83xx_route *route_alloc(struct rtl838x_switch_priv *priv, u32 ip);
 
 int rtl83xx_packet_cntr_alloc(struct rtl838x_switch_priv *priv);
 
+int rtl83xx_port_is_under(const struct net_device * dev, struct rtl838x_switch_priv *priv);
+
 int read_phy(u32 port, u32 page, u32 reg, u32 *val);
 int write_phy(u32 port, u32 page, u32 reg, u32 val);
 

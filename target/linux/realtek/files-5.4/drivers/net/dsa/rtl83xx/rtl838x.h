@@ -379,7 +379,9 @@
 #define RTL930X_PORT_IGNORE 0x3f
 #define MAX_MC_GROUPS 512
 #define UNKNOWN_MC_PMASK (MAX_MC_GROUPS - 1)
-#define MAX_PIE_ENTRIES (18 * 128)
+#define PIE_BLOCK_SIZE 128
+#define MAX_PIE_ENTRIES (18 * PIE_BLOCK_SIZE)
+#define N_FIXED_FIELDS 12
 #define MAX_ROUTES 512
 #define MAX_COUNTERS 2048
 
@@ -452,7 +454,10 @@ enum fwd_rule_action {
 	FWD_RULE_ACTION_FWD = 1,
 };
 
-// Packet Inspection Engine Rules
+/* Intermediate representation of a  Packet Inspection Engine Rule
+ * as suggested by the Kernel's tc flower offload subsystem
+ * Field meaning is universal across SoC families, but data content is specific
+ * to SoC family (e.g. because of different port ranges) */
 struct pie_rule {
 	int id;
 	int packet_cntr;
@@ -460,20 +465,26 @@ struct pie_rule {
 	u32 last_packet_cnt;
 	u64 last_octet_cnt;
 
-	u8 spmmask_fix;
-	u8 spn;
-	bool mgnt_vlan;
-	bool dmac_hit_sw;
-	bool not_first_frag;
-	u8 frame_type_l4; // 0: UDP, 1: TCP, 2: ICMP/ICMPv6, 3: IGMP
-	u8 frame_type;   // 0: ARP, 1: L2 only, 2: IPv4, 3: IPv6
-	bool otag_fmt;
-	bool itag_fmt;
-	bool otag_exist;
-	bool itag_exist;
-	bool frame_type_l2; // 0: Ethernet, 1: LLC_SNAP, 2: LLC_Other, 3: Reserved
-	u8 tid;
+	// The following are requirements for the pie template
+	bool is_egress;
+	bool is_ipv6;		// This is a rule with IPv6 fields
 
+	// Fixed fields that are always matched against on RTL8380
+	u8 spmmask_fix;
+	u8 spn;			// Source port number
+	bool mgnt_vlan;		// Packet arrived on management VLAN
+	bool dmac_hit_sw;	// The packet's destination MAC matches one of the device's
+	bool not_first_frag;	// Not the first IP frament
+	u8 frame_type_l4;	// 0: UDP, 1: TCP, 2: ICMP/ICMPv6, 3: IGMP
+	u8 frame_type;		// 0: ARP, 1: L2 only, 2: IPv4, 3: IPv6
+	bool otag_fmt;		// 0: outer tag packet, 1: outer priority tag or untagged
+	bool itag_fmt;		// 0: inner tag packet, 1: inner priority tag or untagged
+	bool otag_exist;	// packet with outer tag
+	bool itag_exist;	// packet with inner tag
+	bool frame_type_l2;	// 0: Ethernet, 1: LLC_SNAP, 2: LLC_Other, 3: Reserved
+	u8 tid;			// The template ID defining the what the templated fields mean
+
+	// Masks for the fields that are always matched against on RTL8380
 	u8 spmmask_fix_m;
 	u8 spn_m;
 	bool mgnt_vlan_m;
@@ -488,44 +499,50 @@ struct pie_rule {
 	bool frame_type_l2_m;
 	u8 tid_m;
 
+	// Logical operations between rules, special rules for rule numbers apply
 	bool valid;
 	bool cond_not;
 	bool cond_and1;
 	bool cond_and2;
 	bool ivalid;
 
-	u8 drop;
-	bool fwd_sel;
-	bool ovid_sel;
-	bool ivid_sel;
-	bool flt_sel;
-	bool log_sel;
-	bool rmk_sel;
-	bool meter_sel;
-	bool tagst_sel;
-	bool mir_sel;
-	bool nopri_sel;
-	bool cpupri_sel;
-	bool otpid_sel;
-	bool itpid_sel;
-	bool shaper_sel;
+	// Actions to be performed
+	bool drop;		// Drop the packet
+	bool fwd_sel;		// Forward packet: to port, portmask, dest route, next rule, drop
+	bool ovid_sel;		// So something to outer vlan-id: shift, re-assign
+	bool ivid_sel;		// Do something to inner vlan-id: shift, re-assign
+	bool flt_sel;		// Filter the packet when sending to certain ports
+	bool log_sel;		// Log the packet in one of the LOG-table counters
+	bool rmk_sel;		// Re-mark the packet, i.e. change the priority-tag
+	bool meter_sel;		// Meter the packet, i.e. limit rate of this type of packet
+	bool tagst_sel;		// Change the ergress tag
+	bool mir_sel;		// Mirror the packet to a Link Aggregation Group
+	bool nopri_sel;		// Change the normal priority
+	bool cpupri_sel;	// Change the CPU priority
+	bool otpid_sel;		// Change Outer Tag Protocol Identifier (802.1q)
+	bool itpid_sel;		// Change Inner Tag Protocol Identifier (802.1q)
+	bool shaper_sel;	// Apply traffic shaper
+	bool mpls_sel;		// MPLS actions
+	bool bypass_sel;	// Bypass actions
 
-	// Fields used in predefined templates 0-2
-	u32 spm;
+	// Fields used in predefined templates 0-2 on RTL8380
+	u64 spm;		// Source Port Matrix
 	u16 otag;		// Outer VLAN-ID
-	u8 smac[ETH_ALEN];
-	u8 dmac[ETH_ALEN];
-	u8 ethertype;
+	u8 smac[ETH_ALEN];	// Source MAC address
+	u8 dmac[ETH_ALEN];	// Destination MAC address
+	u16 ethertype;		// Ethernet frame type field in ethernet header
 	u16 itag;		// Inner VLAN-ID
 	u16 field_range_check;
-	u32 sip;
-	u32 dip;
-	u16 tos_proto;
-	u16 sport;
-	u16 dport;
+	u32 sip;		// Source IP
+	struct in6_addr sip6;	// IPv6 Source IP
+	u32 dip;		// Destination IP
+	struct in6_addr dip6;	// IPv6 Destination IP
+	u16 tos_proto;		// IPv4: TOS + Protocol fields, IPv6: Traffic class + next header
+	u16 sport;		// TCP/UDP source port
+	u16 dport;		// TCP/UDP destination port
 	u16 icmp_igmp;
 
-	u32 spm_m;
+	u64 spm_m;
 	u16 otag_m;
 	u8 smac_m[ETH_ALEN];
 	u8 dmac_m[ETH_ALEN];
@@ -533,19 +550,32 @@ struct pie_rule {
 	u16 itag_m;
 	u16 field_range_check_m;
 	u32 sip_m;
+	struct in6_addr sip6_m;	// IPv6 Source IP mask
 	u32 dip_m;
+	struct in6_addr dip6_m;	// IPv6 Destination IP mask
 	u16 tos_proto_m;
 	u16 sport_m;
 	u16 dport_m;
 	u16 icmp_igmp_m;
 
-	u16 fwd_data;
-	u16 ovid_data;
-	u16 ivid_data;
-	u16 flt_data;
-	u16 log_data;
-	u16 rmk_data;
-	u16 meter_data;
+	// Data associated with actions
+	u8 fwd_act;		// Type of forwarding action
+				// 0: permit, 1: drop, 2: copy to port id, 4: copy to portmask
+				// 4: redirect to portid, 5: redirect to portmask
+				// 6: route, 7: vlan leaky (only 8380)
+	u16 fwd_data;		// Additional data for forwarding action, e.g. destination port
+	u8 ovid_act;
+	u16 ovid_data;		// Outer VLAN ID
+	u8 ivid_act;
+	u16 ivid_data;		// Inner VLAN ID
+	u16 flt_data;		// Filtering data
+	u16 log_data;		// ID of packet or octet countr in LOG table
+	bool log_octets;
+	u8 mpls_act;		// MPLS action type
+	u16 mpls_lib_idx;	// MPLS action data
+
+	u16 rmk_data;		// Data for remarking
+	u16 meter_data;		// ID of meter for bandwidth control
 	u16 tagst_data;
 	u16 mir_data;
 	u16 nopri_data;
@@ -553,6 +583,11 @@ struct pie_rule {
 	u16 otpid_data;
 	u16 itpid_data;
 	u16 shaper_data;
+
+	// Bypass actions, ignored on RTL8380
+	bool bypass_all;	// Not clear
+	bool bypass_igr_stp;	// Bypass Ingress STP state
+	bool bypass_ibc_sc;	// Bypass Ingress Bandwidth Control and Storm Control
 };
 
 struct rtl83xx_nexthop {
@@ -675,7 +710,8 @@ struct rtl838x_switch_priv {
 	u16 family_id;
 	char version;
 	struct rtl838x_port ports[57];
-	struct mutex reg_mutex;
+	struct mutex reg_mutex;		// Mutex for individual register manipulations
+	struct mutex pie_mutex;		// Mutex for Packe Inspection Engine
 	int link_state_irq;
 	int mirror_group_ports[4];
 	struct mii_bus *mii_bus;
@@ -698,12 +734,12 @@ struct rtl838x_switch_priv {
 	unsigned long int mc_group_bm[MAX_MC_GROUPS >> 5];
 	int n_pie_blocks;
 	struct rhashtable tc_ht;
-	unsigned long int pie_use_bm[MAX_PIE_ENTRIES >> 6];
+	unsigned long int pie_use_bm[MAX_PIE_ENTRIES >> 5];
 	struct rhltable routes;
-	unsigned long int route_use_bm[MAX_ROUTES >> 6];
+	unsigned long int route_use_bm[MAX_ROUTES >> 5];
 	int n_counters;
-	unsigned long int octet_cntr_use_bm[MAX_COUNTERS >> 6];
-	unsigned long int packet_cntr_use_bm[MAX_COUNTERS >> 5];
+	unsigned long int octet_cntr_use_bm[MAX_COUNTERS >> 5];
+	unsigned long int packet_cntr_use_bm[MAX_COUNTERS >> 4];
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);

@@ -794,20 +794,24 @@ static int rtl83xx_port_ipv4_resolve(struct rtl838x_switch_priv *priv,
  * Unfortunately we cannot just follow dev->dsa_prt as this is only set for the
  * DSA master device.
  */
-#define RTL83XX_MAX_PORTS 57
-static int rtl83xx_port_is_under(const struct net_device * dev, struct rtl838x_switch_priv *priv)
+int rtl83xx_port_is_under(const struct net_device * dev, struct rtl838x_switch_priv *priv)
 {
 	int i;
 
-	pr_debug("%s %d, %d\n", __func__, priv->cpu_port, RTL83XX_MAX_PORTS);
-	for (i = 0; i < RTL83XX_MAX_PORTS; i++) {
+// TODO: On 5.12:
+// 	if(!dsa_slave_dev_check(dev)) {
+//		netdev_info(dev, "%s: not a DSA device.\n", __func__);
+//		return -EINVAL;
+//	}
+
+	for (i = 0; i < priv->cpu_port; i++) {
 		if (!priv->ports[i].dp)
 			continue;
 		pr_debug("dp-port: %08x, dev: %08x\n", (u32)(priv->ports[i].dp->slave), (u32)dev);
 		if (priv->ports[i].dp->slave == dev)
 			return i;
 	}
-	return -1;
+	return -EINVAL;
 }
 
 struct rtl83xx_walk_data {
@@ -1169,6 +1173,8 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	priv->ds->ops = &rtl83xx_switch_ops;
 	priv->dev = dev;
 
+	mutex_init(&priv->reg_mutex);
+
 	priv->family_id = soc_info.family;
 	priv->id = soc_info.id;
 	switch(soc_info.family) {
@@ -1244,7 +1250,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	err = rtl83xx_mdio_probe(priv);
 	if (err) {
 		/* Probing fails the 1st time because of missing ethernet driver
-		 * initialization. Use this to disable traffic in case the bootloader left if on
+		 * initialization. Use this to disable traffic in case the bootloader left it on
 		 */
 		return err;
 	}
@@ -1295,6 +1301,8 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	rtl83xx_get_l2aging(priv);
 
 	rtl83xx_setup_qos(priv);
+
+	priv->r->l3_setup(priv);
 
 	/* Clear all destination ports for mirror groups */
 	for (i = 0; i < 4; i++)

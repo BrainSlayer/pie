@@ -79,11 +79,21 @@ static int rtl83xx_parse_flow_rule(struct rtl838x_switch_priv *priv,
 
 		pr_info("%s: IPV4\n", __func__);
 		flow_rule_match_ipv4_addrs(rule, &match);
-		// TODO: Is a flag needed because the mask might be 0?
+		flow->rule.is_ipv6 = false;
 		flow->rule.dip = match.key->dst;
 		flow->rule.dip_m = match.mask->dst;
 		flow->rule.sip = match.key->src;
 		flow->rule.sip_m = match.mask->src;
+	} else if (flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_IPV6_ADDRS)) {
+		struct flow_match_ipv6_addrs match;
+
+		pr_info("%s: IPV6\n", __func__);
+		flow->rule.is_ipv6 = true;
+		flow_rule_match_ipv6_addrs(rule, &match);
+		flow->rule.dip6 = match.key->dst;
+		flow->rule.dip6_m = match.mask->dst;
+		flow->rule.sip6 = match.key->src;
+		flow->rule.sip6_m = match.mask->src;
 	}
 
 	if (flow_rule_match_key(rule, FLOW_DISSECTOR_KEY_PORTS)) {
@@ -101,18 +111,30 @@ static int rtl83xx_parse_flow_rule(struct rtl838x_switch_priv *priv,
 	return 0;
 }
 
-static int rtl83xx_parse_fwd(const struct flow_action_entry *act, struct rtl83xx_flow *flow)
+static void rtl83xx_flow_bypass_all(struct rtl83xx_flow *flow)
+{
+	flow->rule.bypass_sel = true;
+	flow->rule.bypass_all = true;
+	flow->rule.bypass_igr_stp = true;
+	flow->rule.bypass_ibc_sc = true;
+}
+
+static int rtl83xx_parse_fwd(struct rtl838x_switch_priv *priv,
+			     const struct flow_action_entry *act, struct rtl83xx_flow *flow)
 {
 	struct net_device *dev = act->dev;
+	int port;
 
-	if(!netdev_uses_dsa(dev)) {
+	port = rtl83xx_port_is_under(dev, priv);
+	if (port < 0) {
 		netdev_info(dev, "%s: not a DSA device.\n", __func__);
 		return -EINVAL;
 	}
 
-	flow->rule.fwd_data = dev->dsa_ptr->index;
-	// Forwading action qualifiers: FORCE, Skip strom and STP filters
-	flow->rule.fwd_data |= BIT(12) | BIT(11) | BIT(10);
+	flow->rule.fwd_sel = true;
+	flow->rule.fwd_data = port;
+	pr_info("Using port index: %d\n", port);
+	rtl83xx_flow_bypass_all(flow);
 
 	pr_info("%s: data: %04x\n", __func__, flow->rule.fwd_data);
 	return 0;
@@ -133,35 +155,42 @@ static int rtl83xx_add_flow(struct rtl838x_switch_priv *priv, struct flow_cls_of
 		switch (act->id) {
 		case FLOW_ACTION_DROP:
 			pr_info("%s: DROP\n", __func__);
-			flow->rule.drop = 1;
+			flow->rule.drop = true;
+			rtl83xx_flow_bypass_all(flow);
 			return 0;
+
 		case FLOW_ACTION_TRAP:
 			pr_info("%s: TRAP\n", __func__);
 			flow->rule.fwd_data = priv->cpu_port;
-			// Forwading action:  REDIRECT TO PORT, FORCE, Skip filters
-			flow->rule.fwd_data |= 0x4 << 13 | BIT(12) | BIT(11) | BIT(10);
+			flow->rule.fwd_act = 0x4;  // REDIRECT TO PORT
+			rtl83xx_flow_bypass_all(flow);
 			break;
+
 		case FLOW_ACTION_MANGLE:
 		case FLOW_ACTION_ADD:
 			pr_info("%s: MANGLE/ADD\n", __func__);
 			break;
+
 		case FLOW_ACTION_CSUM:
 			pr_info("%s: CSUM\n", __func__);
-			break;
+			return -EOPNOTSUPP;
+
 		case FLOW_ACTION_REDIRECT:
 			pr_info("%s: REDIRECT\n", __func__);
-			err = rtl83xx_parse_fwd(act, flow);
+			err = rtl83xx_parse_fwd(priv, act, flow);
 			if (err)
 				return err;
-			flow->rule.fwd_data |= 0x4 << 13;  // action: redirect to port-id
+			flow->rule.fwd_act = 0x4;  // Redirect to port
 			break;
+
 		case FLOW_ACTION_MIRRED:
 			pr_info("%s: MIRRED\n", __func__);
-			err = rtl83xx_parse_fwd(act, flow);
+			err = rtl83xx_parse_fwd(priv, act, flow);
 			if (err)
 				return err;
-			flow->rule.fwd_data |= 0x2 << 13;  // action: copy to port-id
+			flow->rule.fwd_act = 0x2;  // Copy to port
 			break;
+
 		default:
 			pr_info("%s: Flow action not supported: %d\n", __func__, act->id);
 			return -EOPNOTSUPP;
@@ -215,8 +244,6 @@ rcu_unlock:
 		pr_err("Could not insert add new rule\n");
 		goto out_free;
 	}
-
-	// TODO: Here, we will need to identify whether we already know this flow
 
 	rtl83xx_add_flow(priv, f, flow); // TODO: check error
 
