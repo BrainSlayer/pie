@@ -316,9 +316,8 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 	} else { // IPv4 and IPv6 multicast
 		e->valid = true;
 		e->mc_portmask_index = (r[0] >> 12) & 0x1ff;
-		e->mc_gip = r[1];
-		e->mc_sip = r[2];
-		e->rvid = r[0] & 0xfff;
+		e->mc_gip = (r[1] << 20) | (r[2] >> 12);
+		e->rvid = r[2] & 0xfff;
 	}
 	if (e->is_ip_mc)
 		e->type = IP4_MULTICAST;
@@ -357,19 +356,20 @@ static void rtl838x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 			if (e->next_hop) {
 				r[1] |= BIT(28);
 				r[0] |= e->nh_vlan_target ? BIT(9) : 0;
-				r[0] |= e->nh_route_id &0x1ff;
+				r[0] |= e->nh_route_id & 0x1ff;
 			}
 			r[0] |= (e->age & 0x3) << 17;
 		} else { // L2 Multicast
 			r[0] |= (e->mc_portmask_index & 0x1ff) << 12;
-			r[2] |= e->rvid & 0xfff;
 			r[0] |= e->vid & 0xfff;
+			r[2] |= e->rvid & 0xfff;
 			pr_info("FILL MC: %08x %08x %08x\n", r[0], r[1], r[2]);
 		}
 	} else { // IPv4 and IPv6 multicast
-		r[1] = e->mc_gip;
-		r[2] = e->mc_sip;
-		r[0] |= e->rvid;
+		r[0] |= (e->mc_portmask_index & 0x1ff) << 12;
+		r[1] = e->mc_gip >> 20;
+		r[2] = e->mc_gip << 12;
+		r[2] |= e->rvid;
 	}
 	pr_info("%s: REGISTERS %08x %08x %08x\n", __func__, r[0], r[1], r[2]);
 }
@@ -495,16 +495,6 @@ static void rtl838x_vlan_profile_setup(int profile)
 	 * see e.g. rtl9300_vlan_profile_setup
 	 */
 	rtl838x_write_mcast_pmask(UNKNOWN_MC_PMASK, 0x1fffffff);
-}
-
-static inline int rtl838x_vlan_port_egr_filter(int port)
-{
-	return RTL838X_VLAN_PORT_EGR_FLTR;
-}
-
-static inline int rtl838x_vlan_port_igr_filter(int port)
-{
-	return RTL838X_VLAN_PORT_IGR_FLTR(port);
 }
 
 static void rtl838x_l2_learning_setup(void)
@@ -804,8 +794,13 @@ static void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum templ
 			break;
 
 		case TEMPLATE_FIELD_DIP0:
-			data = pr->dip;
-			data_m = pr->dip_m;
+			if (pr->is_ipv6) {
+				data = pr->dip6.s6_addr16[7];
+				data_m = pr->dip6_m.s6_addr16[7];
+			} else {
+				data = pr->dip;
+				data_m = pr->dip_m;
+			}
 			break;
 
 		case TEMPLATE_FIELD_DIP1:
@@ -846,6 +841,7 @@ static void rtl838x_write_pie_templated(u32 r[], struct pie_rule *pr, enum templ
 			break;
 		default:
 			pr_info("%s: unknown field %d\n", __func__, field_type);
+			continue;
 		}
 		if (!(i % 2)) {
 			r[5 - i / 2] = data;
@@ -1114,10 +1110,11 @@ static void rtl838x_write_pie_fixed_fields(u32 r[],  struct pie_rule *pr)
 	r[17] |= pr->shaper_sel ? BIT(0) : 0;
 }
 
-static void rtl838x_write_pie_action(u32 r[],  struct pie_rule *pr)
+static int rtl838x_write_pie_action(u32 r[],  struct pie_rule *pr)
 {
 	u16 *aif = (u16 *)&r[17];
 	u16 data;
+	int fields_used = 0;
 
 	aif--;
 
@@ -1137,34 +1134,100 @@ static void rtl838x_write_pie_action(u32 r[],  struct pie_rule *pr)
 		data |= pr->bypass_all ? BIT(12) : 0;
 		data |= pr->bypass_ibc_sc ? BIT(11) : 0;
 		data |= pr->bypass_igr_stp ? BIT(10) : 0;
-		*aif-- =  data;
+		*aif-- = data;
+		fields_used++;
 	}
-	if (pr->ovid_sel) // Outer VID action
-		*aif-- = pr->ovid_data;
-	if (pr->ivid_sel) // Inner VID action
-		*aif-- = pr->ivid_data;
-	if (pr->flt_sel) // Filter action
+
+	if (pr->ovid_sel) { // Outer VID action
+		data = (pr->ovid_act & 0x3) << 12;
+		data |= pr->ovid_data;
+		*aif-- = data;
+		fields_used++;
+	}
+
+	if (pr->ivid_sel) { // Inner VID action
+		data = (pr->ivid_act & 0x3) << 12;
+		data |= pr->ivid_data;
+		*aif-- = data;
+		fields_used++;
+	}
+
+	if (pr->flt_sel) { // Filter action
 		*aif-- = pr->flt_data;
-	if (pr->log_sel) // Log action
+		fields_used++;
+	}
+		
+	if (pr->log_sel) { // Log action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->log_data;
-	if (pr->rmk_sel) // Remark action
+		fields_used++;
+	}
+		
+	if (pr->rmk_sel) { // Remark action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->rmk_data;
-	if (pr->meter_sel) // Meter action
+		fields_used++;
+	}
+
+	if (pr->meter_sel) { // Meter action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->meter_data;
-	if (pr->tagst_sel) // Egress Tag Status action
+		fields_used++;
+	}
+
+	if (pr->tagst_sel) { // Egress Tag Status action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->tagst_data;
-	if (pr->mir_sel) // Mirror action
+		fields_used++;
+	}
+
+	if (pr->mir_sel) { // Mirror action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->mir_data;
-	if (pr->nopri_sel) // Normal Priority action
+		fields_used++;
+	}
+
+	if (pr->nopri_sel) { // Normal Priority action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->nopri_data;
-	if (pr->cpupri_sel) // CPU Priority action
+		fields_used++;
+	}
+
+	if (pr->cpupri_sel) { // CPU Priority action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->nopri_data;
-	if (pr->otpid_sel) // OTPID action
+		fields_used++;
+	}
+
+	if (pr->otpid_sel) { // OTPID action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->otpid_data;
-	if (pr->itpid_sel) // ITPID action
+		fields_used++;
+	}
+
+	if (pr->itpid_sel) { // ITPID action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->itpid_data;
-	if (pr->shaper_sel) // Traffic shaper action
+		fields_used++;
+	}
+
+	if (pr->shaper_sel) { // Traffic shaper action
+		if (fields_used >= 4)
+			return -1;
 		*aif-- = pr->shaper_data;
+		fields_used++;
+	}
+
+	return 0;
 }
 
 static void rtl838x_read_pie_action(u32 r[],  struct pie_rule *pr)
@@ -1270,7 +1333,7 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 	// Access IACL table (1) via register 0
 	struct table_reg *q = rtl_table_get(RTL8380_TBL_0, 1);
 	u32 r[18];
-	int i;
+	int i, err = 0;
 	int block = idx / PIE_BLOCK_SIZE;
 	u32 t_select = sw_r32(RTL838X_ACL_BLK_TMPLTE_CTRL(block));
 
@@ -1279,28 +1342,29 @@ static int rtl838x_pie_rule_write(struct rtl838x_switch_priv *priv, int idx, str
 	for (i = 0; i < 18; i++)
 		r[i] = 0;
 
-	if (!pr->valid) {
-		rtl_table_write(q, idx);
-		rtl_table_release(q);
-		return 0;
-	}
+	if (!pr->valid)
+		goto err_out;
+
 	rtl838x_write_pie_fixed_fields(r, pr);
 
 	pr_info("%s: template %d\n", __func__, (t_select >> (pr->tid * 3)) & 0x7);
 	rtl838x_write_pie_templated(r, pr, fixed_templates[(t_select >> (pr->tid * 3)) & 0x7]);
 
-	pr_info("%s: before pie_action\n", __func__);
-	rtl838x_write_pie_action(r, pr);
+	if (rtl838x_write_pie_action(r, pr)) {
+		pr_err("Rule actions too complex\n");
+		goto err_out;
+	}
 
 	rtl838x_pie_rule_dump_raw(r);
 
 	for (i = 0; i < 18; i++)
 		sw_w32(r[i], rtl_table_data(q, i));
 
+err_out:
 	rtl_table_write(q, idx);
 	rtl_table_release(q);
 
-	return 0;
+	return err;
 }
 
 static bool rtl838x_pie_templ_has(int t, enum template_field_id field_type)
@@ -1434,15 +1498,18 @@ static void rtl838x_pie_init(struct rtl838x_switch_priv *priv)
 	sw_w32_mask(0, 1, RTL838X_DMY_REG27);
 	sw_w32_mask(3, 0, RTL838X_INT_RW_CTRL);
 
-	// Enable predefined templates 0, 1 and 2 for first 6 blocks
+	// Enable predefined templates 0, 1 and 2 for even blocks
 	template_selectors = 0 | (1 << 3) | (2 << 6);
-	for (i = 0; i < 6; i++)
+	for (i = 0; i < 6; i += 2)
 		sw_w32(template_selectors, RTL838X_ACL_BLK_TMPLTE_CTRL(i));
 
-	// Enable predefined templates 0, 3 and 4 (IPv6 support) for the rest of the blocks
+	// Enable predefined templates 0, 3 and 4 (IPv6 support) for odd blocks
 	template_selectors = 0 | (3 << 3) | (4 << 6);
-	for (i = 6; i < priv->n_pie_blocks; i++)
+	for (i = 1; i < priv->n_pie_blocks; i += 2)
 		sw_w32(template_selectors, RTL838X_ACL_BLK_TMPLTE_CTRL(i));
+
+	// Group each pair of physical blocks together to a logical block
+	sw_w32(0b10101010101, RTL838X_ACL_BLK_GROUP_CTRL);
 }
 
 static void rtl838x_route_read(struct rtl838x_switch_priv *priv, int idx,
@@ -1574,7 +1641,7 @@ const struct rtl838x_reg rtl838x_reg = {
 	.read_cam = rtl838x_read_cam,
 	.write_cam = rtl838x_write_cam,
 	.vlan_port_egr_filter = RTL838X_VLAN_PORT_EGR_FLTR,
-	.vlan_port_igr_filter = RTL838X_VLAN_PORT_IGR_FLTR(0),
+	.vlan_port_igr_filter = RTL838X_VLAN_PORT_IGR_FLTR,
 	.vlan_port_pb = RTL838X_VLAN_PORT_PB_VLAN,
 	.vlan_port_tag_sts_ctrl = RTL838X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl838x_trk_mbr_ctr,

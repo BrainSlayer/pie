@@ -67,29 +67,27 @@
 #define RTL838X_VLAN_PROFILE(idx)		(0x3A88 + ((idx) << 2))
 #define RTL838X_VLAN_PORT_EGR_FLTR		(0x3A84)
 #define RTL838X_VLAN_PORT_PB_VLAN		(0x3C00)
-#define RTL838X_VLAN_PORT_IGR_FLTR(port)	(0x3A7C + (((port >> 4) << 2)))
-#define RTL838X_VLAN_PORT_IGR_FLTR_0		(0x3A7C)
-#define RTL838X_VLAN_PORT_IGR_FLTR_1		(0x3A7C + 4)
+#define RTL838X_VLAN_PORT_IGR_FLTR		(0x3A7C)
 #define RTL838X_VLAN_PORT_TAG_STS_CTRL		(0xA530)
 
 #define RTL839X_VLAN_PROFILE(idx)		(0x25C0 + (((idx) << 3)))
 #define RTL839X_VLAN_CTRL			(0x26D4)
 #define RTL839X_VLAN_PORT_PB_VLAN		(0x26D8)
-#define RTL839X_VLAN_PORT_IGR_FLTR(port)	(0x27B4 + (((port >> 4) << 2)))
-#define RTL839X_VLAN_PORT_EGR_FLTR(port)	(0x27C4 + (((port >> 5) << 2)))
+#define RTL839X_VLAN_PORT_IGR_FLTR		(0x27B4)
+#define RTL839X_VLAN_PORT_EGR_FLTR		(0x27C4)
 #define RTL839X_VLAN_PORT_TAG_STS_CTRL		(0x6828)
 
 #define RTL930X_VLAN_PROFILE_SET(idx)		(0x9c60 + (((idx) * 20)))
 #define RTL930X_VLAN_CTRL			(0x82D4)
 #define RTL930X_VLAN_PORT_PB_VLAN		(0x82D8)
-#define RTL930X_VLAN_PORT_IGR_FLTR(port)	(0x83C0 + (((port >> 4) << 2)))
+#define RTL930X_VLAN_PORT_IGR_FLTR		(0x83C0)
 #define RTL930X_VLAN_PORT_EGR_FLTR		(0x83C8)
 #define RTL930X_VLAN_PORT_TAG_STS_CTRL		(0xCE24)
 
 #define RTL931X_VLAN_PROFILE_SET(idx)		(0x9800 + (((idx) * 28)))
 #define RTL931X_VLAN_CTRL			(0x94E4)
-#define RTL931X_VLAN_PORT_IGR_FLTR(port)	(0x96B4 + (((port >> 4) << 2)))
-#define RTL931X_VLAN_PORT_EGR_FLTR(port)	(0x96C4 + (((port >> 5) << 2)))
+#define RTL931X_VLAN_PORT_IGR_FLTR		(0x96B4)
+#define RTL931X_VLAN_PORT_EGR_FLTR		(0x96C4)
 #define RTL931X_VLAN_PORT_TAG_CTRL		(0x4860)
 
 /* Table access registers */
@@ -362,13 +360,21 @@
 #define RTL839X_PS_ACL_PWR_CTRL			(0x049c)
 #define RTL838X_ACL_BLK_TMPLTE_CTRL(block)	(0x6108 + ((block) << 2))
 #define RTL839X_ACL_BLK_TMPLTE_CTRL(block)	(0x128c + ((block) << 2))
-#define RTL930X_PIE_BLK_TMPLTE_CTRL(block)	(0xa5a8 + ((block) << 2))
+#define RTL930X_PIE_BLK_TMPLTE_CTRL(block)	(0xa624 + ((block) << 2))
+#define RTL838X_ACL_BLK_GROUP_CTRL		(0x615C)
+#define RTL839X_ACL_BLK_GROUP_CTRL		(0x12ec)
 #define RTL838X_ACL_CLR_CTRL			(0x6168)
 #define RTL839X_ACL_CLR_CTRL			(0x12fc)
 #define RTL930X_PIE_CLR_CTRL			(0xa66c)
 #define RTL838X_DMY_REG27			(0x3378)
 #define RTL838X_ACL_PORT_LOOKUP_CTRL(p)		(0x616C + (((p) << 2)))
 #define RTL930X_ACL_PORT_LOOKUP_CTRL(p)		(0xA784 + (((p) << 2)))
+#define RTL930X_PIE_BLK_PHASE_CTRL		(0xA5A4)
+
+#define ACT_COPY_TO_PORT	2
+#define ACT_REDIRECT_TO_PORT	4
+#define ACT_ROUTE_UC		6
+#define ACT_VID_ASSIGN		0
 
 /* Routing */
 #define RTL839X_ROUTING_SA_CTRL 		0x6afc
@@ -472,6 +478,7 @@ struct pie_rule {
 	// Fixed fields that are always matched against on RTL8380
 	u8 spmmask_fix;
 	u8 spn;			// Source port number
+	bool stacking_port;	// Source port is stacking port
 	bool mgnt_vlan;		// Packet arrived on management VLAN
 	bool dmac_hit_sw;	// The packet's destination MAC matches one of the device's
 	bool not_first_frag;	// Not the first IP frament
@@ -482,11 +489,13 @@ struct pie_rule {
 	bool otag_exist;	// packet with outer tag
 	bool itag_exist;	// packet with inner tag
 	bool frame_type_l2;	// 0: Ethernet, 1: LLC_SNAP, 2: LLC_Other, 3: Reserved
+	bool igr_normal_port;	// Ingress port is not cpu or stacking port
 	u8 tid;			// The template ID defining the what the templated fields mean
 
 	// Masks for the fields that are always matched against on RTL8380
 	u8 spmmask_fix_m;
 	u8 spn_m;
+	bool stacking_port_m;
 	bool mgnt_vlan_m;
 	bool dmac_hit_sw_m;
 	bool not_first_frag_m;
@@ -497,13 +506,14 @@ struct pie_rule {
 	bool otag_exist_m;
 	bool itag_exist_m;
 	bool frame_type_l2_m;
+	bool igr_normal_port_m;
 	u8 tid_m;
 
 	// Logical operations between rules, special rules for rule numbers apply
 	bool valid;
-	bool cond_not;
-	bool cond_and1;
-	bool cond_and2;
+	bool cond_not;		// Matches when conditions not match
+	bool cond_and1;		// And this rule 2n with the next rule 2n+1 in same block
+	bool cond_and2;		// And this rule m in block 2n with rule m in block 2n+1
 	bool ivalid;
 
 	// Actions to be performed
@@ -525,7 +535,7 @@ struct pie_rule {
 	bool mpls_sel;		// MPLS actions
 	bool bypass_sel;	// Bypass actions
 
-	// Fields used in predefined templates 0-2 on RTL8380
+	// Fields used in predefined templates 0-2 on RTL8380 / 90 / 9300
 	u64 spm;		// Source Port Matrix
 	u16 otag;		// Outer VLAN-ID
 	u8 smac[ETH_ALEN];	// Source MAC address
@@ -541,6 +551,8 @@ struct pie_rule {
 	u16 sport;		// TCP/UDP source port
 	u16 dport;		// TCP/UDP destination port
 	u16 icmp_igmp;
+	u16 tcp_info;
+	u16 dsap_ssap;		// Destination / Source Service Access Point bytes (802.3)
 
 	u64 spm_m;
 	u16 otag_m;
@@ -557,6 +569,8 @@ struct pie_rule {
 	u16 sport_m;
 	u16 dport_m;
 	u16 icmp_igmp_m;
+	u16 tcp_info_m;
+	u16 dsap_ssap_m;
 
 	// Data associated with actions
 	u8 fwd_act;		// Type of forwarding action
@@ -569,7 +583,8 @@ struct pie_rule {
 	u8 ivid_act;
 	u16 ivid_data;		// Inner VLAN ID
 	u16 flt_data;		// Filtering data
-	u16 log_data;		// ID of packet or octet countr in LOG table
+	u16 log_data;		// ID of packet or octet counter in LOG table, on RTL93xx
+				// unnecessary since PIE-Rule-ID == LOG-counter-ID
 	bool log_octets;
 	u8 mpls_act;		// MPLS action type
 	u16 mpls_lib_idx;	// MPLS action data
@@ -590,11 +605,31 @@ struct pie_rule {
 	bool bypass_ibc_sc;	// Bypass Ingress Bandwidth Control and Storm Control
 };
 
+/*
+ * An entry in the RTL93XX SoC's ROUTER_MAC tables defining
+ * the MAC interface of a Router port
+ * Mask fields state whether the corresponding data fields replace the metadata
+ * or packet data fields in a packet during the routing action
+ */
+struct rtl93xx_rt_mac {
+	bool valid;	// Valid or not
+	bool p_type;	// Individual (0) or trunk (1) port
+	bool p_mask;	// Whether the port type is used
+	u8 p_id;
+	u8 action;	// Routing action performed: 0: FORWARD, 1: DROP, 2: TRAP2CPU
+			//   3: COPY2CPU, 4: TRAP2MASTERCPU, 5: COPY2MASTERCPU, 6: HARDDROP
+	u16 vid;
+	u16 vid_mask;
+	u64 mac;	// MAC address used as source MAC in the routed packet
+	u64 mac_mask;
+};
+
 struct rtl83xx_nexthop {
 	u16 id;		// ID in HW L2_NEXT_HOP table
 	u32 dev_id;
 	u16 port;
-	u16 vid;	// VLAN-ID for L2 table entry
+	u16 vid;	// VLAN-ID for L2 table entry (saved from L2-UC entry)
+	u16 rvid;	// Relay VID/FID for the L2 table entry
 	u64 mac;	// The MAC address of the entry in the L2_NEXT_HOP table
 	u16 mac_id;
 	u16 l2_id;	// Index of this next hop forwarding entry in L2 FIB table
@@ -743,5 +778,6 @@ struct rtl838x_switch_priv {
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);
+void rtl930x_dbgfs_init(struct rtl838x_switch_priv *priv);
 
 #endif /* _RTL838X_H */

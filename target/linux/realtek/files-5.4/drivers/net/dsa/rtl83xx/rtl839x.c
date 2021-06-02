@@ -99,7 +99,8 @@ static enum template_field_id fixed_templates[N_FIXED_TEMPLATES][N_FIXED_FIELDS]
 	}, {
 	  TEMPLATE_FIELD_SIP0, TEMPLATE_FIELD_SIP1, TEMPLATE_FIELD_SIP2,
 	  TEMPLATE_FIELD_SIP3, TEMPLATE_FIELD_SIP4, TEMPLATE_FIELD_SIP5,
-	  TEMPLATE_FIELD_SIP6, TEMPLATE_FIELD_SIP7, TEMPLATE_FIELD_SPM0,	  TEMPLATE_FIELD_SPM1, TEMPLATE_FIELD_SPM2, TEMPLATE_FIELD_SPM3
+	  TEMPLATE_FIELD_SIP6, TEMPLATE_FIELD_SIP7, TEMPLATE_FIELD_SPM0,
+	  TEMPLATE_FIELD_SPM1, TEMPLATE_FIELD_SPM2, TEMPLATE_FIELD_SPM3
 	},
 };
 
@@ -296,10 +297,11 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 	/* Table contains different entry types, we need to identify the right one:
 	 * Check for MC entries, first
 	 */
+	// pr_info("READING L2: %08x %08x %08x\n", r[0], r[1], r[2]);
 	e->is_ip_mc = !!(r[2] & BIT(31));
 	e->is_ipv6_mc = !!(r[2] & BIT(30));
 	e->type = L2_INVALID;
-	if (!e->is_ip_mc) {
+	if (!e->is_ip_mc && !e->is_ipv6_mc) {
 		e->mac[0] = (r[0] >> 12);
 		e->mac[1] = (r[0] >> 4);
 		e->mac[2] = ((r[1] >> 28) | (r[0] << 4));
@@ -307,11 +309,12 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 		e->mac[4] = (r[1] >> 12);
 		e->mac[5] = (r[1] >> 4);
 
+		e->vid = (r[2] >> 4) & 0xfff;
+		e->rvid = (r[0] >> 20) & 0xfff;
+
 		/* Is it a unicast entry? check multicast bit */
 		if (!(e->mac[0] & 1)) {
 			e->is_static = !!((r[2] >> 18) & 1);
-			e->vid = (r[2] >> 4) & 0xfff;
-			e->rvid = (r[0] >> 20) & 0xfff;
 			e->port = (r[2] >> 24) & 0x3f;
 			e->block_da = !!(r[2] & (1 << 19));
 			e->block_sa = !!(r[2] & (1 << 20));
@@ -332,9 +335,13 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 		} else {
 			e->valid = true;
 			e->type = L2_MULTICAST;
-			e->mc_portmask_index = (r[2]>>6) & 0xfff;
+			e->mc_portmask_index = (r[2] >> 6) & 0xfff;
 			e->vid = e->rvid;
 		}
+	} else { // IPv4 and IPv6 multicast
+		e->vid = e->rvid = (r[0] << 20) & 0xfff;
+		e->mc_gip = r[1];
+		e->mc_portmask_index = (r[2] >> 6) & 0xfff;
 	}
 	if (e->is_ip_mc) {
 		e->valid = true;
@@ -344,10 +351,11 @@ static void rtl839x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 		e->valid = true;
 		e->type = IP6_MULTICAST;
 	}
+	// pr_info("%s: vid %d, rvid: %d\n", __func__, e->vid, e->rvid);
 }
 
 /*
- * Fills the 3 SoC table registers r[] with the information of in the rtl838x_l2_entry
+ * Fills the 3 SoC table registers r[] with the information in the rtl838x_l2_entry
  */
 static void rtl839x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 {
@@ -356,6 +364,8 @@ static void rtl839x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 		return;
 	}
 
+	pr_info("%s: vid %d, rvid, %d, nh_route_id %d\n", __func__,
+		e->vid, e->rvid, e->nh_route_id);
 	r[2] = e->is_ip_mc ? BIT(31) : 0;
 	r[2] |= e->is_ipv6_mc ? BIT(30) : 0;
 
@@ -370,27 +380,28 @@ static void rtl839x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 
 		if (!(e->mac[0] & 1)) { // Not multicast
 			r[2] |= e->is_static ? BIT(18) : 0;
-			r[2] |= e->vid << 4;
 			r[0] |= ((u32)e->rvid) << 20;
 			r[2] |= e->port << 24;
 			r[2] |= e->block_da ? BIT(19) : 0;
 			r[2] |= e->block_sa ? BIT(20) : 0;
 			r[2] |= e->suspended ? BIT(17) : 0;
+			r[2] |= ((u32)e->age) << 21;
 			if (e->next_hop) {
 				r[2] |= BIT(16);
 				r[2] |= e->nh_vlan_target ? BIT(15) : 0;
 				r[2] |= (e->nh_route_id & 0x7ff) << 4;
+			} else {
+				r[2] |= e->vid << 4;
 			}
-			r[2] |= ((u32)e->age) << 21;
+			pr_info("Write L2 NH: %08x %08x %08x\n", r[0], r[1], r[2]);
 		} else {  // L2 Multicast
 			r[0] |= ((u32)e->rvid) << 20;
 			r[2] |= ((u32)e->mc_portmask_index) << 6;
-			pr_debug("Write L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
 		}
 	} else { // IPv4 or IPv6 MC entry
 		r[0] = ((u32)e->rvid) << 20;
-		r[2] |= ((u32)e->mc_portmask_index) << 6;
 		r[1] = e->mc_gip;
+		r[2] |= ((u32)e->mc_portmask_index) << 6;
 	}
 }
 
@@ -514,16 +525,6 @@ static void rtl839x_vlan_profile_setup(int profile)
 	sw_w32(p[1], RTL839X_VLAN_PROFILE(profile) + 4);
 
 	rtl839x_write_mcast_pmask(UNKNOWN_MC_PMASK, 0x001fffffffffffff);
-}
-
-static inline int rtl839x_vlan_port_egr_filter(int port)
-{
-	return RTL839X_VLAN_PORT_EGR_FLTR(port);
-}
-
-static inline int rtl839x_vlan_port_igr_filter(int port)
-{
-	return RTL839X_VLAN_PORT_IGR_FLTR(port);
 }
 
 u64 rtl839x_traffic_get(int source)
@@ -887,8 +888,9 @@ static int rtl839x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from
  * Reads the intermediate representation of the templated match-fields of the
  * PIE rule in the pie_rule structure and fills in the raw data fields in the
  * raw register space r[].
-* The register space configuration size is identical for the RTL8380/90 and RTL9300,
- * however the RTL9310 has 2 more registers / fields and the physical field-ids
+ * The register space configuration size is identical for the RTL8380/90 and RTL9300,
+ * however the RTL9310 has 2 more registers / fields and the physical field-ids are different
+ * on all SoCs
  * On the RTL8390 the template mask registers are not word-aligned!
  */
 static void rtl839x_write_pie_templated(u32 r[], struct pie_rule *pr, enum template_field_id t[])
@@ -996,8 +998,13 @@ static void rtl839x_write_pie_templated(u32 r[], struct pie_rule *pr, enum templ
 			break;
 
 		case TEMPLATE_FIELD_DIP0:
-			data = pr->dip;
-			data_m = pr->dip_m;
+			if (pr->is_ipv6) {
+				data = pr->dip6.s6_addr16[7];
+				data_m = pr->dip6_m.s6_addr16[7];
+			} else {
+				data = pr->dip;
+				data_m = pr->dip_m;
+			}
 			break;
 
 		case TEMPLATE_FIELD_DIP1:
@@ -1039,6 +1046,7 @@ static void rtl839x_write_pie_templated(u32 r[], struct pie_rule *pr, enum templ
 		default:
 			pr_info("%s: unknown field %d\n", __func__, field_type);
 		}
+
 		// On the RTL8390, the mask fields are not word aligned!
 		if (!(i % 2)) {
 			r[5 - i / 2] = data;
@@ -1274,7 +1282,7 @@ static void rtl839x_write_pie_fixed_fields(u32 r[],  struct pie_rule *pr)
 static void rtl839x_write_pie_action(u32 r[],  struct pie_rule *pr)
 {
 	if (pr->drop) {
-		r[13] |= 0x9;	// Set ACT_MASK_FWD  & FWD_ACT = DROP
+		r[13] |= 0x9;	// Set ACT_MASK_FWD & FWD_ACT = DROP
 		r[13] |= BIT(3);
 	} else {
 		r[13] |= pr->fwd_sel ? BIT(3) : 0;
@@ -1519,9 +1527,7 @@ static int rtl839x_pie_rule_add(struct rtl838x_switch_priv *priv, struct pie_rul
 	pr->id = idx;
 
 	rtl839x_pie_lookup_enable(priv, idx);
-	pr_info("%s 1\n", __func__);
 	rtl839x_pie_rule_write(priv, idx, pr);
-	pr_info("%s 2\n", __func__);
 
 	mutex_unlock(&priv->pie_mutex);
 	return 0;
@@ -1638,7 +1644,6 @@ static void rtl839x_setup_port_macs(struct rtl838x_switch_priv *priv)
 	mac = ether_addr_to_u64(dev->dev_addr);
 
 	for (i = 0; i < 15; i++) {
-		pr_info("%s: i: %d, MAC: %016llx\n", __func__, i, mac);
 		mac++;  // BUG: VRRP for testing
 		sw_w32(mac >> 32, RTL839X_ROUTING_SA_CTRL + i * 8);
 		sw_w32(mac, RTL839X_ROUTING_SA_CTRL + i * 8 + 4);
@@ -1743,8 +1748,8 @@ const struct rtl838x_reg rtl839x_reg = {
 	.write_l2_entry_using_hash = rtl839x_write_l2_entry_using_hash,
 	.read_cam = rtl839x_read_cam,
 	.write_cam = rtl839x_write_cam,
-	.vlan_port_egr_filter = RTL839X_VLAN_PORT_EGR_FLTR(0),
-	.vlan_port_igr_filter = RTL839X_VLAN_PORT_IGR_FLTR(0),
+	.vlan_port_egr_filter = RTL839X_VLAN_PORT_EGR_FLTR,
+	.vlan_port_igr_filter = RTL839X_VLAN_PORT_IGR_FLTR,
 	.vlan_port_pb = RTL839X_VLAN_PORT_PB_VLAN,
 	.vlan_port_tag_sts_ctrl = RTL839X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl839x_trk_mbr_ctr,

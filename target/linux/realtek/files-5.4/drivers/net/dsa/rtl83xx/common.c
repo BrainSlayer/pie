@@ -530,7 +530,6 @@ int rtl83xx_l2_nexthop_add(struct rtl838x_switch_priv *priv, struct rtl83xx_next
 		__func__, nh->mac, nh->vid, key, seed);
 
 	e.type = L2_UNICAST;
-	e.rvid = nh->vid;
 	u64_to_ether_addr(nh->mac, &e.mac[0]);
 	e.port = nh->port;
 
@@ -538,8 +537,8 @@ int rtl83xx_l2_nexthop_add(struct rtl838x_switch_priv *priv, struct rtl83xx_next
 	for (i = 0; i < priv->l2_bucket_size; i++) {
 		entry = priv->r->read_l2_entry_using_hash(key, i, &e);
 		pr_info("%s i: %d, entry %016llx, seed %016llx\n", __func__, i, entry, seed);
-		if (e.valid && e.next_hop)
-			continue;
+//		if (e.valid && e.next_hop)
+//			continue;
 		if (!e.valid || ((entry & 0x0fffffffffffffffULL) == seed)) {
 			idx = i > 3 ? ((key >> 14) & 0xffff) | i >> 1
 					: ((key << 2) | i) & 0xffff;
@@ -547,50 +546,52 @@ int rtl83xx_l2_nexthop_add(struct rtl838x_switch_priv *priv, struct rtl83xx_next
 		}
 	}
 
-	pr_info("%s: found idx %d and i %d\n", __func__, idx, i);
-
 	if (idx < 0) {
 		pr_err("%s: No more L2 forwarding entries available\n", __func__);
 		return -1;
 	}
 
 	// Found an existing or empty entry, make it a nexthop entry
-	pr_info("%s BEFORE -> key %d, pos: %d, index: %d\n", __func__, key, i, idx);
+	pr_info("%s BEFORE -> key %d, pos: %d, index: %d, valid: %d\n",
+		__func__, key, i, idx, e.valid);
 	nh->l2_id = idx;
 
 	// Found an existing (e->valid is true) or empty entry, make it a nexthop entry
 	if (e.valid) {
 		nh->port = e.port;
 		nh->vid = e.vid;
+		nh->rvid = e.rvid;
 		nh->dev_id = e.stack_dev;
+		// If the entry is already a valid next hop entry, don't change it
+		if (e.next_hop)
+			return 0;
 	} else {
 		e.valid = true;
 		e.is_static = true;
 		e.vid = nh->vid;
-		e.rvid = nh->vid;
+		e.rvid = nh->rvid;
 		e.is_ip_mc = false;
 		e.is_ipv6_mc = false;
 		e.block_da = false;
 		e.block_sa = false;
 		e.suspended = false;
-		e.nh_vlan_target = false;
 		e.age = 3;
 		e.port = priv->port_ignore;
 		u64_to_ether_addr(nh->mac, &e.mac[0]);
 	}
 	e.next_hop = true;
 	e.nh_route_id = nh->id;
+	e.nh_vlan_target = false;
 
 	pr_info("%s AFTER\n", __func__);
 
 	priv->r->write_l2_entry_using_hash(idx >> 2, idx & 0x3, &e);
 
-	// _dal_longan_l2_nexthop_add
 	return 0;
 }
 
 /*
- * Removes a Layer 2 next hop entry in the forwardin database
+ * Removes a Layer 2 next hop entry in the forwarding database
  * If it was static, the entire entry is removed, otherwise the nexthop bit is cleared
  * and we wait until the entry ages out
  */
@@ -601,6 +602,7 @@ int rtl83xx_l2_nexthop_rm(struct rtl838x_switch_priv *priv, struct rtl83xx_nexth
 	int i = nh->l2_id & 0x3;
 	u64 entry = entry = priv->r->read_l2_entry_using_hash(key, i, &e);
 
+	pr_info("%s: id %d, key %d, index %d\n", __func__, nh->l2_id, key, i);
 	if (!e.valid) {
 		dev_err(priv->dev, "unknown nexthop, id %x\n", nh->l2_id);
 		return -1;
@@ -609,7 +611,8 @@ int rtl83xx_l2_nexthop_rm(struct rtl838x_switch_priv *priv, struct rtl83xx_nexth
 	if (e.is_static)
 		e.valid = false;
 	e.next_hop = false;
-	e.vid = e.rvid;
+	e.vid = nh->vid;
+	e.rvid = nh->rvid;
 
 	priv->r->write_l2_entry_using_hash(key, i, &e);
 
@@ -697,11 +700,13 @@ const static struct rhashtable_params route_ht_params = {
 	.head_offset = offsetof(struct rtl83xx_route, linkage),
 };
 
+/*
+ * Updates an L3 next hop entry in the ROUTING table
+ */
 static int rtl83xx_l3_nexthop_update(struct rtl838x_switch_priv *priv,  __be32 ip_addr,
 				     u64 mac, u16 vlan)
 {
 	struct rtl83xx_route *r;
-	bool needs_add;
 	struct rhlist_head *tmp, *list;
 
 	rcu_read_lock();
@@ -715,29 +720,28 @@ static int rtl83xx_l3_nexthop_update(struct rtl838x_switch_priv *priv,  __be32 i
 		pr_info("%s: Setting up fwding: ip %pI4, GW mac %016llx, vlan %d\n",
 			__func__, &ip_addr, mac, vlan);
 
+		// Reads the ROUTING table entry associated with the route
 		priv->r->route_read(priv, r->id, r);
 		pr_info("Route with id %d to %pI4 / %d\n", r->id, &r->dst_ip, r->prefix_len);
-
-		needs_add = r->nh.gw == mac ? false : true;
 
 		vlan = 1; // TODO: Change me
 
 		r->nh.mac = r->nh.gw = mac;
 		r->nh.port = priv->port_ignore;
 		r->nh.vid = vlan;
+		rtl83xx_l2_nexthop_add(priv, &r->nh);
 
-		if (needs_add)
-			rtl83xx_l2_nexthop_add(priv, &r->nh);
-		// Create nexthop entry
+		// Update ROUTING table: map gateway-mac and switch-mac id to route id
 		priv->r->route_write(priv, r->id, r);
 
 		// Add PIE forwarding entry with dst_ip and prefix_len
 		r->pr.fwd_sel = true;
-		r->pr.dip = ip_addr;
+		r->pr.dip = r->dst_ip;
 		r->pr.dip_m = inet_make_mask(r->prefix_len);
-		// Forwarding action is routing (0x6) with the given L2 id
-		// BUG: Works only on 8380
-		r->pr.fwd_data = (0x6 << 13) | r->nh.l2_id;
+		// TODO: Works only on 8380 / 8390
+		r->pr.fwd_act = ACT_ROUTE_UC;
+		r->pr.fwd_data = r->nh.l2_id;
+
 		if (r->pr.id < 0) {
 			r->pr.packet_cntr = rtl83xx_packet_cntr_alloc(priv);
 			if (r->pr.packet_cntr >= 0) {
@@ -748,6 +752,9 @@ static int rtl83xx_l3_nexthop_update(struct rtl838x_switch_priv *priv,  __be32 i
 			}
 			priv->r->pie_rule_add(priv, &r->pr);
 		} else {
+			int pkts = priv->r->packet_cntr_read(r->pr.packet_cntr);
+			pr_info("%s: total packets: %d\n", __func__, pkts);
+
 			priv->r->pie_rule_write(priv, r->pr.id, &r->pr);
 		}
 	}
@@ -910,8 +917,11 @@ static int rtl83xx_fib4_del(struct rtl838x_switch_priv *priv,
 		return -ENOENT;
 	}
 	rhl_for_each_entry_rcu(r, tmp, list, linkage) {
-		if (r->dst_ip == info->dst && r->prefix_len == info->dst_len)
+		if (r->dst_ip == info->dst && r->prefix_len == info->dst_len) {
+			pr_info("%s: found a route with id %d, nh-id %d\n",
+				__func__, r->id, r->nh.id);
 			break;
+		}
 	}
 	rcu_read_unlock();
 
@@ -1052,7 +1062,7 @@ static void rtl83xx_fib_event_work_do(struct work_struct *work)
 
 	/* Protect internal structures from changes */
 	rtnl_lock();
-	pr_info("%s: doing work, event %ld\n", __func__, fib_work->event);
+	pr_debug("%s: doing work, event %ld\n", __func__, fib_work->event);
 	switch (fib_work->event) {
 	case FIB_EVENT_ENTRY_ADD:
 	case FIB_EVENT_ENTRY_REPLACE:
@@ -1068,7 +1078,6 @@ static void rtl83xx_fib_event_work_do(struct work_struct *work)
 		break;
 	case FIB_EVENT_RULE_ADD:
 	case FIB_EVENT_RULE_DEL:
-		pr_info("%s Change rules\n", __func__);
 		rule = fib_work->fr_info.rule;
 		if (!fib4_rule_default(rule))
 			pr_err("%s: FIB4 default rule failed\n", __func__);
@@ -1106,7 +1115,7 @@ static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, v
 	case FIB_EVENT_ENTRY_REPLACE:
 	case FIB_EVENT_ENTRY_APPEND:
 	case FIB_EVENT_ENTRY_DEL:
-		pr_info("%s: FIB_ENTRY ADD/DELL, event %ld\n", __func__, event);
+		pr_debug("%s: FIB_ENTRY ADD/DELL, event %ld\n", __func__, event);
 		if (info->family == AF_INET) {
 			struct fib_entry_notifier_info *fen_info = ptr;
 
@@ -1355,6 +1364,8 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		sw_w32(7, priv->r->spcl_trap_eapol_ctrl);
 
 		rtl838x_dbgfs_init(priv);
+	} else {
+		rtl930x_dbgfs_init(priv);
 	}
 
 	return 0;

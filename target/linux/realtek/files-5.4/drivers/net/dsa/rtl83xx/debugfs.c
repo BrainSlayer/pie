@@ -587,3 +587,17 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 err:
 	rtl838x_dbgfs_cleanup(priv);
 }
+
+void rtl930x_dbgfs_init(struct rtl838x_switch_priv *priv)
+{
+	struct dentry *dbg_dir;
+
+	pr_info("%s called\n", __func__);
+	dbg_dir = debugfs_lookup(RTL838X_DRIVER_NAME, NULL);
+	if (!dbg_dir)
+		dbg_dir = debugfs_create_dir(RTL838X_DRIVER_NAME, NULL);
+
+	priv->dbgfs_dir = dbg_dir;
+
+	debugfs_create_file("drop_counters", 0400, dbg_dir, priv, &drop_counter_fops);
+}
