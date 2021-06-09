@@ -23,7 +23,12 @@ for lan in /sys/class/net/lan*; do
 done
 ucidef_set_bridge_device switch
 ucidef_set_interface_wan "$lan_list"
-ucidef_set_interface "lan" ifname "lan1:t" protocol "static" vlan 100
+if [ -e /sys/class/net/lan01 ]
+then
+	ucidef_set_interface "lan" ifname "lan01:t" protocol "static" ipaddr "192.168.100.1" netmask "255.255.255.0" vlan 100
+else
+	ucidef_set_interface "lan" ifname "lan1:t" protocol "static" ipaddr "192.168.100.1" netmask "255.255.255.0" vlan 100
+fi
 
 lan_mac=""
 wan_mac=""

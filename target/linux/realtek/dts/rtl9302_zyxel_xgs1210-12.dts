@@ -30,35 +30,31 @@
 
 			partition@0 {
 				label = "u-boot";
-				reg = <0x0 0x40000>;
+				reg = <0x0 0xe0000>;
 				read-only;
 			};
 			partition@40000 {
 				label = "u-boot-env";
-				reg = <0x40000 0x10000>;
+				reg = <0xe0000 0x10000>;
 				read-only;
 			};
 			partition@50000 {
 				label = "u-boot-env2";
-				reg = <0x50000 0x10000>;
+				reg = <0xf0000 0x10000>;
 				read-only;
 			};
 			partition@60000 {
 				label = "jffs";
-				reg = <0x60000 0x100000>;
+				reg = <0x100000 0x100000>;
 			};
 			partition@160000 {
 				label = "jffs2";
-				reg = <0x160000 0x100000>;
+				reg = <0x200000 0x100000>;
 			};
 			partition@b260000 {
 				label = "firmware";
-				reg = <0x260000 0x6d0000>;
+				reg = <0x300000 0xd00000>;
 				compatible = "denx,uimage";
-			};
-			partition@930000 {
-				label = "runtime2";
-				reg = <0x930000 0x6d0000>;
 			};
 		};
 	};
