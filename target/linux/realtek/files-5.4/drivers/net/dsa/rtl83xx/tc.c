@@ -162,7 +162,7 @@ static int rtl83xx_add_flow(struct rtl838x_switch_priv *priv, struct flow_cls_of
 		case FLOW_ACTION_TRAP:
 			pr_info("%s: TRAP\n", __func__);
 			flow->rule.fwd_data = priv->cpu_port;
-			flow->rule.fwd_act = ACT_REDIRECT_TO_PORT;
+			flow->rule.fwd_act = PIE_ACT_REDIRECT_TO_PORT;
 			rtl83xx_flow_bypass_all(flow);
 			break;
 
@@ -176,19 +176,26 @@ static int rtl83xx_add_flow(struct rtl838x_switch_priv *priv, struct flow_cls_of
 
 		case FLOW_ACTION_VLAN_PUSH:
 			pr_info("%s: VLAN_PUSH\n", __func__);
-//			actions->push_vlan_tci = htons(act->vlan.vid);
-//			actions->push_vlan_tpid = act->vlan.proto;
-			flow->rule.ivid_act = ACT_VID_ASSIGN;
+//			TODO: act->vlan.proto
+			flow->rule.ivid_act = PIE_ACT_VID_ASSIGN;
 			flow->rule.ivid_sel = true;
 			flow->rule.ivid_data = htons(act->vlan.vid);
-			return -EOPNOTSUPP;
+			flow->rule.ovid_act = PIE_ACT_VID_ASSIGN;
+			flow->rule.ovid_sel = true;
+			flow->rule.ovid_data = htons(act->vlan.vid);
+			flow->rule.fwd_mod_to_cpu = true;
+			break;
 
 		case FLOW_ACTION_VLAN_POP:
 			pr_info("%s: VLAN_POP\n", __func__);
-			flow->rule.ivid_act = ACT_VID_ASSIGN;
+			flow->rule.ivid_act = PIE_ACT_VID_ASSIGN;
 			flow->rule.ivid_data = 0;
 			flow->rule.ivid_sel = true;
-			return -EOPNOTSUPP;
+			flow->rule.ovid_act = PIE_ACT_VID_ASSIGN;
+			flow->rule.ovid_data = 0;
+			flow->rule.ovid_sel = true;
+			flow->rule.fwd_mod_to_cpu = true;
+			break;
 
 		case FLOW_ACTION_CSUM:
 			pr_info("%s: CSUM\n", __func__);
@@ -199,7 +206,7 @@ static int rtl83xx_add_flow(struct rtl838x_switch_priv *priv, struct flow_cls_of
 			err = rtl83xx_parse_fwd(priv, act, flow);
 			if (err)
 				return err;
-			flow->rule.fwd_act = ACT_REDIRECT_TO_PORT;
+			flow->rule.fwd_act = PIE_ACT_REDIRECT_TO_PORT;
 			break;
 
 		case FLOW_ACTION_MIRRED:
@@ -207,7 +214,7 @@ static int rtl83xx_add_flow(struct rtl838x_switch_priv *priv, struct flow_cls_of
 			err = rtl83xx_parse_fwd(priv, act, flow);
 			if (err)
 				return err;
-			flow->rule.fwd_act = ACT_COPY_TO_PORT;
+			flow->rule.fwd_act = PIE_ACT_COPY_TO_PORT;
 			break;
 
 		default:
