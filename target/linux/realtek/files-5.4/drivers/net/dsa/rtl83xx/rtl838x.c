@@ -1512,8 +1512,7 @@ static void rtl838x_pie_init(struct rtl838x_switch_priv *priv)
 	sw_w32(0b10101010101, RTL838X_ACL_BLK_GROUP_CTRL);
 }
 
-static void rtl838x_route_read(struct rtl838x_switch_priv *priv, int idx,
-			       struct rtl83xx_route *rt)
+static void rtl838x_route_read(int idx, struct rtl83xx_route *rt)
 {
 	// Read ROUTING table (2) via register RTL8380_TBL_1
 	struct table_reg *r = rtl_table_get(RTL8380_TBL_1, 2);
@@ -1529,8 +1528,7 @@ static void rtl838x_route_read(struct rtl838x_switch_priv *priv, int idx,
 	rtl_table_release(r);
 }
 
-static void rtl838x_route_write(struct rtl838x_switch_priv *priv, int idx,
-			        struct rtl83xx_route *rt)
+static void rtl838x_route_write(int idx, struct rtl83xx_route *rt)
 {
 	// Access ROUTING table (2) via register RTL8380_TBL_1
 	struct table_reg *r = rtl_table_get(RTL8380_TBL_1, 2);

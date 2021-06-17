@@ -371,13 +371,40 @@
 #define RTL930X_ACL_PORT_LOOKUP_CTRL(p)		(0xA784 + (((p) << 2)))
 #define RTL930X_PIE_BLK_PHASE_CTRL		(0xA5A4)
 
-#define ACT_COPY_TO_PORT	2
-#define ACT_REDIRECT_TO_PORT	4
-#define ACT_ROUTE_UC		6
-#define ACT_VID_ASSIGN		0
+// PIE actions
+#define PIE_ACT_COPY_TO_PORT	2
+#define PIE_ACT_REDIRECT_TO_PORT 4
+#define PIE_ACT_ROUTE_UC	6
+#define PIE_ACT_VID_ASSIGN	0
 
-/* Routing */
+// L3 actions
+#define L3_FORWARD		0
+#define L3_DROP			1
+#define L3_TRAP2CPU		2
+#define L3_COPY2CPU		3
+#define L3_TRAP2MASTERCPU	4
+#define L3_COPY2MASTERCPU	5
+#define L3_HARDDROP		6
+
+// Route actions
+#define ROUTE_ACT_FORWARD	0
+#define ROUTE_ACT_TRAP2CPU	1
+#define ROUTE_ACT_COPY2CPU	2
+#define ROUTE_ACT_DROP		3
+
+/* L3 Routing */
 #define RTL839X_ROUTING_SA_CTRL 		0x6afc
+#define RTL930X_L3_HOST_TBL_CTRL		(0xAB48)
+#define RTL930X_L3_IPUC_ROUTE_CTRL		(0xAB4C)
+#define RTL930X_L3_IP6UC_ROUTE_CTRL		(0xAB50)
+#define RTL930X_L3_IPMC_ROUTE_CTRL		(0xAB54)
+#define RTL930X_L3_IP6MC_ROUTE_CTRL		(0xAB58)
+#define RTL930X_L3_IP_MTU_CTRL(i)		(0xAB5C + ((i >> 1) << 2))
+#define RTL930X_L3_IP6_MTU_CTRL(i)		(0xAB6C + ((i >> 1) << 2))
+#define RTL930X_L3_HW_LU_KEY_CTRL		(0xAC9C)
+#define RTL930X_L3_HW_LU_KEY_IP_CTRL		(0xACA0)
+#define RTL930X_L3_HW_LU_CTRL			(0xACC0)
+#define RTL930X_L3_IP_ROUTE_CTRL		0xab44
 
 #define MAX_VLANS 4096
 #define MAX_LAGS 16
@@ -389,7 +416,14 @@
 #define MAX_PIE_ENTRIES (18 * PIE_BLOCK_SIZE)
 #define N_FIXED_FIELDS 12
 #define MAX_ROUTES 512
+#define MAX_HOST_ROUTES 1536
 #define MAX_COUNTERS 2048
+#define MAX_INTF_MTUS 8
+#define DEFAULT_MTU 1536
+#define MAX_INTERFACES 100
+#define MAX_ROUTER_MACS 64
+#define L3_EGRESS_DMACS 2048
+#define MAX_SMACS 64
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -460,14 +494,20 @@ enum fwd_rule_action {
 	FWD_RULE_ACTION_FWD = 1,
 };
 
+enum pie_phase {
+	PHASE_VACL = 0,
+	PHASE_IACL = 1,
+};
+
 /* Intermediate representation of a  Packet Inspection Engine Rule
  * as suggested by the Kernel's tc flower offload subsystem
  * Field meaning is universal across SoC families, but data content is specific
  * to SoC family (e.g. because of different port ranges) */
 struct pie_rule {
 	int id;
-	int packet_cntr;
-	int octet_cntr;
+	enum pie_phase phase;	// Phase in which this template is applied
+	int packet_cntr;	// ID of a packet counter assigned to this rule
+	int octet_cntr;		// ID of a byte counter assigned to this rule
 	u32 last_packet_cnt;
 	u64 last_octet_cnt;
 
@@ -481,6 +521,7 @@ struct pie_rule {
 	bool stacking_port;	// Source port is stacking port
 	bool mgnt_vlan;		// Packet arrived on management VLAN
 	bool dmac_hit_sw;	// The packet's destination MAC matches one of the device's
+	bool content_too_deep;	// The content of the packet cannot be parsed: too many layers
 	bool not_first_frag;	// Not the first IP frament
 	u8 frame_type_l4;	// 0: UDP, 1: TCP, 2: ICMP/ICMPv6, 3: IGMP
 	u8 frame_type;		// 0: ARP, 1: L2 only, 2: IPv4, 3: IPv6
@@ -498,6 +539,7 @@ struct pie_rule {
 	bool stacking_port_m;
 	bool mgnt_vlan_m;
 	bool dmac_hit_sw_m;
+	bool content_too_deep_m;
 	bool not_first_frag_m;
 	u8 frame_type_l4_m;
 	u8 frame_type_m;
@@ -534,6 +576,8 @@ struct pie_rule {
 	bool shaper_sel;	// Apply traffic shaper
 	bool mpls_sel;		// MPLS actions
 	bool bypass_sel;	// Bypass actions
+	bool fwd_sa_lrn;	// Learn the source address when forwarding
+	bool fwd_mod_to_cpu;	// Forward the modified VLAN tag format to CPU-port
 
 	// Fields used in predefined templates 0-2 on RTL8380 / 90 / 9300
 	u64 spm;		// Source Port Matrix
@@ -605,17 +649,33 @@ struct pie_rule {
 	bool bypass_ibc_sc;	// Bypass Ingress Bandwidth Control and Storm Control
 };
 
+struct rtl838x_l3_intf {
+	u16 vid;
+	u8 smac_idx;
+	u8 ip4_mtu_id;
+	u8 ip6_mtu_id;
+	u16 ip4_mtu;
+	u16 ip6_mtu;
+	u8 ttl_scope;
+	u8 hl_scope;
+	u8 ip4_icmp_redirect;
+	u8 ip6_icmp_redirect;
+	u8 ip4_pbr_icmp_redirect;
+	u8 ip6_pbr_icmp_redirect;
+};
+
 /*
- * An entry in the RTL93XX SoC's ROUTER_MAC tables defining
- * the MAC interface of a Router port
- * Mask fields state whether the corresponding data fields replace the metadata
- * or packet data fields in a packet during the routing action
+ * An entry in the RTL93XX SoC's ROUTER_MAC tables setting up a termination point
+ * for the L3 routing system. Packets arriving and matching an entry in this table
+ * will be considered for routing.
+ * Mask fields state whether the corresponding data fields matter for matching
  */
 struct rtl93xx_rt_mac {
 	bool valid;	// Valid or not
 	bool p_type;	// Individual (0) or trunk (1) port
 	bool p_mask;	// Whether the port type is used
 	u8 p_id;
+	u8 p_id_mask;	// Mask for the port
 	u8 action;	// Routing action performed: 0: FORWARD, 1: DROP, 2: TRAP2CPU
 			//   3: COPY2CPU, 4: TRAP2MASTERCPU, 5: COPY2MASTERCPU, 6: HARDDROP
 	u16 vid;
@@ -625,7 +685,7 @@ struct rtl93xx_rt_mac {
 };
 
 struct rtl83xx_nexthop {
-	u16 id;		// ID in HW L2_NEXT_HOP table
+	u16 id;		// ID: L3_NEXT_HOP table-index or route-index set in L2_NEXT_HOP
 	u32 dev_id;
 	u16 port;
 	u16 vid;	// VLAN-ID for L2 table entry (saved from L2-UC entry)
@@ -634,7 +694,7 @@ struct rtl83xx_nexthop {
 	u16 mac_id;
 	u16 l2_id;	// Index of this next hop forwarding entry in L2 FIB table
 	u64 gw;		// The gateway MAC address packets are forwarded to
-	u16 if_id;
+	int if_id;	// Interface (into L3_EGR_INTF_IDX)
 };
 
 struct rtl838x_switch_priv;
@@ -647,15 +707,30 @@ struct rtl83xx_flow {
 	u32 flags;
 };
 
+struct rtl93xx_route_attr {
+	bool valid;
+	bool hit;
+	bool ttl_dec;
+	bool ttl_check;
+	bool dst_null;
+	bool qos_as;
+	u8 qos_prio;
+	u8 type;
+	u8 action;
+};
+
 struct rtl83xx_route {
 	u32 gw_ip;			// IP of the route's gateway
 	u32 dst_ip;			// IP of the destination net
-	u16 prefix_len;			// Network prefix len of the destination net
+	struct in6_addr dst_ip6;
+	int prefix_len;			// Network prefix len of the destination net
+	bool is_host_route;
 	int id;				// ID number of this route
 	struct rhlist_head linkage;
 	u16 switch_mac_id;		// Index into switch's own MACs, RTL839X only
 	struct rtl83xx_nexthop nh;
 	struct pie_rule pr;
+	struct rtl93xx_route_attr attr;
 };
 
 struct rtl838x_reg {
@@ -729,10 +804,20 @@ struct rtl838x_reg {
 	int (*pie_rule_write)(struct rtl838x_switch_priv *priv, int idx, struct pie_rule *pr);
 	int (*pie_rule_add)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
 	void (*pie_rule_rm)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
-	void (*route_read)(struct rtl838x_switch_priv *priv, int idx, struct rtl83xx_route *rt);
-	void (*route_write)(struct rtl838x_switch_priv *priv, int idx, struct rtl83xx_route *rt);
+	void (*route_read)(int idx, struct rtl83xx_route *rt);
+	void (*route_write)(int idx, struct rtl83xx_route *rt);
+	void (*host_route_write)(int idx, struct rtl83xx_route *rt);
 	int (*l3_setup)(struct rtl838x_switch_priv *priv);
+	void (*set_l3_nexthop)(int idx, u16 dmac_id, u16 interface);
+	void (*get_l3_nexthop)(int idx, u16 *dmac_id, u16 *interface);
 	void (*l2_learning_setup)(void);
+	u64 (*get_l3_egress_mac)(u32 idx);
+	void (*set_l3_egress_mac)(u32 idx, u64 mac);
+	int (*find_l3_slot)(struct rtl83xx_route *rt, bool must_exist);
+	int (*route_lookup_hw)(struct rtl83xx_route *rt);
+	void (*get_l3_router_mac)(u32 idx, struct rtl93xx_rt_mac *m);
+	void (*set_l3_router_mac)(u32 idx, struct rtl93xx_rt_mac *m);
+	void (*set_l3_egress_intf)(int idx, struct rtl838x_l3_intf *intf);
 	u32 (*packet_cntr_read)(int counter);
 	void (*packet_cntr_clear)(int counter);
 };
@@ -772,9 +857,13 @@ struct rtl838x_switch_priv {
 	unsigned long int pie_use_bm[MAX_PIE_ENTRIES >> 5];
 	struct rhltable routes;
 	unsigned long int route_use_bm[MAX_ROUTES >> 5];
+	unsigned long int host_route_use_bm[MAX_HOST_ROUTES >> 5];
 	int n_counters;
 	unsigned long int octet_cntr_use_bm[MAX_COUNTERS >> 5];
 	unsigned long int packet_cntr_use_bm[MAX_COUNTERS >> 4];
+	struct rtl838x_l3_intf *interfaces[MAX_INTERFACES];
+	u16 intf_mtus[MAX_INTF_MTUS];
+	int intf_mtu_count[MAX_INTF_MTUS];
 };
 
 void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv);

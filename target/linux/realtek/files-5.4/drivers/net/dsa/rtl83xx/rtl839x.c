@@ -1497,14 +1497,12 @@ static int rtl839x_pie_rule_add(struct rtl838x_switch_priv *priv, struct pie_rul
 		min_block = max_block;
 		max_block = priv->n_pie_blocks;
 	}
-	pr_info("In %s\n", __func__);
 
 	mutex_lock(&priv->pie_mutex);
 
 	for (block = min_block; block < max_block; block++) {
 		for (j = 0; j < 2; j++) {
 			t = (sw_r32(RTL839X_ACL_BLK_TMPLTE_CTRL(block)) >> (j * 3)) & 0x7;
-			pr_info("Testing block %d, template %d, template id %d\n", block, j, t);
 			idx = rtl839x_pie_verify_template(priv, pr, t, block);
 			if (idx >= 0)
 				break;
@@ -1518,7 +1516,6 @@ static int rtl839x_pie_rule_add(struct rtl838x_switch_priv *priv, struct pie_rul
 		return -EOPNOTSUPP;
 	}
 
-	pr_info("Using block: %d, index %d, template-id %d\n", block, idx, j);
 	set_bit(idx, priv->pie_use_bm);
 
 	pr->valid = true;
@@ -1592,8 +1589,7 @@ static void rtl839x_pie_init(struct rtl838x_switch_priv *priv)
 		sw_w32(template_selectors, RTL839X_ACL_BLK_TMPLTE_CTRL(i));
 }
 
-static void rtl839x_route_read(struct rtl838x_switch_priv *priv, int idx,
-			       struct rtl83xx_route *rt)
+static void rtl839x_route_read(int idx, struct rtl83xx_route *rt)
 {
 	u64 v;
 	// Read ROUTING table (2) via register RTL8390_TBL_1
@@ -1612,8 +1608,7 @@ static void rtl839x_route_read(struct rtl838x_switch_priv *priv, int idx,
 	rtl_table_release(r);
 }
 
-static void rtl839x_route_write(struct rtl838x_switch_priv *priv, int idx,
-			        struct rtl83xx_route *rt)
+static void rtl839x_route_write(int idx, struct rtl83xx_route *rt)
 {
 	u32 v;
 

@@ -847,6 +847,7 @@ static int rtl83xx_vlan_filtering(struct dsa_switch *ds, int port,
 			sw_w32_mask(0b10 << ((port % 16) << 1), 0b01 << ((port % 16) << 1),
 				    priv->r->vlan_port_igr_filter + ((port >> 4) << 2));
 		sw_w32_mask(0, BIT(port % 32), priv->r->vlan_port_egr_filter + ((port >> 5) << 2));
+		//sw_w32_mask(BIT(port % 32), 0, priv->r->vlan_port_egr_filter + ((port >> 5) << 2));  //BUG
 	} else {
 		/* Disable ingress and egress filtering */
 		if (port != priv->cpu_port)
@@ -1182,7 +1183,7 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 		if (!e.valid)
 			continue;
 
-		if (e.port == port) {
+		if (e.port == port || e.port == RTL930X_PORT_IGNORE) {
 			fid = ((i >> 2) & 0x3ff) | (e.rvid & ~0x3ff);
 			mac = ether_addr_to_u64(&e.mac[0]);
 			pkey = priv->r->l2_hash_key(priv, priv->r->l2_hash_seed(mac, fid));
