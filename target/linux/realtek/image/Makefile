@@ -156,5 +156,16 @@ define Device/zyxel_xgs1210-12
 endef
 TARGET_DEVICES += zyxel_xgs1210-12
 
+define Device/zyxel_xgs1250-12
+  SOC := rtl9302
+  UIMAGE_MAGIC := 0x93001250
+  DEVICE_VENDOR := Zyxel
+  DEVICE_MODEL := XGS1250-12
+  KERNEL := kernel-bin | append-dtb | gzip | custom-uimage OpenWRT
+  KERNEL_INITRAMFS := kernel-bin | append-dtb | gzip | custom-uimage OpenWRT
+  DEVICE_PACKAGES := ip-bridge ethtool
+endef
+TARGET_DEVICES += zyxel_xgs1250-12
+
 
 $(eval $(call BuildImage))
