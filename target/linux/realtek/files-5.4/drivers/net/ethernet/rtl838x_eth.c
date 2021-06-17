@@ -1303,6 +1303,7 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 			/* Make sure data is visible */
 			mb();
 			memcpy(skb->data, (u8 *)KSEG1ADDR(data), len);
+
 			/* Overwrite CRC with cpu_tag */
 			if (dsa) {
 				priv->r->decode_tag(h, &tag);
