@@ -123,7 +123,7 @@ u32 rtl930x_hash(struct rtl838x_switch_priv *priv, u64 seed);
 irqreturn_t rtl930x_switch_irq(int irq, void *dev_id);
 irqreturn_t rtl839x_switch_irq(int irq, void *dev_id);
 void rtl930x_vlan_profile_dump(int index);
-int rtl9300_sds_power(int mac, int val);
+int rtl9300_sds_power(struct rtl838x_switch_priv *priv, int mac, bool power_on);
 void rtl9300_sds_rst(int sds_num, u32 mode);
 void rtl930x_print_matrix(void);
 

@@ -717,41 +717,6 @@ irqreturn_t rtl930x_switch_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-int rtl9300_sds_power(int mac, int val)
-{
-	int sds_num;
-	u32 mode;
-
-	// TODO: these numbers are hard-coded for the Zyxel XGS1210 12 Switch
-	pr_info("SerDes: %s %d\n", __func__, mac);
-	switch (mac) {
-	case 24:
-		sds_num = 6;
-		mode = 0x12; // HISGMII
-		break;
-	case 25:
-		sds_num = 7;
-		mode = 0x12; // HISGMII
-		break;
-	case 26:
-		sds_num = 8;
-		mode = 0x1b; // 10GR/1000BX auto
-		break;
-	case 27:
-		sds_num = 9;
-		mode = 0x1b; // 10GR/1000BX auto
-		break;
-	default:
-		return -1;
-	}
-	if (!val)
-		mode = 0x1f; // OFF
-
-	rtl9300_sds_rst(sds_num, mode);
-
-	return 0;
-}
-
 int rtl930x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 {
 	u32 v;
@@ -2252,7 +2217,7 @@ static void rtl930x_set_l3_egress_mac(u32 idx, u64 mac)
 	sw_w32(mac >> 32, rtl_table_data(r, 0));
 	sw_w32(mac, rtl_table_data(r, 1));
 
-	pr_info("%s: setting index %d to %016llx\n", __func__, idx, mac);
+	pr_debug("%s: setting index %d to %016llx\n", __func__, idx, mac);
 	rtl_table_write(r, idx);
 	rtl_table_release(r);
 }

@@ -1759,6 +1759,7 @@ const struct rtl838x_reg rtl839x_reg = {
 	.write_mcast_pmask = rtl839x_write_mcast_pmask,
 	.l2_learning_setup = rtl839x_l2_learning_setup,
 	.pie_init = rtl839x_pie_init,
+	.pie_rule_read = rtl839x_pie_rule_read,
 	.pie_rule_write = rtl839x_pie_rule_write,
 	.pie_rule_add = rtl839x_pie_rule_add,
 	.pie_rule_rm = rtl839x_pie_rule_rm,

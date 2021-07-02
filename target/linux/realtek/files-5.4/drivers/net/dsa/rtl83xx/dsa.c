@@ -6,7 +6,8 @@
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
 #include "rtl83xx.h"
 
-
+extern int rtl930x_read_sds_phy(int phy_addr, int page, int phy_reg);
+extern int rtl930x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v);
 extern struct rtl83xx_soc_info soc_info;
 
 
@@ -277,7 +278,65 @@ static void rtl83xx_phylink_validate(struct dsa_switch *ds, int port,
 		phylink_set(mask, 1000baseX_Full);
 
 	/* On the RTL839x family of SoCs, ports 48 to 51 are SFP ports */
-	if (port >=48 && port <= 51 && priv->family_id == RTL8390_FAMILY_ID)
+	if (port >= 48 && port <= 51 && priv->family_id == RTL8390_FAMILY_ID)
+		phylink_set(mask, 1000baseX_Full);
+
+	phylink_set(mask, 10baseT_Half);
+	phylink_set(mask, 10baseT_Full);
+	phylink_set(mask, 100baseT_Half);
+	phylink_set(mask, 100baseT_Full);
+
+	bitmap_and(supported, supported, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	bitmap_and(state->advertising, state->advertising, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+}
+
+static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
+				     unsigned long *supported,
+				     struct phylink_link_state *state)
+{
+	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
+
+	pr_info("In %s port %d, state is %d (%s)", __func__, port, state->interface,
+		phy_modes(state->interface));
+
+	if (!phy_interface_mode_is_rgmii(state->interface) &&
+	    state->interface != PHY_INTERFACE_MODE_NA &&
+	    state->interface != PHY_INTERFACE_MODE_1000BASEX &&
+	    state->interface != PHY_INTERFACE_MODE_MII &&
+	    state->interface != PHY_INTERFACE_MODE_REVMII &&
+	    state->interface != PHY_INTERFACE_MODE_GMII &&
+	    state->interface != PHY_INTERFACE_MODE_QSGMII &&
+	    state->interface != PHY_INTERFACE_MODE_XGMII &&
+	    state->interface != PHY_INTERFACE_MODE_HSGMII &&
+	    state->interface != PHY_INTERFACE_MODE_10GKR &&
+	    state->interface != PHY_INTERFACE_MODE_INTERNAL &&
+	    state->interface != PHY_INTERFACE_MODE_SGMII) {
+		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
+		dev_err(ds->dev,
+			"Unsupported interface: %d for port %d\n",
+			state->interface, port);
+		return;
+	}
+
+	/* Allow all the expected bits */
+	phylink_set(mask, Autoneg);
+	phylink_set_port_modes(mask);
+	phylink_set(mask, Pause);
+	phylink_set(mask, Asym_Pause);
+
+	/* With the exclusion of MII and Reverse MII, we support Gigabit,
+	 * including Half duplex
+	 */
+	if (state->interface != PHY_INTERFACE_MODE_MII &&
+	    state->interface != PHY_INTERFACE_MODE_REVMII) {
+		phylink_set(mask, 1000baseT_Full);
+		phylink_set(mask, 1000baseT_Half);
+	}
+
+	/* On the RTL9300 family of SoCs, ports 26 to 27 may be SFP ports TODO: take out of .dts */
+	if (port >= 26 && port <= 27)
 		phylink_set(mask, 1000baseX_Full);
 
 	phylink_set(mask, 10baseT_Half);
@@ -301,14 +360,7 @@ static int rtl83xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	if (port < 0 || port > priv->cpu_port)
 		return -EINVAL;
 
-	/*
-	 * On the RTL9300 for at least the RTL8226B PHY, the MAC-side link
-	 * state needs to be read twice in order to read a correct result.
-	 * This would not be necessary for ports connected e.g. to RTL8218D
-	 * PHYs.
-	 */
 	state->link = 0;
-	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
 	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
 	if (link & BIT_ULL(port))
 		state->link = 1;
@@ -338,6 +390,70 @@ static int rtl83xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
 			state->speed = SPEED_100; /* Is in fact 500Mbit */
 	}
 
+	state->pause &= (MLO_PAUSE_RX | MLO_PAUSE_TX);
+	if (priv->r->get_port_reg_le(priv->r->mac_rx_pause_sts) & BIT_ULL(port))
+		state->pause |= MLO_PAUSE_RX;
+	if (priv->r->get_port_reg_le(priv->r->mac_tx_pause_sts) & BIT_ULL(port))
+		state->pause |= MLO_PAUSE_TX;
+	return 1;
+}
+
+static int rtl93xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
+					  struct phylink_link_state *state)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	u64 speed;
+	u64 link;
+
+	if (port < 0 || port > priv->cpu_port)
+		return -EINVAL;
+
+	/*
+	 * On the RTL9300 for at least the RTL8226B PHY, the MAC-side link
+	 * state needs to be read twice in order to read a correct result.
+	 * This would not be necessary for ports connected e.g. to RTL8218D
+	 * PHYs.
+	 */
+	state->link = 0;
+	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
+	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
+	if (link & BIT_ULL(port))
+		state->link = 1;
+	pr_info("%s: link state port %d: %llx, media %08x\n", __func__, port,
+		link & BIT_ULL(port), sw_r32(RTL930X_MAC_LINK_MEDIA_STS));
+
+	state->duplex = 0;
+	if (priv->r->get_port_reg_le(priv->r->mac_link_dup_sts) & BIT_ULL(port))
+		state->duplex = 1;
+
+	speed = priv->r->get_port_reg_le(priv->r->mac_link_spd_sts(port));
+	speed >>= (port % 8) << 2;
+	switch (speed & 0xf) {
+	case 0:
+		state->speed = SPEED_10;
+		break;
+	case 1:
+		state->speed = SPEED_100;
+		break;
+	case 2:
+	case 7:
+		state->speed = SPEED_1000;
+		break;
+	case 4:
+		state->speed = SPEED_10000;
+		break;
+	case 5:
+	case 8:
+		state->speed = SPEED_2500;
+		break;
+	case 6:
+		state->speed = SPEED_5000;
+		break;
+	default:
+		pr_err("%s: unknown speed: %d\n", __func__, (u32)speed & 0xf);
+	}
+
+	pr_info("%s: speed is: %d %d\n", __func__, (u32)speed & 0xf, state->speed);
 	state->pause &= (MLO_PAUSE_RX | MLO_PAUSE_TX);
 	if (priv->r->get_port_reg_le(priv->r->mac_rx_pause_sts) & BIT_ULL(port))
 		state->pause |= MLO_PAUSE_RX;
@@ -391,11 +507,8 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	u32 reg;
 	int speed_bit = priv->family_id == RTL8380_FAMILY_ID ? 4 : 3;
 
-	pr_debug("%s port %d, mode %x\n", __func__, port, mode);
-
-	// BUG: Make this work on RTL93XX
-	if (priv->family_id >= RTL9300_FAMILY_ID)
-		return;
+	pr_info("%s port %d, mode %x, phy-mode: %s, speed %d, link %d\n", __func__,
+		port, mode, phy_modes(state->interface), state->speed, state->link);
 
 	if (port == priv->cpu_port) {
 		/* Set Speed, duplex, flow control
@@ -465,6 +578,90 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
 }
 
+static void rtl93xx_phylink_mac_config(struct dsa_switch *ds, int port,
+					unsigned int mode,
+					const struct phylink_link_state *state)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	int sds_num, sds_mode;
+	u32 reg, v;
+	u32 *p1 = 0xb8003308, *p2 = 0xb800330c;
+
+	pr_info("%s port %d, mode %x, phy-mode: %s, speed %d, link %d\n", __func__,
+		port, mode, phy_modes(state->interface), state->speed, state->link);
+	pr_info("%s: %08x %08x\n", __func__, *p1, *p2);
+	*p1 |= BIT(15);
+	*p2 &= ~BIT(15);
+
+	// BUG: Make this work on RTL93XX
+	if (priv->family_id >= RTL9310_FAMILY_ID)
+		return;
+
+	// Nothing to be done for the CPU-port
+	if (port == priv->cpu_port)
+		return;
+
+	// On the RTL930X, ports 24 to 27 are using an internal SerDes
+	if (port >=24 && port <= 27) {
+		sds_num = port - 18; // Port 24 mapped to SerDes 6, 25 to 7 ...
+		switch (state->interface) {
+		case PHY_INTERFACE_MODE_HSGMII:
+			sds_mode = 0x12;
+			break;
+		case PHY_INTERFACE_MODE_1000BASEX:
+			sds_mode = 0x04;
+			break;
+		case PHY_INTERFACE_MODE_XGMII:
+			sds_mode = 0x10;
+			break;
+		case PHY_INTERFACE_MODE_10GKR:
+			sds_mode = 0x1b;
+			break;
+		case PHY_INTERFACE_MODE_USXGMII:
+			sds_mode = 0x0d;
+			break;
+		default:
+			pr_err("%s: unknown serdes mode: %s\n",
+			       __func__, phy_modes(state->interface));
+			return;
+		}
+		rtl9300_sds_rst(sds_num, sds_mode);
+	}
+
+	reg = sw_r32(priv->r->mac_force_mode_ctrl(port));
+	reg &= ~(0xf << 3);
+	switch (state->speed) {
+	case SPEED_10000:
+		reg |= 4 << 3;
+		break;
+	case SPEED_2500:
+		reg |= 5 << 3;
+		break;
+	case SPEED_1000:
+		pr_info("Setting PHY speed to 1000M\n");
+		// BUG: SDS-num is hard-coded!
+		v = rtl930x_read_sds_phy(8, 2, 0);
+		v &= ~(BIT(6) | BIT(13));
+		v |= BIT(6);
+		rtl930x_write_sds_phy(8, 2, 0, v);
+
+		reg |= 2 << 3;
+		break;
+	default:
+		reg |= 2 << 3;
+		break;
+	}
+
+	if (state->link)
+		reg |= FORCE_LINK_EN;
+
+	if (state->duplex == DUPLEX_FULL)
+			reg |= BIT(2);
+
+	reg |= 1; // Force Link up
+	sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
+}
+
 static void rtl83xx_phylink_mac_link_down(struct dsa_switch *ds, int port,
 				     unsigned int mode,
 				     phy_interface_t interface)
@@ -472,6 +669,18 @@ static void rtl83xx_phylink_mac_link_down(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	/* Stop TX/RX to port */
 	sw_w32_mask(0x3, 0, priv->r->mac_port_ctrl(port));
+}
+
+static void rtl93xx_phylink_mac_link_down(struct dsa_switch *ds, int port,
+				     unsigned int mode,
+				     phy_interface_t interface)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	/* Stop TX/RX to port */
+	sw_w32_mask(0x3, 0, priv->r->mac_port_ctrl(port));
+
+	// No longer force link
+	sw_w32_mask(3, 0, priv->r->mac_force_mode_ctrl(port));
 }
 
 static void rtl83xx_phylink_mac_link_up(struct dsa_switch *ds, int port,
@@ -484,6 +693,16 @@ static void rtl83xx_phylink_mac_link_up(struct dsa_switch *ds, int port,
 	sw_w32_mask(0, 0x3, priv->r->mac_port_ctrl(port));
 }
 
+static void rtl93xx_phylink_mac_link_up(struct dsa_switch *ds, int port,
+				   unsigned int mode,
+				   phy_interface_t interface,
+				   struct phy_device *phydev)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+
+	/* Restart TX/RX to port */
+	sw_w32_mask(0, 0x3, priv->r->mac_port_ctrl(port));
+}
 static void rtl83xx_get_strings(struct dsa_switch *ds,
 				int port, u32 stringset, u8 *data)
 {
@@ -1558,11 +1777,11 @@ const struct dsa_switch_ops rtl930x_switch_ops = {
 	.phy_read		= dsa_phy_read,
 	.phy_write		= dsa_phy_write,
 
-	.phylink_validate	= rtl83xx_phylink_validate,
-	.phylink_mac_link_state	= rtl83xx_phylink_mac_link_state,
-	.phylink_mac_config	= rtl83xx_phylink_mac_config,
-	.phylink_mac_link_down	= rtl83xx_phylink_mac_link_down,
-	.phylink_mac_link_up	= rtl83xx_phylink_mac_link_up,
+	.phylink_validate	= rtl93xx_phylink_validate,
+	.phylink_mac_link_state	= rtl93xx_phylink_mac_link_state,
+	.phylink_mac_config	= rtl93xx_phylink_mac_config,
+	.phylink_mac_link_down	= rtl93xx_phylink_mac_link_down,
+	.phylink_mac_link_up	= rtl93xx_phylink_mac_link_up,
 
 	.get_strings		= rtl83xx_get_strings,
 	.get_ethtool_stats	= rtl83xx_get_ethtool_stats,

@@ -334,12 +334,10 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 		}
 	}
 
-	// TODO: Do this needs to come from the .dts, at least the SerDes number
+	// TODO: Do this needs to come from the .dts
 	if (priv->family_id == RTL9300_FAMILY_ID) {
 		priv->ports[24].is2G5 = true;
 		priv->ports[25].is2G5 = true;
-		priv->ports[24].sds_num = 1;
-		priv->ports[24].sds_num = 2;
 	}
 
 	/* Disable MAC polling the PHY so that we can start configuration */
@@ -349,25 +347,18 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 	if (priv->family_id == RTL8380_FAMILY_ID) {
 		/* Enable SerDes NWAY and PHY control via SoC */
 		sw_w32_mask(BIT(7), BIT(15), RTL838X_SMI_GLB_CTRL);
-	} else {
+	} else if (priv->family_id == RTL8390_FAMILY_ID) {
 		/* Disable PHY polling via SoC */
 		sw_w32_mask(BIT(7), 0, RTL839X_SMI_GLB_CTRL);
 	}
 
-	/* Power on fibre ports and reset them if necessary */
+	/* Power on fibre ports and reset them if necessary
+	 * TODO: Put this in rtl83xx_phylink_mac_config ? see rtl93xx_phylink_mac_config
+	 */
 	if (priv->ports[24].phy == PHY_RTL838X_SDS) {
 		pr_debug("Powering on fibre ports & reset\n");
 		rtl8380_sds_power(24, 1);
 		rtl8380_sds_power(26, 1);
-	}
-
-	// TODO: Only power on SerDes with external PHYs connected
-	if (priv->family_id == RTL9300_FAMILY_ID) {
-		pr_info("RTL9300 Powering on SerDes ports\n");
-		rtl9300_sds_power(24, 1);
-		rtl9300_sds_power(25, 1);
-		rtl9300_sds_power(26, 1);
-		rtl9300_sds_power(27, 1);
 	}
 
 	pr_debug("%s done\n", __func__);
