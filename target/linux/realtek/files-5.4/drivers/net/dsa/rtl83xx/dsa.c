@@ -134,10 +134,6 @@ static void rtl83xx_vlan_setup(struct rtl838x_switch_priv *priv)
 	for (i = 0; i < MAX_VLANS; i ++)
 		priv->r->vlan_set_tagged(i, &info);
 
-	// reset PVIDs; defaults to 1 on reset
-	for (i = 0; i <= priv->ds->num_ports; i++)
-		sw_w32(0, priv->r->vlan_port_pb + (i << 2));
-
 	// Set forwarding action based on inner VLAN tag
 	for (i = 0; i < priv->cpu_port; i++)
 		priv->r->vlan_fwd_on_inner(i, true);
@@ -182,10 +178,15 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 
 	ds->configure_vlan_while_not_filtering = true;
 
+	priv->r->l2_learning_setup();
+
 	/* Enable MAC Polling PHY again */
 	rtl83xx_enable_phy_polling(priv);
 	pr_debug("Please wait until PHY is settled\n");
 	msleep(1000);
+
+	priv->r->pie_init(priv);
+
 	return 0;
 }
 
@@ -225,6 +226,8 @@ static int rtl930x_setup(struct dsa_switch *ds)
 	ds->configure_vlan_while_not_filtering = true;
 
 	rtl83xx_enable_phy_polling(priv);
+
+	priv->r->pie_init(priv);
 
 	return 0;
 }
@@ -842,14 +845,15 @@ static int rtl83xx_vlan_filtering(struct dsa_switch *ds, int port,
 		 */
 		if (port != priv->cpu_port)
 			sw_w32_mask(0b10 << ((port % 16) << 1), 0b01 << ((port % 16) << 1),
-				    priv->r->vlan_port_igr_filter + ((port >> 5) << 2));
-		sw_w32_mask(0, BIT(port % 32), priv->r->vlan_port_egr_filter + ((port >> 4) << 2));
+				    priv->r->vlan_port_igr_filter + ((port >> 4) << 2));
+		sw_w32_mask(0, BIT(port % 32), priv->r->vlan_port_egr_filter + ((port >> 5) << 2));
+		//sw_w32_mask(BIT(port % 32), 0, priv->r->vlan_port_egr_filter + ((port >> 5) << 2));  //BUG
 	} else {
 		/* Disable ingress and egress filtering */
 		if (port != priv->cpu_port)
 			sw_w32_mask(0b11 << ((port % 16) << 1), 0,
-				    priv->r->vlan_port_igr_filter + ((port >> 5) << 2));
-		sw_w32_mask(BIT(port % 32), 0, priv->r->vlan_port_egr_filter + ((port >> 4) << 2));
+				    priv->r->vlan_port_igr_filter + ((port >> 4) << 2));
+		sw_w32_mask(BIT(port % 32), 0, priv->r->vlan_port_egr_filter + ((port >> 5) << 2));
 	}
 
 	/* Do we need to do something to the CPU-Port, too? */
@@ -913,6 +917,9 @@ static void rtl83xx_vlan_add(struct dsa_switch *ds, int port,
 	}
 
 	for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
+		if (!v)
+			continue;
+
 		/* Get port memberships of this vlan */
 		priv->r->vlan_tables_read(v, &info);
 
@@ -972,7 +979,9 @@ static int rtl83xx_vlan_del(struct dsa_switch *ds, int port,
 
 		/* remove port from both tables */
 		info.untagged_ports &= (~BIT_ULL(port));
-		info.tagged_ports &= (~BIT_ULL(port));
+		/* always leave vid 1 */
+		if (v != 1)
+			info.tagged_ports &= (~BIT_ULL(port));
 
 		priv->r->vlan_set_untagged(v, info.untagged_ports);
 		pr_debug("Untagged ports, VLAN %d: %llx\n", v, info.untagged_ports);
@@ -1174,7 +1183,7 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 		if (!e.valid)
 			continue;
 
-		if (e.port == port) {
+		if (e.port == port || e.port == RTL930X_PORT_IGNORE) {
 			fid = ((i >> 2) & 0x3ff) | (e.rvid & ~0x3ff);
 			mac = ether_addr_to_u64(&e.mac[0]);
 			pkey = priv->r->l2_hash_key(priv, priv->r->l2_hash_seed(mac, fid));
@@ -1232,7 +1241,7 @@ static int rtl83xx_mc_group_alloc(struct rtl838x_switch_priv *priv, int port)
 	pr_debug("Using MC group %d\n", mc_group);
 	set_bit(mc_group, priv->mc_group_bm);
 	mc_group++;  // We cannot use group 0, as this is used for lookup miss flooding
-	portmask = BIT_ULL(port) | BIT_ULL(priv->cpu_port); 
+	portmask = BIT_ULL(port);
 	priv->r->write_mcast_pmask(mc_group, portmask);
 
 	return mc_group;
@@ -1254,11 +1263,8 @@ static u64 rtl83xx_mc_group_del_port(struct rtl838x_switch_priv *priv, int mc_gr
 
 	portmask &= ~BIT_ULL(port);
 	priv->r->write_mcast_pmask(mc_group, portmask);
-	if (portmask == BIT_ULL(priv->cpu_port)) {
-		portmask &= ~BIT_ULL(priv->cpu_port);
-		priv->r->write_mcast_pmask(mc_group, portmask);
+	if (!portmask)
 		clear_bit(mc_group, priv->mc_group_bm);
-	}
 
 	return portmask;
 }
