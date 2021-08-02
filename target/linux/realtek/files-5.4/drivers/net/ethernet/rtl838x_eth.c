@@ -1171,7 +1171,7 @@ static int rtl838x_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		h = &ring->tx_header[q][ring->c_tx[q]];
 		h->size = len;
 		h->len = len;
-		// On RTL8380 SoCs, small packet lengths being sent need adjustments
+		// On RTL8380 SoCs, the packet length being sent needs adjustment
 		if (priv->family_id == RTL8380_FAMILY_ID) {
 			if (len < ETH_ZLEN - 4)
 				h->len -= 4;
@@ -1928,6 +1928,7 @@ static const struct net_device_ops rtl838x_eth_netdev_ops = {
 	.ndo_tx_timeout = rtl838x_eth_tx_timeout,
 	.ndo_set_features = rtl83xx_set_features,
 	.ndo_fix_features = rtl838x_fix_features,
+	.ndo_setup_tc = rtl83xx_setup_tc,
 };
 
 static const struct net_device_ops rtl839x_eth_netdev_ops = {
