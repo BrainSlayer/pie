@@ -563,10 +563,13 @@ static int rtl83xx_port_enable(struct dsa_switch *ds, int port,
 	return 0;
 }
 
+static u64 rtl83xx_mc_group_del_port(struct rtl838x_switch_priv *priv, int mc_group, int port);
+
 static void rtl83xx_port_disable(struct dsa_switch *ds, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u64 v;
+	int mc_group;
 
 	pr_debug("%s %x: %d", __func__, (u32)priv, port);
 	/* you can only disable user ports */
@@ -576,6 +579,9 @@ static void rtl83xx_port_disable(struct dsa_switch *ds, int port)
 	// BUG: This does not work on RTL931X
 	/* remove port from switch mask of CPU_PORT */
 	priv->r->traffic_disable(priv->cpu_port, port);
+	for (mc_group = 0; mc_group < MAX_MC_GROUPS; mc_group++) {
+		rtl83xx_mc_group_del_port(priv, mc_group, port);
+	}
 
 	/* remove all other ports in the same bridge from switch mask of port */
 	v = priv->r->traffic_get(port);
@@ -702,7 +708,7 @@ static void rtl83xx_port_bridge_leave(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
-	int i;
+	int i, mc_group;
 
 	pr_debug("%s %x: %d", __func__, (u32)priv, port);
 	mutex_lock(&priv->reg_mutex);
@@ -716,9 +722,12 @@ static void rtl83xx_port_bridge_leave(struct dsa_switch *ds, int port,
 		if (dsa_is_user_port(ds, i) && i != port) {
 			if (dsa_to_port(ds, i)->bridge_dev != bridge)
 				continue;
-			if (priv->ports[i].enable)
+			if (priv->ports[i].enable) {
 				priv->r->traffic_disable(i, port);
-
+				for (mc_group = 0; mc_group < MAX_MC_GROUPS; mc_group++) {
+					rtl83xx_mc_group_del_port(priv, mc_group, port);
+				}
+			}
 			priv->ports[i].pm |= BIT_ULL(port);
 			port_bitmap &= ~BIT_ULL(i);
 		}
