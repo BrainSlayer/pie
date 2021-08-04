@@ -1396,7 +1396,7 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 	int group;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int ctrl_reg, dpm_reg, spm_reg;	
-
+	u64 v;
 	pr_debug("In %s\n", __func__);
 
 	for (group = 0; group < 4; group++) {
@@ -1414,10 +1414,24 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 		return -ENOSPC;
 
 	ctrl_reg = priv->r->mir_ctrl + group * 4;
-	dpm_reg = priv->r->mir_dpm + group * 4 * priv->port_width;
-	spm_reg = priv->r->mir_spm + group * 4 * priv->port_width;
+	dpm_reg = priv->r->mir_dpm + (group << 2) * priv->port_width;
+	spm_reg = priv->r->mir_spm + (group << 2) * priv->port_width;
 
 	pr_debug("Using group %d\n", group);
+	priv->r->traffic_disable(priv->cpu_port, mirror->to_local_port);
+	priv->r->traffic_enable(port, mirror->to_local_port);
+
+	v = priv->r->traffic_get(priv->cpu_port);
+	v &= ~BIT_ULL(mirror->to_local_port);
+	priv->r->traffic_set(priv->cpu_port, v);
+
+
+	v = priv->r->traffic_get(port);
+	v |= BIT_ULL(mirror->to_local_port);
+	priv->r->traffic_set(port, v);
+	
+
+
 	mutex_lock(&priv->reg_mutex);
 
 	if (priv->family_id == RTL8380_FAMILY_ID) {
@@ -1463,8 +1477,8 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 		return;
 
 	ctrl_reg = priv->r->mir_ctrl + group * 4;
-	dpm_reg = priv->r->mir_dpm + group * 4 * priv->port_width;
-	spm_reg = priv->r->mir_spm + group * 4 * priv->port_width;
+	dpm_reg = priv->r->mir_dpm + (group << 2) * priv->port_width;
+	spm_reg = priv->r->mir_spm + (group << 2) * priv->port_width;
 
 	mutex_lock(&priv->reg_mutex);
 	if (mirror->ingress) {
