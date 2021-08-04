@@ -1294,15 +1294,19 @@ static void rtl83xx_fib_event_work_do(struct work_struct *work)
 			pr_err("%s: FIB4 failed\n", __func__);
 		break;
 	case FIB_EVENT_ENTRY_DEL:
-		rtl83xx_fib4_del(priv, &fib_work->fen_info);
-		fib_info_put(fib_work->fen_info.fi);
+		if (!fib_work->is_fib6) {
+			rtl83xx_fib4_del(priv, &fib_work->fen_info);
+			fib_info_put(fib_work->fen_info.fi);
+		}
 		break;
 	case FIB_EVENT_RULE_ADD:
 	case FIB_EVENT_RULE_DEL:
-		rule = fib_work->fr_info.rule;
-		if (!fib4_rule_default(rule))
-			pr_err("%s: FIB4 default rule failed\n", __func__);
-		fib_rule_put(rule);
+		if (!fib_work->is_fib6) {
+			rule = fib_work->fr_info.rule;
+			if (!fib4_rule_default(rule))
+				pr_err("%s: FIB4 default rule failed\n", __func__);
+			fib_rule_put(rule);
+		}
 		break;
 	}
 	rtnl_unlock();
