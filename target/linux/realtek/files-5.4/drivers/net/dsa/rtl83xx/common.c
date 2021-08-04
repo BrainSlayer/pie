@@ -973,7 +973,7 @@ static int rtl83xx_fib4_del(struct rtl838x_switch_priv *priv,
 			    struct fib_entry_notifier_info *info)
 {
 	struct fib_nh *nh = fib_info_nh(info->fi, 0);
-	struct rtl83xx_route *r;
+	struct rtl83xx_route *r = NULL;
 	struct rhlist_head *tmp, *list;
 
 	pr_info("In %s, ip %pI4, len %d\n", __func__, &info->dst, info->dst_len);
@@ -993,13 +993,14 @@ static int rtl83xx_fib4_del(struct rtl838x_switch_priv *priv,
 	}
 	rcu_read_unlock();
 
-	rtl83xx_l2_nexthop_rm(priv, &r->nh);
-
-	pr_info("%s: Releasing packet counter %d\n", __func__, r->pr.packet_cntr);
-	set_bit(r->pr.packet_cntr, priv->packet_cntr_use_bm);
-	priv->r->pie_rule_rm(priv, &r->pr);
-
-	rtl83xx_route_rm(priv, r);
+	/* if there is no route has been found, this is NULL here */
+	if (r) {
+		rtl83xx_l2_nexthop_rm(priv, &r->nh);
+		pr_info("%s: Releasing packet counter %d\n", __func__, r->pr.packet_cntr);
+		set_bit(r->pr.packet_cntr, priv->packet_cntr_use_bm);
+		priv->r->pie_rule_rm(priv, &r->pr);
+		rtl83xx_route_rm(priv, r);
+	}
 
 	nh->fib_nh_flags &= ~RTNH_F_OFFLOAD;
 
