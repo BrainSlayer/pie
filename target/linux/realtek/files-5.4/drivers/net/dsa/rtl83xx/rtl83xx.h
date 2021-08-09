@@ -127,6 +127,9 @@ int rtl9300_sds_power(int mac, int val);
 void rtl9300_sds_rst(int sds_num, u32 mode);
 void rtl930x_print_matrix(void);
 
+int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port);
+int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port);
+
 /* RTL931x-specific */
 irqreturn_t rtl931x_switch_irq(int irq, void *dev_id);
 
