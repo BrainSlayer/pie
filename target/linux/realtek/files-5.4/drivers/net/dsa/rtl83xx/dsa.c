@@ -1479,7 +1479,7 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 		priv->r->mask_port_reg_be(1ULL << port, 0, dpm_reg);
 	}
 
-	if (!(sw_r32(spm_reg) && sw_r32(dpm_reg))) {
+	if (!((priv->r->get_port_reg_be(dpm_reg) & 1ULL << port) && (priv->r->get_port_reg_be(spm_reg) & 1ULL << port))) {
 		priv->mirror_group_ports[group] = -1;
 		sw_w32(0, ctrl_reg);
 	}
