@@ -1578,6 +1578,43 @@ out:
 	mutex_unlock(&priv->reg_mutex);
 	return 0;
 }
+static int rtl83xx_port_pre_bridge_flags(struct dsa_switch *ds, int port, unsigned long flags, struct netlink_ext_ack *extack)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	unsigned long features = 0;
+	if (priv->r->enable_learning)
+		    features |= BR_LEARNING;
+	if (priv->r->enable_flood)
+		    features |= BR_FLOOD;
+	if (priv->r->enable_mcast_flood)
+		    features |= BR_MCAST_FLOOD;
+	if (priv->r->enable_bcast_flood)
+		    features |= BR_BCAST_FLOOD;
+	if (flags & ~(features))
+		return -EINVAL;
+	
+	return 0;
+}
+
+static int rtl83xx_port_bridge_flags(struct dsa_switch *ds, int port, unsigned long flags, struct netlink_ext_ack *extack)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+
+	if (priv->r->enable_learning)
+		priv->r->enable_learning(port, !!(flags & BR_LEARNING));
+	    
+	if (priv->r->enable_flood)
+		priv->r->enable_flood(port, !!(flags & BR_FLOOD));
+
+	if (priv->r->enable_mcast_flood)
+		priv->r->enable_mcast_flood(port, !!(flags & BR_MCAST_FLOOD));
+
+	if (priv->r->enable_bcast_flood)
+		priv->r->enable_bcast_flood(port, !!(flags & BR_BCAST_FLOOD));
+
+	return 0;
+	
+}
 
 int dsa_phy_read(struct dsa_switch *ds, int phy_addr, int phy_reg)
 {
@@ -1660,6 +1697,8 @@ const struct dsa_switch_ops rtl83xx_switch_ops = {
 	.port_lag_change	= rtl83xx_port_lag_change,
 	.port_lag_join		= rtl83xx_port_lag_join,
 	.port_lag_leave		= rtl83xx_port_lag_leave,
+	.port_pre_bridge_flags  = rtl83xx_port_pre_bridge_flags,
+	.port_bridge_flags  = rtl83xx_port_bridge_flags,
 };
 
 const struct dsa_switch_ops rtl930x_switch_ops = {
@@ -1707,4 +1746,7 @@ const struct dsa_switch_ops rtl930x_switch_ops = {
 	.port_lag_change	= rtl83xx_port_lag_change,
 	.port_lag_join		= rtl83xx_port_lag_join,
 	.port_lag_leave		= rtl83xx_port_lag_leave,
+	
+	.port_pre_bridge_flags  = rtl83xx_port_pre_bridge_flags,
+	.port_bridge_flags  = rtl83xx_port_bridge_flags,
 };

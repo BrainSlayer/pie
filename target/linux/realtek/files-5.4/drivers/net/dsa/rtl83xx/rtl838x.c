@@ -515,6 +515,45 @@ static void rtl838x_l2_learning_setup(void)
 	sw_w32(0, RTL838X_SPCL_TRAP_ARP_CTRL);
 }
 
+static void rtl838x_enable_learning(int port, bool enable)
+{
+	// Limit learning to maximum: 32k entries, after that just flood (bits 0-1)
+	
+	if (enable)  {
+		// flood after 32k entries
+		sw_w32((0x3fff << 2) | 0, RTL838X_L2_PORT_LRN_CONSTRT + (port << 2));
+	} else { 
+		// just forward
+		sw_w32(0, RTL838X_L2_PORT_LRN_CONSTRT + (port << 2));
+	}
+
+}
+static void rtl838x_enable_flood(int port, bool enable)
+{
+	u32 flood_mask = sw_r32(RTL838X_L2_PORT_LRN_CONSTRT + (port << 2));
+
+	if (enable)  {
+		// flood
+		flood_mask &=~3;
+		flood_mask |=0;
+		sw_w32(flood_mask, RTL838X_L2_PORT_LRN_CONSTRT + (port << 2));
+	} else {
+		// drop (bit 1)
+		flood_mask &=~3; 
+		flood_mask |=1;
+		sw_w32(flood_mask, RTL838X_L2_PORT_LRN_CONSTRT + (port << 2));
+	}
+
+}
+static void rtl838x_enable_mcast_flood(int port, bool enable)
+{
+
+}
+static void rtl838x_enable_bcast_flood(int port, bool enable)
+{
+
+}
+
 static void rtl838x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
 {
 	int i;
@@ -1662,6 +1701,8 @@ const struct rtl838x_reg rtl838x_reg = {
 	.l3_setup = rtl838x_l3_setup,
 	.packet_cntr_read = rtl838x_packet_cntr_read,
 	.packet_cntr_clear = rtl838x_packet_cntr_clear,
+	.enable_learning = rtl838x_enable_learning,
+	.enable_flood = rtl838x_enable_flood,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
