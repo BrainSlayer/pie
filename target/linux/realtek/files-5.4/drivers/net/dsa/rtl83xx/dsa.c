@@ -724,13 +724,13 @@ static void rtl83xx_port_bridge_leave(struct dsa_switch *ds, int port,
 				continue;
 			if (priv->ports[i].enable) {
 				priv->r->traffic_disable(i, port);
-				for (mc_group = 0; mc_group < MAX_MC_GROUPS; mc_group++) {
-					rtl83xx_mc_group_del_port(priv, mc_group, port);
-				}
 			}
 			priv->ports[i].pm |= BIT_ULL(port);
 			port_bitmap &= ~BIT_ULL(i);
 		}
+	}
+	for (mc_group = 0; mc_group < MAX_MC_GROUPS; mc_group++) {
+		rtl83xx_mc_group_del_port(priv, mc_group, port);
 	}
 
 	/* Add all other ports to this port matrix. */
@@ -1180,8 +1180,8 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 	struct rtl838x_l2_entry e;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int i;
-	u32 fid, pkey;
-	u64 mac;
+	u32 fid, pkey, key;
+	u64 mac, seed;
 
 	mutex_lock(&priv->reg_mutex);
 
@@ -1199,8 +1199,8 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 			pr_info("-> index %d, key %x, bucket %d, dmac %016llx, fid: %x rvid: %x\n",
 				i, i >> 2, i & 0x3, mac, fid, e.rvid);
 			dump_l2_entry(&e);
-			u64 seed = priv->r->l2_hash_seed(mac, e.rvid);
-			u32 key = priv->r->l2_hash_key(priv, seed);
+			seed = priv->r->l2_hash_seed(mac, e.rvid);
+			key = priv->r->l2_hash_key(priv, seed);
 			pr_info("seed: %016llx, key based on rvid: %08x\n", seed, key);
 			cb(e.mac, e.vid, e.is_static, data);
 		}
@@ -1395,8 +1395,7 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 	/* We support 4 mirror groups, one destination port per group */
 	int group;
 	struct rtl838x_switch_priv *priv = ds->priv;
-	int ctrl_reg, dpm_reg, spm_reg;	
-	u64 v;
+	int ctrl_reg, dpm_reg, spm_reg;
 	pr_debug("In %s\n", __func__);
 
 	for (group = 0; group < 4; group++) {
@@ -1413,33 +1412,19 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 	if (group >= 4)
 		return -ENOSPC;
 
-	ctrl_reg = priv->r->mir_ctrl + group * 4;
-	dpm_reg = priv->r->mir_dpm + (group << 2) * priv->port_width;
-	spm_reg = priv->r->mir_spm + (group << 2) * priv->port_width;
-
-	pr_debug("Using group %d\n", group);
-	priv->r->traffic_disable(priv->cpu_port, mirror->to_local_port);
-	priv->r->traffic_enable(port, mirror->to_local_port);
-
-	v = priv->r->traffic_get(priv->cpu_port);
-	v &= ~BIT_ULL(mirror->to_local_port);
-	priv->r->traffic_set(priv->cpu_port, v);
-
-
-	v = priv->r->traffic_get(port);
-	v |= BIT_ULL(mirror->to_local_port);
-	priv->r->traffic_set(port, v);
+	ctrl_reg = priv->r->mir_ctrl + (group * 4);
+	dpm_reg = priv->r->mir_dpm + ((group << 2) * priv->port_width);
+	spm_reg = priv->r->mir_spm + ((group << 2) * priv->port_width);
+	pr_info("Using group %d local port %d, port %d\n", group, mirror->to_local_port, port);
 	
-
-
 	mutex_lock(&priv->reg_mutex);
 
 	if (priv->family_id == RTL8380_FAMILY_ID) {
 		/* Enable mirroring to port across VLANs (bit 11) */
-		sw_w32(1 << 11 | (mirror->to_local_port << 4) | 1, ctrl_reg);
+		sw_w32(1 << 11 | ( mirror->to_local_port << 4) | 1, ctrl_reg);
 	} else {
 		/* Enable mirroring to destination port */
-		sw_w32((mirror->to_local_port << 4) | 1, ctrl_reg);
+		sw_w32(( mirror->to_local_port << 4) | 1, ctrl_reg);
 	}
 
 	if (ingress && (priv->r->get_port_reg_be(spm_reg) & (1ULL << port))) {
@@ -1495,6 +1480,103 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 	}
 
 	mutex_unlock(&priv->reg_mutex);
+}
+
+/* pointless? */
+static int rtl83xx_port_lag_change(struct dsa_switch *ds, int port)
+{
+	struct dsa_port *dp;
+	struct net_device *lag;
+	unsigned int id;
+	struct rtl838x_switch_priv *priv = ds->priv;
+	mutex_lock(&priv->reg_mutex);
+	dsa_lags_foreach_id(id, ds->dst) {
+		lag = dsa_lag_dev(ds->dst, id);
+		if (!lag)
+			continue;
+
+		dsa_lag_foreach_port(dp, ds->dst, lag) {
+			if (dp->ds == ds) {
+				if (dp->lag_tx_enabled) {
+					pr_info("port_lag_change: enable port %d\n",dp->index); 
+					rtl83xx_port_enable(ds, dp->index, NULL);
+				} else {
+					pr_info("port_lag_change: disable port %d\n",dp->index); 
+					rtl83xx_port_disable(ds, dp->index);
+				}
+			}
+		}
+	}
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+
+static int rtl83xx_port_lag_join(struct dsa_switch *ds, int port,
+				   struct net_device *lag,
+				   struct netdev_lag_upper_info *info)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	int i, err;
+
+	mutex_lock(&priv->reg_mutex);
+
+	for (i = 0; i < priv->n_lags; i++) {
+		if ((!priv->lag_devs[i]) || (priv->lag_devs[i] == lag))
+			break;
+	}
+	if (port >= priv->cpu_port) {
+		err = -EINVAL;
+		goto out;
+	}
+	pr_info("port_lag_join: group %d, port %d\n",i, port); 
+	if (!priv->lag_devs[i])
+		priv->lag_devs[i] = lag;
+	err = rtl83xx_lag_add(priv->ds, i, port);
+	if (err) {
+		err = -EINVAL;
+		goto out;
+	}
+
+out:
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+
+}
+
+static int rtl83xx_port_lag_leave(struct dsa_switch *ds, int port,
+				    struct net_device *lag)
+{
+	int i, group = -1, err;
+	struct rtl838x_switch_priv *priv = ds->priv;
+	
+	mutex_lock(&priv->reg_mutex);
+	for (i=0;i<priv->n_lags;i++) {
+		if (priv->lags_port_members[group] & BIT_ULL(port)) {
+			group = i;
+			break;
+		}
+	}
+	
+	if (group == -1) {
+		pr_info("port_lag_leave: port %d is not a member\n", port); 
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (port >= priv->cpu_port) {
+		err = -EINVAL;
+		goto out;
+	}
+	pr_info("port_lag_del: group %d, port %d\n",group, port); 
+	err = rtl83xx_lag_del(priv->ds, group, port);
+	if (err) {
+		err = -EINVAL;
+		goto out;
+	}
+
+out:
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
 }
 
 int dsa_phy_read(struct dsa_switch *ds, int phy_addr, int phy_reg)
@@ -1574,6 +1656,10 @@ const struct dsa_switch_ops rtl83xx_switch_ops = {
 
 	.port_mirror_add	= rtl83xx_port_mirror_add,
 	.port_mirror_del	= rtl83xx_port_mirror_del,
+
+	.port_lag_change	= rtl83xx_port_lag_change,
+	.port_lag_join		= rtl83xx_port_lag_join,
+	.port_lag_leave		= rtl83xx_port_lag_leave,
 };
 
 const struct dsa_switch_ops rtl930x_switch_ops = {
@@ -1618,4 +1704,7 @@ const struct dsa_switch_ops rtl930x_switch_ops = {
 	.port_mdb_add		= rtl83xx_port_mdb_add,
 	.port_mdb_del		= rtl83xx_port_mdb_del,
 
+	.port_lag_change	= rtl83xx_port_lag_change,
+	.port_lag_join		= rtl83xx_port_lag_join,
+	.port_lag_leave		= rtl83xx_port_lag_leave,
 };
