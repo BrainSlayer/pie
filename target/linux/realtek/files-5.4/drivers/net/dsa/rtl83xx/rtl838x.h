@@ -197,7 +197,9 @@
 #define RTL931X_L2_TBL_FLUSH_CTRL		(0xCD9C)
 
 #define RTL838X_L2_LRN_CONSTRT			(0x329C)
+#define RTL838X_L2_PORT_LRN_CONSTRT		(0x32A0)
 #define RTL839X_L2_LRN_CONSTRT			(0x3910)
+#define RTL839X_L2_PORT_LRN_CONSTRT		(0x3914)
 #define RTL930X_L2_LRN_CONSTRT_CTRL		(0x909c)
 #define RTL838X_L2_FLD_PMSK			(0x3288)
 #define RTL839X_L2_FLD_PMSK			(0x38EC)
@@ -828,6 +830,10 @@ struct rtl838x_reg {
 	void (*set_l3_egress_intf)(int idx, struct rtl838x_l3_intf *intf);
 	u32 (*packet_cntr_read)(int counter);
 	void (*packet_cntr_clear)(int counter);
+	void (*enable_learning)(int port, bool enable);
+	void (*enable_flood)(int port, bool enable);
+	void (*enable_mcast_flood)(int port, bool enable);
+	void (*enable_bcast_flood)(int port, bool enable);
 };
 
 struct rtl838x_switch_priv {
