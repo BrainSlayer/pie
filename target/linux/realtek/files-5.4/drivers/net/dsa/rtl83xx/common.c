@@ -183,27 +183,23 @@ u64 rtl838x_get_port_reg(int reg)
 /* Port register accessor functions for the RTL839x and RTL931X SoCs */
 void rtl839x_mask_port_reg_be(u64 clear, u64 set, int reg)
 {
-	u32 *setmask = (u32*)&set;
-	u32 *clearmask = (u32*)&clear;
-	
-	sw_w32_mask(clearmask[0], setmask[0], reg);
-	sw_w32_mask(clearmask[1], setmask[1], reg + 4);
+	sw_w32_mask((u32)(clear >> 32), (u32)(set >> 32), reg);
+	sw_w32_mask((u32)(clear & 0xffffffff), (u32)(set & 0xffffffff), reg + 4);
 }
 
 u64 rtl839x_get_port_reg_be(int reg)
 {
-	u64 v;
-	u32 *get = (u32*)&v;
-	get[0]=sw_r32(reg);
-	get[1]=sw_r32(reg + 4);
+	u64 v = sw_r32(reg);
+
+	v <<= 32;
+	v |= sw_r32(reg + 4);
 	return v;
 }
 
 void rtl839x_set_port_reg_be(u64 set, int reg)
 {
-	u32 *setmask = (u32*)&set;
-	sw_w32(setmask[0], reg);
-	sw_w32(setmask[1], reg + 4);
+	sw_w32(set >> 32, reg);
+	sw_w32(set & 0xffffffff, reg + 4);
 }
 
 void rtl839x_mask_port_reg_le(u64 clear, u64 set, int reg)
@@ -1493,6 +1489,8 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->n_counters = 0; // TODO: Figure out logs on RTL9310
 		break;
 	}
+	memset(priv->mc_group_saves, -1, sizeof(priv->mc_group_saves));
+
 	priv->ds->num_lag_ids = priv->n_lags;
 
 	pr_debug("Chip version %c\n", priv->version);

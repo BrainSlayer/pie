@@ -835,13 +835,13 @@ struct rtl838x_reg {
 	void (*enable_mcast_flood)(int port, bool enable);
 	void (*enable_bcast_flood)(int port, bool enable);
 };
-
 struct rtl838x_switch_priv {
 	/* Switch operation */
 	struct dsa_switch *ds;
 	struct device *dev;
 	u16 id;
 	u16 family_id;
+	int mc_group_saves[MAX_MC_GROUPS];
 	char version;
 	struct rtl838x_port ports[57];
 	struct mutex reg_mutex;		// Mutex for individual register manipulations
