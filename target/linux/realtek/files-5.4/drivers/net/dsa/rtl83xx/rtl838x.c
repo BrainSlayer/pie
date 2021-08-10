@@ -1703,6 +1703,12 @@ const struct rtl838x_reg rtl838x_reg = {
 	.packet_cntr_clear = rtl838x_packet_cntr_clear,
 	.enable_learning = rtl838x_enable_learning,
 	.enable_flood = rtl838x_enable_flood,
+	.rma_bpdu_ctrl = RTL838X_RMA_BPDU_CTRL,
+	.rma_ptp_ctrl = RTL838X_RMA_PTP_CTRL,
+	.rma_lltp_ctrl = RTL838X_RMA_LLTP_CTRL,
+	.rma_bpdu_ctrl_div = 16,
+	.rma_ptp_ctrl_div = 16,
+	.rma_lltp_ctrl_div = 16,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
