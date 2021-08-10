@@ -324,14 +324,14 @@ static const struct file_operations port_egress_fops = {
 	.write = port_egress_rate_write,
 };
 
-
-
 static ssize_t port_838x_bpdu_action_read(struct file *filp, char __user *buffer, size_t count,
 				loff_t *ppos)
 {
 	struct rtl838x_port *p = filp->private_data;
+	struct dsa_switch *ds = p->dp->ds;
+	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port = p->dp->index;
-	int value = sw_r32(RTL838X_RMA_BPDU_CTRL + ((port >> 4) << 2)) >> (((port&0xf) <<1) & 0x3);
+	int value = sw_r32(priv->r->rma_bpdu_ctrl + ((port / priv->r->rma_bpdu_ctrl_div) << 2)) >> (((port % priv->r->rma_bpdu_ctrl_div) <<1) & 0x3);
 
 	if (value < 0)
 		return -EINVAL;
@@ -343,13 +343,15 @@ static ssize_t port_838x_bpdu_action_write(struct file *filp, const char __user 
 				size_t count, loff_t *ppos)
 {
 	struct rtl838x_port *p = filp->private_data;
+	struct dsa_switch *ds = p->dp->ds;
+	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 value;
 	u32 port = p->dp->index;
 	size_t res = rtl838x_common_write(buffer, count, ppos, &value);
 	if (res < 0)
 		return res;
 
-	sw_w32_mask(3 << ((port&0xf) << 1), (value & 0x3) << ((port&0xf) << 1), RTL838X_RMA_BPDU_CTRL + ((port >> 4) << 2));
+	sw_w32_mask(3 << ((port % priv->r->rma_bpdu_ctrl_div) << 1), (value & 0x3) << ((port % priv->r->rma_bpdu_ctrl_div) << 1), priv->r->rma_bpdu_ctrl + ((port / priv->r->rma_bpdu_ctrl_div) << 2));
 	return res;
 }
 
@@ -365,8 +367,10 @@ static ssize_t port_838x_ptp_action_read(struct file *filp, char __user *buffer,
 				loff_t *ppos)
 {
 	struct rtl838x_port *p = filp->private_data;
+	struct dsa_switch *ds = p->dp->ds;
+	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port = p->dp->index;
-	int value = sw_r32(RTL838X_RMA_PTP_CTRL + ((port >> 4) << 2)) >> (((port&0xf) <<1) & 0x3);
+	int value = sw_r32(priv->r->rma_ptp_ctrl + ((port / priv->r->rma_ptp_ctrl_div) << 2)) >> (((port % priv->r->rma_ptp_ctrl_div) <<1) & 0x3);
 
 	if (value < 0)
 		return -EINVAL;
@@ -378,13 +382,15 @@ static ssize_t port_838x_ptp_action_write(struct file *filp, const char __user *
 				size_t count, loff_t *ppos)
 {
 	struct rtl838x_port *p = filp->private_data;
+	struct dsa_switch *ds = p->dp->ds;
+	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 value;
 	u32 port = p->dp->index;
 	size_t res = rtl838x_common_write(buffer, count, ppos, &value);
 	if (res < 0)
 		return res;
 
-	sw_w32_mask(3 << ((port&0xf) << 1), (value & 0x3) << ((port&0xf) << 1), RTL838X_RMA_PTP_CTRL + ((port >> 4) << 2));
+	sw_w32_mask(3 << ((port % priv->r->rma_ptp_ctrl_div) << 1), (value & 0x3) << ((port % priv->r->rma_ptp_ctrl_div) << 1), priv->r->rma_ptp_ctrl + ((port / priv->r->rma_ptp_ctrl_div) << 2));
 	return res;
 }
 
@@ -399,8 +405,10 @@ static ssize_t port_838x_lltp_action_read(struct file *filp, char __user *buffer
 				loff_t *ppos)
 {
 	struct rtl838x_port *p = filp->private_data;
+	struct dsa_switch *ds = p->dp->ds;
+	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port = p->dp->index;
-	int value = sw_r32(RTL838X_RMA_LLTP_CTRL + ((port >> 4) << 2)) >> (((port&0xf) <<1) & 0x3);
+	int value = sw_r32(priv->r->rma_lltp_ctrl + ((port / priv->r->rma_lltp_ctrl_div) << 2)) >> (((port % priv->r->rma_lltp_ctrl_div) <<1) & 0x3);
 
 	if (value < 0)
 		return -EINVAL;
@@ -412,13 +420,15 @@ static ssize_t port_838x_lltp_action_write(struct file *filp, const char __user 
 				size_t count, loff_t *ppos)
 {
 	struct rtl838x_port *p = filp->private_data;
+	struct dsa_switch *ds = p->dp->ds;
+	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 value;
 	u32 port = p->dp->index;
 	size_t res = rtl838x_common_write(buffer, count, ppos, &value);
 	if (res < 0)
 		return res;
 
-	sw_w32_mask(3 << ((port&0xf) << 1), (value & 0x3) << ((port&0xf) << 1), RTL838X_RMA_LLTP_CTRL + ((port >> 4) << 2));
+	sw_w32_mask(3 << ((port% priv->r->rma_lltp_ctrl_div) << 1), (value & 0x3) << ((port % priv->r->rma_lltp_ctrl_div) << 1), priv->r->rma_lltp_ctrl + ((port / priv->r->rma_lltp_ctrl_div) << 2));
 	return res;
 }
 
@@ -431,12 +441,14 @@ static const struct file_operations port_838x_action_lltp_fops = {
 
 
 
-static ssize_t port_839x_bpdu_action_read(struct file *filp, char __user *buffer, size_t count,
+static ssize_t port_838x_eapol_action_read(struct file *filp, char __user *buffer, size_t count,
 				loff_t *ppos)
 {
 	struct rtl838x_port *p = filp->private_data;
+	struct dsa_switch *ds = p->dp->ds;
+	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port = p->dp->index;
-	int value = sw_r32(RTL839X_RMA_BPDU_CTRL + ((port >> 4) << 2)) >> (((port&0xf) <<1) & 0x3);
+	int value = sw_r32(priv->r->rma_eapol_ctrl + ((port / priv->r->rma_eapol_ctrl_div) << 2)) >> (((port % priv->r->rma_eapol_ctrl_div) <<1) & 0x3);
 
 	if (value < 0)
 		return -EINVAL;
@@ -444,95 +456,29 @@ static ssize_t port_839x_bpdu_action_read(struct file *filp, char __user *buffer
 	return rtl838x_common_read(buffer, count, ppos, (u32)value);
 }
 
-static ssize_t port_839x_bpdu_action_write(struct file *filp, const char __user *buffer,
+static ssize_t port_838x_eapol_action_write(struct file *filp, const char __user *buffer,
 				size_t count, loff_t *ppos)
 {
 	struct rtl838x_port *p = filp->private_data;
+	struct dsa_switch *ds = p->dp->ds;
+	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 value;
 	u32 port = p->dp->index;
 	size_t res = rtl838x_common_write(buffer, count, ppos, &value);
 	if (res < 0)
 		return res;
 
-	sw_w32_mask(3 << ((port&0xf) << 1), (value & 0x3) << ((port&0xf) << 1), RTL839X_RMA_BPDU_CTRL + ((port >> 4) << 2));
+	sw_w32_mask(3 << ((port % priv->r->rma_eapol_ctrl_div) << 1), (value & 0x3) << ((port % priv->r->rma_eapol_ctrl_div) << 1), priv->r->rma_eapol_ctrl + ((port / priv->r->rma_eapol_ctrl_div) << 2));
 	return res;
 }
 
-static const struct file_operations port_839x_action_bpdu_fops = {
+static const struct file_operations port_838x_action_eapol_fops = {
 	.owner = THIS_MODULE,
 	.open = simple_open,
-	.read = port_839x_bpdu_action_read,
-	.write = port_839x_bpdu_action_write,
+	.read = port_838x_eapol_action_read,
+	.write = port_838x_eapol_action_write,
 };
 
-
-static ssize_t port_839x_ptp_action_read(struct file *filp, char __user *buffer, size_t count,
-				loff_t *ppos)
-{
-	struct rtl838x_port *p = filp->private_data;
-	u32 port = p->dp->index;
-	int value = sw_r32(RTL839X_RMA_PTP_CTRL + ((port >> 4) << 2)) >> (((port&0xf) <<1) & 0x3);
-
-	if (value < 0)
-		return -EINVAL;
-
-	return rtl838x_common_read(buffer, count, ppos, (u32)value);
-}
-
-static ssize_t port_839x_ptp_action_write(struct file *filp, const char __user *buffer,
-				size_t count, loff_t *ppos)
-{
-	struct rtl838x_port *p = filp->private_data;
-	u32 value;
-	u32 port = p->dp->index;
-	size_t res = rtl838x_common_write(buffer, count, ppos, &value);
-	if (res < 0)
-		return res;
-
-	sw_w32_mask(3 << ((port&0xf) << 1), (value & 0x3) << ((port&0xf) << 1), RTL839X_RMA_PTP_CTRL + ((port >> 4) << 2));
-	return res;
-}
-
-static const struct file_operations port_839x_action_ptp_fops = {
-	.owner = THIS_MODULE,
-	.open = simple_open,
-	.read = port_839x_ptp_action_read,
-	.write = port_839x_ptp_action_write,
-};
-
-static ssize_t port_839x_lltp_action_read(struct file *filp, char __user *buffer, size_t count,
-				loff_t *ppos)
-{
-	struct rtl838x_port *p = filp->private_data;
-	u32 port = p->dp->index;
-	int value = sw_r32(RTL839X_RMA_LLTP_CTRL + ((port >> 4) << 2)) >> (((port&0xf) <<1) & 0x3);
-
-	if (value < 0)
-		return -EINVAL;
-
-	return rtl838x_common_read(buffer, count, ppos, (u32)value);
-}
-
-static ssize_t port_839x_lltp_action_write(struct file *filp, const char __user *buffer,
-				size_t count, loff_t *ppos)
-{
-	struct rtl838x_port *p = filp->private_data;
-	u32 value;
-	u32 port = p->dp->index;
-	size_t res = rtl838x_common_write(buffer, count, ppos, &value);
-	if (res < 0)
-		return res;
-
-	sw_w32_mask(3 << ((port&0xf) << 1), (value & 0x3) << ((port&0xf) << 1), RTL839X_RMA_LLTP_CTRL + ((port >> 4) << 2));
-	return res;
-}
-
-static const struct file_operations port_839x_action_lltp_fops = {
-	.owner = THIS_MODULE,
-	.open = simple_open,
-	.read = port_839x_lltp_action_read,
-	.write = port_839x_lltp_action_write,
-};
 
 
 
@@ -570,9 +516,6 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 				(u32 *)(RTL838X_SW_BASE + RTL838X_VLAN_PORT_TAG_STS_CTRL 
 				+ (port << 2)));
 
-		debugfs_create_file("action_bpdu", 0600, port_dir, &priv->ports[port],&port_838x_action_bpdu_fops);
-		debugfs_create_file("action_ptp", 0600, port_dir, &priv->ports[port],&port_838x_action_ptp_fops);
-		debugfs_create_file("action_lltp", 0600, port_dir, &priv->ports[port],&port_838x_action_lltp_fops);
 
 	} else {
 		debugfs_create_x32("storm_rate_uc", 0644, port_dir,
@@ -587,10 +530,13 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 		debugfs_create_x32("vlan_port_tag_sts_ctrl", 0644, port_dir,
 				(u32 *)(RTL838X_SW_BASE + RTL839X_VLAN_PORT_TAG_STS_CTRL
 				+ (port << 2)));
-		debugfs_create_file("action_bpdu", 0600, port_dir, &priv->ports[port],&port_839x_action_bpdu_fops);
-		debugfs_create_file("action_ptp", 0600, port_dir, &priv->ports[port],&port_839x_action_ptp_fops);
-		debugfs_create_file("action_lltp", 0600, port_dir, &priv->ports[port],&port_839x_action_lltp_fops);
 	}
+
+	debugfs_create_file("action_bpdu", 0600, port_dir, &priv->ports[port],&port_838x_action_bpdu_fops);
+	debugfs_create_file("action_ptp", 0600, port_dir, &priv->ports[port],&port_838x_action_ptp_fops);
+	debugfs_create_file("action_lltp", 0600, port_dir, &priv->ports[port],&port_838x_action_lltp_fops);
+	if (priv->r->rma_lltp_ctrl)
+		debugfs_create_file("action_eapol", 0600, port_dir, &priv->ports[port],&port_838x_action_eapol_fops);
 
 	debugfs_create_u32("id", 0444, port_dir, (u32 *)&priv->ports[port].dp->index);
 

@@ -389,5 +389,13 @@ const struct rtl838x_reg rtl931x_reg = {
 //	.vlan_port_pb = does not exist
 	.vlan_port_tag_sts_ctrl = RTL931X_VLAN_PORT_TAG_CTRL,
 	.trk_mbr_ctr = rtl931x_trk_mbr_ctr,
+	.rma_bpdu_ctrl = RTL931X_RMA_BPDU_CTRL,
+	.rma_ptp_ctrl = RTL931X_RMA_PTP_CTRL,
+	.rma_lltp_ctrl = RTL931X_RMA_LLTP_CTRL,
+	.rma_eapol_ctrl = RTL931X_RMA_EAPOL_CTRL,
+	.rma_bpdu_ctrl_div = 10,
+	.rma_ptp_ctrl_div = 1,
+	.rma_lltp_ctrl_div = 10,
+	.rma_eapol_ctrl_div = 10,
 };
 

@@ -1808,4 +1808,10 @@ const struct rtl838x_reg rtl839x_reg = {
 	.packet_cntr_clear = rtl839x_packet_cntr_clear,
 	.enable_learning = rtl839x_enable_learning,
 	.enable_flood = rtl839x_enable_flood,
+	.rma_bpdu_ctrl = RTL839X_RMA_BPDU_CTRL,
+	.rma_ptp_ctrl = RTL839X_RMA_PTP_CTRL,
+	.rma_lltp_ctrl = RTL839X_RMA_LLTP_CTRL,
+	.rma_bpdu_ctrl_div = 16,
+	.rma_ptp_ctrl_div = 16,
+	.rma_lltp_ctrl_div = 16,
 };

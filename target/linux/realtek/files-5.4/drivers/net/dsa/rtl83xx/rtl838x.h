@@ -350,12 +350,21 @@
 
 #define RTL838X_RMA_BPDU_CTRL		(0x4330) 
 #define RTL839X_RMA_BPDU_CTRL		(0x122C)
+#define RTL930X_RMA_BPDU_CTRL		(0x9E7C)
+#define RTL931X_RMA_BPDU_CTRL		(0x881C)
 
 #define RTL838X_RMA_PTP_CTRL		(0x4338) 
 #define RTL839X_RMA_PTP_CTRL		(0x123C)
+#define RTL930X_RMA_PTP_CTRL		(0x9E88)
+#define RTL931X_RMA_PTP_CTRL		(0x8834)
 
 #define RTL838X_RMA_LLTP_CTRL		(0x4340) 
 #define RTL839X_RMA_LLTP_CTRL		(0x124C)
+#define RTL930X_RMA_LLTP_CTRL		(0x9EFC)
+#define RTL931X_RMA_LLTP_CTRL		(0x8918)
+
+#define RTL930X_RMA_EAPOL_CTRL		(0x9F08)
+#define RTL931X_RMA_EAPOL_CTRL		(0x8930)
 
 
 /* QoS */
@@ -785,26 +794,14 @@ struct rtl838x_reg {
 	void (*mask_port_reg_le)(u64 clear, u64 set, int reg);
 	void (*set_port_reg_le)(u64 set, int reg);
 	u64 (*get_port_reg_le)(int reg);
-	int stat_port_rst;
-	int stat_rst;
-	int stat_port_std_mib;
 	int (*port_iso_ctrl)(int p);
 	void (*traffic_enable)(int source, int dest);
 	void (*traffic_disable)(int source, int dest);
 	void (*traffic_set)(int source, u64 dest_matrix);
 	u64 (*traffic_get)(int source);
-	int l2_ctrl_0;
-	int l2_ctrl_1;
-	int l2_port_aging_out;
-	int smi_poll_ctrl;
-	int l2_tbl_flush_ctrl;
 	void (*exec_tbl0_cmd)(u32 cmd);
 	void (*exec_tbl1_cmd)(u32 cmd);
 	int (*tbl_access_data_0)(int i);
-	int isr_glb_src;
-	int isr_port_link_sts_chg;
-	int imr_port_link_sts_chg;
-	int imr_glb;
 	void (*vlan_tables_read)(u32 vlan, struct rtl838x_vlan_info *info);
 	void (*vlan_set_tagged)(u32 vlan, struct rtl838x_vlan_info *info);
 	void (*vlan_set_untagged)(u32 vlan, u64 portmask);
@@ -816,26 +813,13 @@ struct rtl838x_reg {
 	int  (*mac_port_ctrl)(int port);
 	int  (*l2_port_new_salrn)(int port);
 	int  (*l2_port_new_sa_fwd)(int port);
-	int mir_ctrl;
-	int mir_dpm;
-	int mir_spm;
-	int mac_link_sts;
-	int mac_link_dup_sts;
 	int  (*mac_link_spd_sts)(int port);
-	int mac_rx_pause_sts;
-	int mac_tx_pause_sts;
 	u64 (*read_l2_entry_using_hash)(u32 hash, u32 position, struct rtl838x_l2_entry *e);
 	void (*write_l2_entry_using_hash)(u32 hash, u32 pos, struct rtl838x_l2_entry *e);
 	u64 (*read_cam)(int idx, struct rtl838x_l2_entry *e);
 	void (*write_cam)(int idx, struct rtl838x_l2_entry *e);
-	int vlan_port_egr_filter;
-	int vlan_port_igr_filter;
-	int vlan_port_pb;
-	int vlan_port_tag_sts_ctrl;
 	int (*rtl838x_vlan_port_tag_sts_ctrl)(int port);
 	int (*trk_mbr_ctr)(int group);
-	int rma_bpdu_fld_pmask;
-	int spcl_trap_eapol_ctrl;
 	void (*init_eee)(struct rtl838x_switch_priv *priv, bool enable);
 	void (*port_eee_set)(struct rtl838x_switch_priv *priv, int port, bool enable);
 	int (*eee_port_ability)(struct rtl838x_switch_priv *priv,
@@ -869,6 +853,39 @@ struct rtl838x_reg {
 	void (*enable_flood)(int port, bool enable);
 	void (*enable_mcast_flood)(int port, bool enable);
 	void (*enable_bcast_flood)(int port, bool enable);
+	u32 stat_port_rst;
+	u32 stat_rst;
+	u32 stat_port_std_mib;
+	u32 l2_ctrl_0;
+	u32 l2_ctrl_1;
+	u32 l2_port_aging_out;
+	u32 smi_poll_ctrl;
+	u32 l2_tbl_flush_ctrl;
+	u32 isr_glb_src;
+	u32 isr_port_link_sts_chg;
+	u32 imr_port_link_sts_chg;
+	u32 imr_glb;
+	u32 mir_ctrl;
+	u32 mir_dpm;
+	u32 mir_spm;
+	u32 mac_link_sts;
+	u32 mac_link_dup_sts;
+	u32 mac_rx_pause_sts;
+	u32 mac_tx_pause_sts;
+	u32 vlan_port_egr_filter;
+	u32 vlan_port_igr_filter;
+	u32 vlan_port_pb;
+	u32 vlan_port_tag_sts_ctrl;
+	u32 rma_bpdu_fld_pmask;
+	u32 spcl_trap_eapol_ctrl;
+	u32 rma_bpdu_ctrl;
+    	u32 rma_ptp_ctrl;
+	u32 rma_lltp_ctrl;
+	u32 rma_eapol_ctrl;
+	u32 rma_bpdu_ctrl_div;
+	u32 rma_ptp_ctrl_div;
+	u32 rma_lltp_ctrl_div;
+	u32 rma_eapol_ctrl_div;
 };
 struct rtl838x_switch_priv {
 	/* Switch operation */
