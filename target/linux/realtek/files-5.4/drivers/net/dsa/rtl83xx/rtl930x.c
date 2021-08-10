@@ -2446,4 +2446,12 @@ const struct rtl838x_reg rtl930x_reg = {
 	.set_l3_egress_intf = rtl930x_set_l3_egress_intf,
 	.packet_cntr_read = rtl930x_packet_cntr_read,
 	.packet_cntr_clear = rtl930x_packet_cntr_clear,
+	.rma_bpdu_ctrl = RTL930X_RMA_BPDU_CTRL,
+	.rma_ptp_ctrl = RTL930X_RMA_PTP_CTRL,
+	.rma_lltp_ctrl = RTL930X_RMA_LLTP_CTRL,
+	.rma_eapol_ctrl = RTL930X_RMA_EAPOL_CTRL,
+	.rma_bpdu_ctrl_div = 10,
+	.rma_ptp_ctrl_div = 1,
+	.rma_lltp_ctrl_div = 10,
+	.rma_eapol_ctrl_div = 10,
 };
