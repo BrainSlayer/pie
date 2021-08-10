@@ -1413,7 +1413,7 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 				   bool ingress)
 {
 	/* We support 4 mirror groups, one destination port per group */
-	int group, err;
+	int group, err = 0;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int ctrl_reg, dpm_reg, spm_reg;
 	pr_debug("In %s\n", __func__);
@@ -1438,7 +1438,7 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 	ctrl_reg = priv->r->mir_ctrl + (group * 4);
 	dpm_reg = priv->r->mir_dpm + ((group << 2) * priv->port_width);
 	spm_reg = priv->r->mir_spm + ((group << 2) * priv->port_width);
-	pr_info("Using group %d local port %d, port %d\n", group, mirror->to_local_port, port);
+	pr_debug("Using group %d local port %d, port %d\n", group, mirror->to_local_port, port);
 	
 
 	if (priv->family_id == RTL8380_FAMILY_ID) {
@@ -1450,16 +1450,13 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 	}
 
 	if (ingress && (priv->r->get_port_reg_be(spm_reg) & (1ULL << port))) {
-		mutex_unlock(&priv->reg_mutex);
 		err = -EEXIST;
 		goto out;
 	}
 	if ((!ingress) && (priv->r->get_port_reg_be(dpm_reg) & (1ULL << port))) {
-		mutex_unlock(&priv->reg_mutex);
 		err = -EEXIST;
 		goto out;
 	}
-
 	if (ingress)
 		priv->r->mask_port_reg_be(0, 1ULL << port, spm_reg);
 	else
@@ -1498,8 +1495,9 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 		/* Egress, clear destination port matrix */
 		priv->r->mask_port_reg_be(1ULL << port, 0, dpm_reg);
 	}
+	
+	if (!(priv->r->get_port_reg_be(dpm_reg) & (1ULL << port)) && !(priv->r->get_port_reg_be(spm_reg) & (1ULL << port))) {
 
-	if (!((priv->r->get_port_reg_be(dpm_reg) & 1ULL << port) && (priv->r->get_port_reg_be(spm_reg) & 1ULL << port))) {
 		priv->mirror_group_ports[group] = -1;
 		sw_w32(0, ctrl_reg);
 	}
