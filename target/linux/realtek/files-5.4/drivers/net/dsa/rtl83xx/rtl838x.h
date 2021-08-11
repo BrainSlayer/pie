@@ -291,12 +291,28 @@
 #define RTL838X_STORM_CTRL_PORT_UC(p)		(0x4718 + (((p) << 2)))
 #define RTL838X_STORM_CTRL_PORT_MC(p)		(0x478c + (((p) << 2)))
 #define RTL838X_STORM_CTRL_PORT_BC(p)		(0x4800 + (((p) << 2)))
+
 #define RTL839X_STORM_CTRL_PORT_UC_0(p)		(0x185C + (((p) << 3)))
 #define RTL839X_STORM_CTRL_PORT_UC_1(p)		(0x1860 + (((p) << 3)))
 #define RTL839X_STORM_CTRL_PORT_MC_0(p)		(0x19FC + (((p) << 3)))
 #define RTL839X_STORM_CTRL_PORT_MC_1(p)		(0x1a00 + (((p) << 3)))
 #define RTL839X_STORM_CTRL_PORT_BC_0(p)		(0x1B9C + (((p) << 3)))
 #define RTL839X_STORM_CTRL_PORT_BC_1(p)		(0x1BA0 + (((p) << 3)))
+
+#define RTL930X_STORM_CTRL_PORT_UC_0(p)		(0x1A70 + (((p) << 3)))
+#define RTL930X_STORM_CTRL_PORT_UC_1(p)		(0x1A74 + (((p) << 3)))
+#define RTL930X_STORM_CTRL_PORT_MC_0(p)		(0x8B60 + (((p) << 3)))
+#define RTL930X_STORM_CTRL_PORT_MC_1(p)		(0x8B64 + (((p) << 3)))
+#define RTL930X_STORM_CTRL_PORT_BC_0(p)		(0x8C50 + (((p) << 3)))
+#define RTL930X_STORM_CTRL_PORT_BC_1(p)		(0x8C54 + (((p) << 3)))
+
+#define RTL931X_STORM_CTRL_PORT_UC_0(p)		(0xB014 + (((p) << 3)))
+#define RTL931X_STORM_CTRL_PORT_UC_1(p)		(0xB018 + (((p) << 3)))
+#define RTL931X_STORM_CTRL_PORT_MC_0(p)		(0xB1EC + (((p) << 3)))
+#define RTL931X_STORM_CTRL_PORT_MC_1(p)		(0xB1F0 + (((p) << 3)))
+#define RTL931X_STORM_CTRL_PORT_BC_0(p)		(0xB3C4 + (((p) << 3)))
+#define RTL931X_STORM_CTRL_PORT_BC_1(p)		(0xB3C4 + (((p) << 3)))
+
 #define RTL839X_TBL_ACCESS_CTRL_2		(0x611C)
 #define RTL839X_TBL_ACCESS_DATA_2(i)		(0x6120 + (((i) << 2)))
 #define RTL839X_IGR_BWCTRL_PORT_CTRL_10G_0(p)	(0x1618 + (((p) << 3)))
@@ -877,7 +893,6 @@ struct rtl838x_reg {
 	u32 vlan_port_pb;
 	u32 vlan_port_tag_sts_ctrl;
 	u32 rma_bpdu_fld_pmask;
-	u32 spcl_trap_eapol_ctrl;
 	u32 rma_bpdu_ctrl;
     	u32 rma_ptp_ctrl;
 	u32 rma_lltp_ctrl;
@@ -886,7 +901,25 @@ struct rtl838x_reg {
 	u32 rma_ptp_ctrl_div;
 	u32 rma_lltp_ctrl_div;
 	u32 rma_eapol_ctrl_div;
+	u32 storm_ctrl_port_uc;
+	u32 storm_ctrl_port_mc;
+	u32 storm_ctrl_port_bc;
+	u32 storm_ctrl_port_uc_shift;
+	u32 storm_ctrl_port_mc_shift;
+	u32 storm_ctrl_port_bc_shift;
+	u32 vlan_ctrl;
+	u32 spcl_trap_eapol_ctrl;
+	u32 spcl_trap_arp_ctrl;
+	u32 spcl_trap_igmp_ctrl;
+	u32 spcl_trap_ipv6_ctrl;
+	u32 spcl_trap_switch_mac_ctrl;
+	u32 spcl_trap_switch_ipv4_addr_ctrl;
+	u32 spcl_trap_crc_ctrl;
+	u32 spcl_trap_ctrl;
 };
+
+
+
 struct rtl838x_switch_priv {
 	/* Switch operation */
 	struct dsa_switch *ds;
