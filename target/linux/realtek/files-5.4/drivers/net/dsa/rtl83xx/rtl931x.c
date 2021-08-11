@@ -397,5 +397,12 @@ const struct rtl838x_reg rtl931x_reg = {
 	.rma_ptp_ctrl_div = 1,
 	.rma_lltp_ctrl_div = 10,
 	.rma_eapol_ctrl_div = 10,
+	.storm_ctrl_port_uc = RTL931X_STORM_CTRL_PORT_UC_0(0),
+	.storm_ctrl_port_bc = RTL931X_STORM_CTRL_PORT_BC_0(0),
+	.storm_ctrl_port_mc = RTL931X_STORM_CTRL_PORT_MC_0(0),
+	.storm_ctrl_port_uc_shift = 3,
+	.storm_ctrl_port_bc_shift = 3,
+	.storm_ctrl_port_mc_shift = 3,
+	.vlan_ctrl = RTL931X_VLAN_CTRL,
 };
 
