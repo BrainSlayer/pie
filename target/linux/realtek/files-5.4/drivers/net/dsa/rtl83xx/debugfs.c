@@ -441,6 +441,8 @@ static const struct file_operations port_838x_action_lltp_fops = {
 
 
 
+
+
 static ssize_t port_838x_eapol_action_read(struct file *filp, char __user *buffer, size_t count,
 				loff_t *ppos)
 {
@@ -502,35 +504,18 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 
 	port_dir = debugfs_create_dir(priv->ports[port].dp->name, parent);
 
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-		debugfs_create_x32("storm_rate_uc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_STORM_CTRL_PORT_UC(port)));
+	debugfs_create_x32("storm_rate_uc", 0644, port_dir,
+			(u32 *)(RTL838X_SW_BASE + priv->r->storm_ctrl_port_uc + (port << priv->r->storm_ctrl_port_uc_shift)));
 
-		debugfs_create_x32("storm_rate_mc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_STORM_CTRL_PORT_MC(port)));
+	debugfs_create_x32("storm_rate_mc", 0644, port_dir,
+			(u32 *)(RTL838X_SW_BASE + priv->r->storm_ctrl_port_mc + (port << priv->r->storm_ctrl_port_mc_shift)));
 
-		debugfs_create_x32("storm_rate_bc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_STORM_CTRL_PORT_BC(port)));
+	debugfs_create_x32("storm_rate_bc", 0644, port_dir,
+			(u32 *)(RTL838X_SW_BASE + priv->r->storm_ctrl_port_bc + (port << priv->r->storm_ctrl_port_bc_shift)));
 
-		debugfs_create_x32("vlan_port_tag_sts_ctrl", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_VLAN_PORT_TAG_STS_CTRL 
-				+ (port << 2)));
+	debugfs_create_x32("vlan_port_tag_sts_ctrl", 0644, port_dir,
+			(u32 *)(RTL838X_SW_BASE + priv->r->vlan_port_tag_sts_ctrl + (port << 2)));
 
-
-	} else {
-		debugfs_create_x32("storm_rate_uc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_STORM_CTRL_PORT_UC_0(port)));
-
-		debugfs_create_x32("storm_rate_mc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_STORM_CTRL_PORT_MC_0(port)));
-
-		debugfs_create_x32("storm_rate_bc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_STORM_CTRL_PORT_BC_0(port)));
-
-		debugfs_create_x32("vlan_port_tag_sts_ctrl", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_VLAN_PORT_TAG_STS_CTRL
-				+ (port << 2)));
-	}
 
 	debugfs_create_file("action_bpdu", 0600, port_dir, &priv->ports[port],&port_838x_action_bpdu_fops);
 	debugfs_create_file("action_ptp", 0600, port_dir, &priv->ports[port],&port_838x_action_ptp_fops);
@@ -728,45 +713,34 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 		}
 	}
 
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-		debugfs_create_x32("bpdu_flood_mask", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + priv->r->rma_bpdu_fld_pmask));
-		debugfs_create_x32("vlan_ctrl", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_VLAN_CTRL));
+	debugfs_create_x32("bpdu_flood_mask", 0644, rtl838x_dir,
+			(u32 *)(RTL838X_SW_BASE + priv->r->rma_bpdu_fld_pmask));
+	debugfs_create_x32("vlan_ctrl", 0644, rtl838x_dir,
+			(u32 *)(RTL838X_SW_BASE + priv->r->vlan_ctrl));
+	if (priv->r->spcl_trap_eapol_ctrl)
 		debugfs_create_x32("trap_eapol", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_SPCL_TRAP_EAPOL_CTRL));
+				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_eapol_ctrl));
+	if (priv->r->spcl_trap_arp_ctrl)
 		debugfs_create_x32("trap_arp", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_SPCL_TRAP_ARP_CTRL));
+				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_arp_ctrl));
+	if (priv->r->spcl_trap_igmp_ctrl)
 		debugfs_create_x32("trap_igmp", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_SPCL_TRAP_IGMP_CTRL));
+				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_igmp_ctrl));
+	if (priv->r->spcl_trap_ipv6_ctrl)
 		debugfs_create_x32("trap_ipv6", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_SPCL_TRAP_IPV6_CTRL));
+				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_ipv6_ctrl));
+	if (priv->r->spcl_trap_switch_mac_ctrl)
 		debugfs_create_x32("trap_switch_mac", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_SPCL_TRAP_SWITCH_MAC_CTRL));
-		debugfs_create_x32("trap", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_SPCL_TRAP_CTRL));
-	} else {
-		debugfs_create_x64("bpdu_flood_mask", 0644, rtl838x_dir,
-				(u64 *)(RTL838X_SW_BASE + priv->r->rma_bpdu_fld_pmask));
-		debugfs_create_x32("vlan_ctrl", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_VLAN_CTRL));
-		debugfs_create_x32("trap_eapol", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_SPCL_TRAP_EAPOL_CTRL));
-		debugfs_create_x32("trap_arp", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_SPCL_TRAP_ARP_CTRL));
-		debugfs_create_x32("trap_igmp", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_SPCL_TRAP_IGMP_CTRL));
-		debugfs_create_x32("trap_ipv6", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_SPCL_TRAP_IPV6_CTRL));
-		debugfs_create_x32("trap_switch_mac", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_SPCL_TRAP_SWITCH_MAC_CTRL));
+				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_switch_mac_ctrl));
+	if (priv->r->spcl_trap_switch_ipv4_addr_ctrl)
 		debugfs_create_x32("trap_switch_ipv4_addr", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_SPCL_TRAP_SWITCH_IPV4_ADDR_CTRL));
+				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_switch_ipv4_addr_ctrl));
+	if (priv->r->spcl_trap_crc_ctrl)
 		debugfs_create_x32("trap_crc", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_SPCL_TRAP_CRC_CTRL));
+				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_crc_ctrl));
+	if (priv->r->spcl_trap_ctrl)
 		debugfs_create_x32("trap", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_SPCL_TRAP_CTRL));
-	}
+				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_ctrl));
 
 	ret = rtl838x_dbgfs_leds(rtl838x_dir, priv);
 	if (ret)

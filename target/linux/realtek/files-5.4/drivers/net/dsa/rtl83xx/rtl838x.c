@@ -1683,7 +1683,6 @@ const struct rtl838x_reg rtl838x_reg = {
 	.vlan_port_tag_sts_ctrl = RTL838X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl838x_trk_mbr_ctr,
 	.rma_bpdu_fld_pmask = RTL838X_RMA_BPDU_FLD_PMSK,
-	.spcl_trap_eapol_ctrl = RTL838X_SPCL_TRAP_EAPOL_CTRL,
 	.init_eee = rtl838x_init_eee,
 	.port_eee_set = rtl838x_port_eee_set,
 	.eee_port_ability = rtl838x_eee_port_ability,
@@ -1709,6 +1708,19 @@ const struct rtl838x_reg rtl838x_reg = {
 	.rma_bpdu_ctrl_div = 16,
 	.rma_ptp_ctrl_div = 16,
 	.rma_lltp_ctrl_div = 16,
+	.storm_ctrl_port_uc = RTL838X_STORM_CTRL_PORT_UC(0),
+	.storm_ctrl_port_bc = RTL838X_STORM_CTRL_PORT_BC(0),
+	.storm_ctrl_port_mc = RTL838X_STORM_CTRL_PORT_MC(0),
+	.storm_ctrl_port_uc_shift = 2,
+	.storm_ctrl_port_bc_shift = 2,
+	.storm_ctrl_port_mc_shift = 2,
+	.spcl_trap_eapol_ctrl = RTL838X_SPCL_TRAP_EAPOL_CTRL,
+	.spcl_trap_arp_ctrl = RTL838X_SPCL_TRAP_ARP_CTRL,
+	.spcl_trap_igmp_ctrl = RTL838X_SPCL_TRAP_IGMP_CTRL,
+	.spcl_trap_ipv6_ctrl = RTL838X_SPCL_TRAP_IPV6_CTRL,
+	.spcl_trap_switch_mac_ctrl = RTL838X_SPCL_TRAP_SWITCH_MAC_CTRL,
+	.spcl_trap_ctrl = RTL838X_SPCL_TRAP_CTRL,
+	.vlan_ctrl = RTL838X_VLAN_CTRL,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
