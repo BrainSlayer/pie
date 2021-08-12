@@ -2461,4 +2461,6 @@ const struct rtl838x_reg rtl930x_reg = {
 	.storm_ctrl_port_bc_shift = 3,
 	.storm_ctrl_port_mc_shift = 3,
 	.vlan_ctrl = RTL930X_VLAN_CTRL,
+	.sflow_ctrl = RTL930X_SFLOW_CTRL,
+	.sflow_port_rate_ctrl = RTL930X_SFLOW_PORT_RATE_CTRL,
 };
