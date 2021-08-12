@@ -240,20 +240,28 @@
 #define RTL839X_MIR_CTRL			(0x2500)
 #define RTL839X_MIR_DPM_CTRL			(0x2530)
 #define RTL839X_MIR_SPM_CTRL			(0x2510)
+#define RTL839X_MIR_SAMPLE_RATE_CTRL		(0x2558)
+#define RTL839X_SFLOW_CTRL			(0x2400)
+#define RTL839X_SFLOW_PORT_RATE_CTRL		(0x2404)
 
 #define RTL930X_MIR_CTRL			(0xA2A0)
 #define RTL930X_MIR_DPM_CTRL			(0xA2C0)
 #define RTL930X_MIR_SPM_CTRL			(0xA2B0)
+#define RTL930X_MIR_SAMPLE_RATE_CTRL		(0xA2D0)
+#define RTL930X_SFLOW_CTRL			(0xBEA0)
+#define RTL930X_SFLOW_PORT_RATE_CTRL		(0xBEA4)
 
 #define RTL931X_MIR_CTRL			(0xAF00)
 #define RTL931X_MIR_DPM_CTRL			(0xAF30)
 #define RTL931X_MIR_SPM_CTRL			(0xAF10)
+#define RTL931X_MIR_SAMPLE_RATE_CTRL		(0xAF50)
+#define RTL931X_SFLOW_CTRL			(0x8400)
+#define RTL931X_SFLOW_PORT_RATE_CTRL		(0x8404)
 
 #define RTL931X_MIR_RSPAN_VLAN_CTRL			(0x69A0)
 #define RTL931X_MIR_RSPAN_TX_CTRL			(0x69B0)
-#define RTL931X_MIR_RSPAN_RX_TAG_RM_CTRL		(0x2550)
+#define RTL931X_MIR_RSPAN_RX_TAG_RM_CTRL		(0xAF5C)
 #define RTL931X_MIR_RSPAN_RX_TAG_EN_CTRL		(0x2554)
-#define RTL931X_MIR_SAMPLE_RATE_CTRL			(0x2558)
 
 
 
@@ -916,6 +924,8 @@ struct rtl838x_reg {
 	u32 spcl_trap_switch_ipv4_addr_ctrl;
 	u32 spcl_trap_crc_ctrl;
 	u32 spcl_trap_ctrl;
+	u32 sflow_ctrl;
+	u32 sflow_port_rate_ctrl;
 };
 
 
@@ -946,6 +956,7 @@ struct rtl838x_switch_priv {
 	int n_lags;
 	u64 lags_port_members[MAX_LAGS];
 	struct net_device *lag_devs[MAX_LAGS];
+	u64 lagmembers;
 	struct notifier_block nb;  // TODO: change to different name
 	struct notifier_block ne_nb;
 	struct notifier_block fib_nb;

@@ -40,7 +40,6 @@
 #define RTL839X_MIR_RSPAN_TX_CTRL		(0x69b0)
 #define RTL839X_MIR_RSPAN_TX_TAG_RM_CTRL	(0x2550)
 #define RTL839X_MIR_RSPAN_TX_TAG_EN_CTRL	(0x2554)
-#define RTL839X_MIR_SAMPLE_RATE_CTRL		(0x2558)
 
 #define RTL838X_STAT_PRVTE_DROP_COUNTERS	(0x6A00)
 #define RTL839X_STAT_PRVTE_DROP_COUNTERS	(0x3E00)
@@ -504,6 +503,8 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 
 	port_dir = debugfs_create_dir(priv->ports[port].dp->name, parent);
 
+	debugfs_create_x32("sflow_port_rate", 0644, port_dir,
+			(u32 *)(RTL838X_SW_BASE + priv->r->sflow_port_rate_ctrl + (port << 2)));
 	debugfs_create_x32("storm_rate_uc", 0644, port_dir,
 			(u32 *)(RTL838X_SW_BASE + priv->r->storm_ctrl_port_uc + (port << priv->r->storm_ctrl_port_uc_shift)));
 
@@ -717,6 +718,8 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 			(u32 *)(RTL838X_SW_BASE + priv->r->rma_bpdu_fld_pmask));
 	debugfs_create_x32("vlan_ctrl", 0644, rtl838x_dir,
 			(u32 *)(RTL838X_SW_BASE + priv->r->vlan_ctrl));
+	debugfs_create_x32("sflow_ctrl", 0644, rtl838x_dir,
+			(u32 *)(RTL838X_SW_BASE + priv->r->sflow_ctrl));
 	if (priv->r->spcl_trap_eapol_ctrl)
 		debugfs_create_x32("trap_eapol", 0644, rtl838x_dir,
 				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_eapol_ctrl));
