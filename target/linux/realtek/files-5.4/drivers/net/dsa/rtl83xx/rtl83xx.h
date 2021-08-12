@@ -4,7 +4,7 @@
 #define _NET_DSA_RTL83XX_H
 
 #include <net/dsa.h>
-#include "rtl838x.h"
+#include <linux/rtl838x.h>
 
 
 #define RTL8380_VERSION_A 'A'

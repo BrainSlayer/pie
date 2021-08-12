@@ -7,7 +7,6 @@
 
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
 #include "rtl83xx.h"
-#include "rtl838x.h"
 
 /*
  * Parse the flow rule for the matching conditions

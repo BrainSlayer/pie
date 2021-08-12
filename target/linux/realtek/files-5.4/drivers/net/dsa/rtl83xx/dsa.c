@@ -106,7 +106,7 @@ static enum dsa_tag_protocol rtl83xx_get_tag_protocol(struct dsa_switch *ds, int
 	/* The switch does not tag the frames, instead internally the header
 	 * structure for each packet is tagged accordingly.
 	 */
-	return DSA_TAG_PROTO_TRAILER;
+	return DSA_TAG_PROTO_RTL83XX;
 }
 
 /*
@@ -864,7 +864,6 @@ static int rtl83xx_vlan_filtering(struct dsa_switch *ds, int port,
 				  bool vlan_filtering)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-
 	pr_debug("%s: port %d\n", __func__, port);
 	mutex_lock(&priv->reg_mutex);
 
@@ -1415,10 +1414,13 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 	/* We support 4 mirror groups, one destination port per group */
 	int group, err = 0;
 	struct rtl838x_switch_priv *priv = ds->priv;
+	struct rtl838x_vlan_info info;
 	int ctrl_reg, dpm_reg, spm_reg;
+	int v;
 	pr_debug("In %s\n", __func__);
 
 	mutex_lock(&priv->reg_mutex);
+
 	for (group = 0; group < 4; group++) {
 		if (priv->mirror_group_ports[group] == mirror->to_local_port)
 			break;
@@ -1505,6 +1507,19 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 	mutex_unlock(&priv->reg_mutex);
 }
 
+static bool rtl83xx_lag_can_offload(struct dsa_switch *ds,
+				      struct net_device *lag,
+				      struct netdev_lag_upper_info *info)
+{
+	struct dsa_port *dp;
+	int id;
+
+	id = dsa_lag_id(ds->dst, lag);
+	if (id < 0 || id >= ds->num_lag_ids)
+		return false;
+	return true;
+}
+
 /* pointless? */
 static int rtl83xx_port_lag_change(struct dsa_switch *ds, int port)
 {
@@ -1512,9 +1527,11 @@ static int rtl83xx_port_lag_change(struct dsa_switch *ds, int port)
 	struct net_device *lag;
 	unsigned int id;
 	struct rtl838x_switch_priv *priv = ds->priv;
+	pr_info("%s: %d\n", __func__, port);
 	mutex_lock(&priv->reg_mutex);
 	dsa_lags_foreach_id(id, ds->dst) {
 		lag = dsa_lag_dev(ds->dst, id);
+		pr_info("lag id %d = %p\n", id, lag);
 		if (!lag)
 			continue;
 
@@ -1522,10 +1539,10 @@ static int rtl83xx_port_lag_change(struct dsa_switch *ds, int port)
 			if (dp->ds == ds) {
 				if (dp->lag_tx_enabled) {
 					pr_info("port_lag_change: enable port %d\n",dp->index); 
-					rtl83xx_port_enable(ds, dp->index, NULL);
+	//				rtl83xx_port_enable(ds, dp->index, NULL);
 				} else {
 					pr_info("port_lag_change: disable port %d\n",dp->index); 
-					rtl83xx_port_disable(ds, dp->index);
+	//				rtl83xx_port_disable(ds, dp->index);
 				}
 			}
 		}
@@ -1541,6 +1558,9 @@ static int rtl83xx_port_lag_join(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int i, err;
 
+	if (!rtl83xx_lag_can_offload(ds, lag, info))
+		return -EOPNOTSUPP;
+
 	mutex_lock(&priv->reg_mutex);
 
 	for (i = 0; i < priv->n_lags; i++) {
@@ -1554,6 +1574,8 @@ static int rtl83xx_port_lag_join(struct dsa_switch *ds, int port,
 	pr_info("port_lag_join: group %d, port %d\n",i, port); 
 	if (!priv->lag_devs[i])
 		priv->lag_devs[i] = lag;
+	priv->lagmembers |= (1ULL << port);
+	pr_info("lag_members = %llX\n", priv->lagmembers);
 	err = rtl83xx_lag_add(priv->ds, i, port);
 	if (err) {
 		err = -EINVAL;
@@ -1574,7 +1596,7 @@ static int rtl83xx_port_lag_leave(struct dsa_switch *ds, int port,
 	
 	mutex_lock(&priv->reg_mutex);
 	for (i=0;i<priv->n_lags;i++) {
-		if (priv->lags_port_members[group] & BIT_ULL(port)) {
+		if (priv->lags_port_members[i] & BIT_ULL(port)) {
 			group = i;
 			break;
 		}
@@ -1591,11 +1613,15 @@ static int rtl83xx_port_lag_leave(struct dsa_switch *ds, int port,
 		goto out;
 	}
 	pr_info("port_lag_del: group %d, port %d\n",group, port); 
+	priv->lagmembers &=~ (1ULL << port);
+	pr_info("lag_members = %llX\n", priv->lagmembers);
 	err = rtl83xx_lag_del(priv->ds, group, port);
 	if (err) {
 		err = -EINVAL;
 		goto out;
 	}
+	if (!priv->lags_port_members[i])
+		priv->lag_devs[i] = NULL;
 
 out:
 	mutex_unlock(&priv->reg_mutex);

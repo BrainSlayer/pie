@@ -412,7 +412,7 @@ int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port)
 	}
 
 	for (i = 0; i < priv->n_lags; i++) {
-		if (priv->lags_port_members[i] & BIT_ULL(i))
+		if (priv->lags_port_members[i] & BIT_ULL(port))
 			break;
 	}
 	if (i != priv->n_lags) {
@@ -446,8 +446,7 @@ int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port)
 
 
 	if (!(priv->lags_port_members[group] & BIT_ULL(port))) {
-		pr_err("%s: Port not member of LAG: %d\n", __func__, group
-		);
+		pr_err("%s: Port not member of LAG: %d\n", __func__, group);
 		return -ENOSPC;
 	}
 
@@ -672,7 +671,7 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	struct rtl838x_switch_priv *priv;
 	int err;
 
-	pr_debug("In: %s, event: %lu\n", __func__, event);
+	pr_info("In: %s, event: %lu\n", __func__, event);
 
 	if ((event != NETDEV_CHANGEUPPER) && (event != NETDEV_CHANGELOWERSTATE))
 		return NOTIFY_DONE;
@@ -680,7 +679,7 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	priv = container_of(this, struct rtl838x_switch_priv, nb);
 	switch (event) {
 	case NETDEV_CHANGEUPPER:
-		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
+//		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
 		break;
 	}
 
