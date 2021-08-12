@@ -1721,6 +1721,8 @@ const struct rtl838x_reg rtl838x_reg = {
 	.spcl_trap_switch_mac_ctrl = RTL838X_SPCL_TRAP_SWITCH_MAC_CTRL,
 	.spcl_trap_ctrl = RTL838X_SPCL_TRAP_CTRL,
 	.vlan_ctrl = RTL838X_VLAN_CTRL,
+	.trk_hash_ctrl = RTL838X_TRK_HASH_CTRL,
+	.trk_hash_idx_ctrl = RTL838X_TRK_HASH_IDX_CTRL,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
