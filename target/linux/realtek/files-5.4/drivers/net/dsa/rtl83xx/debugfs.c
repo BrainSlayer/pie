@@ -624,7 +624,7 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 	struct dentry *mirror_dir;
 	struct debugfs_regset32 *port_ctrl_regset;
 	int ret, i;
-	char lag_name[10];
+	char lag_name[32];
 	char mirror_name[10];
 
 	pr_info("%s called\n", __func__);
@@ -663,14 +663,22 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 	/* Create entries for LAGs */
 	for (i = 0; i < priv->n_lags; i++) {
 		snprintf(lag_name, sizeof(lag_name), "lag.%02d", i);
-		if (priv->family_id == RTL8380_FAMILY_ID)
-			debugfs_create_x32(lag_name, 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + priv->r->trk_mbr_ctr(i)));
-		else
-			debugfs_create_x64(lag_name, 0644, rtl838x_dir,
-				(u64 *)(RTL838X_SW_BASE + priv->r->trk_mbr_ctr(i)));
+		debugfs_create_x64(lag_name, 0644, rtl838x_dir, (u64 *)(RTL838X_SW_BASE + priv->r->trk_mbr_ctr(i)));
 	}
-
+	if (priv->r->trk_hash_ctrl) {
+	for (i = 0; i < 4; i++) { 
+		snprintf(lag_name, sizeof(lag_name), "lag.hash_algo.%02d", i);
+		debugfs_create_x64(lag_name, 0644, rtl838x_dir, (u64 *)(RTL838X_SW_BASE + priv->r->trk_hash_ctrl + (i << 2)));
+	}
+	}
+	if (priv->r->trk_hash_idx_ctrl) {
+	for (i = 0; i < priv->n_lags; i++) { 
+		if (priv->family_id == RTL8390_FAMILY_ID) {
+			snprintf(lag_name, sizeof(lag_name), "lag.hash_algo_idx.%02d", i);
+			debugfs_create_x64(lag_name, 0644, rtl838x_dir, (u64 *)(RTL838X_SW_BASE + priv->r->trk_hash_idx_ctrl + ((i >> 4) << 2)));
+		}
+	}
+	}
 	/* Create directories for mirror groups */
 	for (i = 0; i < 4; i++) {
 		snprintf(mirror_name, sizeof(mirror_name), "mirror.%1d", i);

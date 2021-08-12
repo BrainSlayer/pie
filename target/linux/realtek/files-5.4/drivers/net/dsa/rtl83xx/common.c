@@ -419,7 +419,10 @@ int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port)
 		pr_err("%s: Port already member of LAG: %d\n", __func__, i);
 		return -ENOSPC;
 	}
-
+	if (priv->r->trk_hash_idx_ctrl) {
+		sw_w32(0, priv->r->trk_hash_idx_ctrl);
+		sw_w32(0x7f, priv->r->trk_hash_ctrl);
+	}
 	priv->r->mask_port_reg_be(0, BIT_ULL(port), priv->r->trk_mbr_ctr(group));
 	priv->lags_port_members[group] |= BIT_ULL(port);
 
@@ -449,7 +452,7 @@ int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port)
 		pr_err("%s: Port not member of LAG: %d\n", __func__, group);
 		return -ENOSPC;
 	}
-
+	// 0x7f algo mask all
 	priv->r->mask_port_reg_be(BIT_ULL(port), 0, priv->r->trk_mbr_ctr(group));
 	priv->lags_port_members[group] &= ~BIT_ULL(port);
 
@@ -679,7 +682,7 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	priv = container_of(this, struct rtl838x_switch_priv, nb);
 	switch (event) {
 	case NETDEV_CHANGEUPPER:
-//		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
+		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
 		break;
 	}
 

@@ -1526,18 +1526,57 @@ static int rtl83xx_port_lag_change(struct dsa_switch *ds, int port)
 	struct dsa_port *dp;
 	struct net_device *lag;
 	unsigned int id;
+	int num_tx, i;
 	struct rtl838x_switch_priv *priv = ds->priv;
+	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
 	pr_info("%s: %d\n", __func__, port);
 	mutex_lock(&priv->reg_mutex);
+
+
+
+
 	dsa_lags_foreach_id(id, ds->dst) {
 		lag = dsa_lag_dev(ds->dst, id);
 		pr_info("lag id %d = %p\n", id, lag);
 		if (!lag)
 			continue;
 
+		num_tx = 0;
 		dsa_lag_foreach_port(dp, ds->dst, lag) {
+			if (dp->lag_tx_enabled)
+				num_tx++;
+		}
+
+		if (!num_tx)
+			continue;
+
+		dsa_lag_foreach_port(dp, ds->dst, lag) {
+			if (!dp->lag_tx_enabled)
+			    continue;
 			if (dp->ds == ds) {
 				if (dp->lag_tx_enabled) {
+					for (i = 0; i < ds->num_ports; i++) {
+						/* Add this port to the port matrix of the other ports in the
+						 * same bridge. If the port is disabled, port matrix is kept
+						 * and not being setup until the port becomes enabled.
+						 */
+						if (dsa_is_user_port(ds, i) && i != port) {
+							if (priv->ports[i].enable)
+								priv->r->traffic_enable(i, port);
+							priv->ports[i].pm |= BIT_ULL(port);
+							port_bitmap |= BIT_ULL(i);
+						}
+					}
+					load_mcgroups(priv, port);
+
+					/* Add all other ports to this port matrix. */
+					if (priv->ports[port].enable) {
+						priv->r->traffic_enable(priv->cpu_port, port);
+						v = priv->r->traffic_get(port);
+						v |= port_bitmap;
+						priv->r->traffic_set(port, v);
+					}
+					priv->ports[port].pm |= port_bitmap;
 					pr_info("port_lag_change: enable port %d\n",dp->index); 
 	//				rtl83xx_port_enable(ds, dp->index, NULL);
 				} else {
