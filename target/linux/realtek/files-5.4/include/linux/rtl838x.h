@@ -330,10 +330,20 @@
 #define RTL839X_IGR_BWCTRL_CTRL_LB_THR		(0x1614)
 
 /* Link aggregation (Trunking) */
-#define RTL839X_TRK_MBR_CTR			(0x2200)
-#define RTL838X_TRK_MBR_CTR			(0x3E00)
+
+
 #define RTL930X_TRK_MBR_CTRL			(0xA41C)
+
+
 #define RTL931X_TRK_MBR_CTRL			(0xB8D0)
+
+#define RTL838X_TRK_MBR_CTR			(0x3E00)
+#define RTL838X_TRK_HASH_IDX_CTRL 		(0x3E20)
+#define RTL838X_TRK_HASH_CTRL			(0x3E24)
+
+#define RTL839X_TRK_MBR_CTR			(0x2200)
+#define RTL839X_TRK_HASH_IDX_CTRL 		(0x2280)
+#define RTL839X_TRK_HASH_CTRL			(0x2284)
 
 /* Attack prevention */
 #define RTL838X_ATK_PRVNT_PORT_EN		(0x5B00)
@@ -926,6 +936,8 @@ struct rtl838x_reg {
 	u32 spcl_trap_ctrl;
 	u32 sflow_ctrl;
 	u32 sflow_port_rate_ctrl;
+	u32 trk_hash_idx_ctrl;
+	u32 trk_hash_ctrl;
 };
 
 

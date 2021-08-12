@@ -1831,4 +1831,6 @@ const struct rtl838x_reg rtl839x_reg = {
 	.vlan_ctrl = RTL839X_VLAN_CTRL,
 	.sflow_ctrl = RTL839X_SFLOW_CTRL,
 	.sflow_port_rate_ctrl = RTL839X_SFLOW_PORT_RATE_CTRL,
+	.trk_hash_ctrl = RTL839X_TRK_HASH_CTRL,
+	.trk_hash_idx_ctrl = RTL839X_TRK_HASH_IDX_CTRL,
 };
