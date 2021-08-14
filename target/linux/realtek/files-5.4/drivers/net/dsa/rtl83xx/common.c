@@ -674,7 +674,7 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	struct rtl838x_switch_priv *priv;
 	int err;
 
-	pr_info("In: %s, event: %lu\n", __func__, event);
+	pr_debug("In: %s, event: %lu\n", __func__, event);
 
 	if ((event != NETDEV_CHANGEUPPER) && (event != NETDEV_CHANGELOWERSTATE))
 		return NOTIFY_DONE;
@@ -1347,7 +1347,7 @@ static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, v
 	case FIB_EVENT_ENTRY_REPLACE:
 	case FIB_EVENT_ENTRY_APPEND:
 	case FIB_EVENT_ENTRY_DEL:
-		pr_info("%s: FIB_ENTRY ADD/DELL, event %ld\n", __func__, event);
+		pr_debug("%s: FIB_ENTRY ADD/DELL, event %ld\n", __func__, event);
 		if (info->family == AF_INET) {
 			struct fib_entry_notifier_info *fen_info = ptr;
 
@@ -1374,7 +1374,7 @@ static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, v
 				kfree(fib_work);
 				return notifier_from_errno(-EINVAL);
 			}
-			pr_info("%s: FIB_RULE ADD/DELL for IPv6\n", __func__);
+			pr_debug("%s: FIB_RULE ADD/DELL for IPv6\n", __func__);
 			fib_work->is_fib6 = true;
 			memcpy(&fib_work->fen6_info, fen6_info, sizeof(fib_work->fen6_info));
 		}
@@ -1382,7 +1382,7 @@ static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, v
 
 	case FIB_EVENT_RULE_ADD:
 	case FIB_EVENT_RULE_DEL:
-		pr_info("%s: FIB_RULE ADD/DELL, event: %ld\n", __func__, event);
+		pr_debug("%s: FIB_RULE ADD/DELL, event: %ld\n", __func__, event);
 		memcpy(&fib_work->fr_info, ptr, sizeof(fib_work->fr_info));
 		fib_rule_get(fib_work->fr_info.rule);
 		break;
