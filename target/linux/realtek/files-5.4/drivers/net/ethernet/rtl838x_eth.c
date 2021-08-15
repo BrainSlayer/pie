@@ -34,11 +34,11 @@ extern struct rtl83xx_soc_info soc_info;
  * the memory used for the ring buffer.
  */
 #define MAX_RXRINGS	32
-#define MAX_RXLEN	100
-#define MAX_ENTRIES	(200 * 8)
+#define MAX_RXLEN	400
+#define MAX_ENTRIES	(400 * 8)
 #define TXRINGS		2
 // BUG: TXRINGLEN can be 160
-#define TXRINGLEN	16
+#define TXRINGLEN	200
 #define NOTIFY_EVENTS	10
 #define NOTIFY_BLOCKS	10
 #define TX_EN		0x8
@@ -53,6 +53,10 @@ extern struct rtl83xx_soc_info soc_info;
 #define RTL838X_STORM_CTRL_PORT_BC_EXCEED	(0x470C)
 #define RTL838X_STORM_CTRL_PORT_MC_EXCEED	(0x4710)
 #define RTL838X_STORM_CTRL_PORT_UC_EXCEED	(0x4714)
+
+#define RTL839X_STORM_CTRL_PORT_BC_EXCEED	(0x180C)
+#define RTL839X_STORM_CTRL_PORT_MC_EXCEED	(0x1814)
+#define RTL839X_STORM_CTRL_PORT_UC_EXCEED	(0x181C)
 #define RTL838X_ATK_PRVNT_STS			(0x5B1C)
 
 struct p_hdr {
@@ -426,21 +430,48 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 	bool triggered = false;
 	u32 atk = sw_r32(RTL838X_ATK_PRVNT_STS);
 	int i;
-	u32 storm_uc = sw_r32(RTL838X_STORM_CTRL_PORT_UC_EXCEED);
-	u32 storm_mc = sw_r32(RTL838X_STORM_CTRL_PORT_MC_EXCEED);
-	u32 storm_bc = sw_r32(RTL838X_STORM_CTRL_PORT_BC_EXCEED);
-
-	pr_debug("IRQ: %08x\n", status);
-	if (storm_uc || storm_mc || storm_bc) {
-		pr_warn("Storm control UC: %08x, MC: %08x, BC: %08x\n",
-			storm_uc, storm_mc, storm_bc);
-
-		sw_w32(storm_uc, RTL838X_STORM_CTRL_PORT_UC_EXCEED);
-		sw_w32(storm_mc, RTL838X_STORM_CTRL_PORT_MC_EXCEED);
-		sw_w32(storm_bc, RTL838X_STORM_CTRL_PORT_BC_EXCEED);
-
-		triggered = true;
+#if 0
+	/*
+	 * this code is wrong in many points. first. the register has a per port offset. so this code here checks only the content of port 0
+	 * second, the registers are different for each chipset. remove this code for now since it does not make any sense at all 
+	 */
+	u32 storm_uc = 0;
+	u32 storm_mc = 0;
+	u32 storm_bc = 0;
+	if (priv->family_id == RTL8390_FAMILY_ID) {
+		storm_uc = sw_r32(RTL839X_STORM_CTRL_PORT_UC_EXCEED);
+		storm_mc = sw_r32(RTL839X_STORM_CTRL_PORT_MC_EXCEED);
+		storm_bc = sw_r32(RTL839X_STORM_CTRL_PORT_BC_EXCEED);
+		pr_debug("IRQ: %08x\n", status);
+		if (storm_uc || storm_mc || storm_bc) {
+			pr_warn("Storm control UC: %08x, MC: %08x, BC: %08x\n",
+				storm_uc, storm_mc, storm_bc);
+	
+			sw_w32(storm_uc, RTL839X_STORM_CTRL_PORT_UC_EXCEED);
+			sw_w32(storm_mc, RTL839X_STORM_CTRL_PORT_MC_EXCEED);
+			sw_w32(storm_bc, RTL839X_STORM_CTRL_PORT_BC_EXCEED);
+	
+			triggered = true;
+		}
 	}
+	if (priv->family_id == RTL8380_FAMILY_ID) {
+		storm_uc = sw_r32(RTL838X_STORM_CTRL_PORT_UC_EXCEED);
+		storm_mc = sw_r32(RTL838X_STORM_CTRL_PORT_MC_EXCEED);
+		storm_bc = sw_r32(RTL838X_STORM_CTRL_PORT_BC_EXCEED);
+		pr_debug("IRQ: %08x\n", status);
+		if (storm_uc || storm_mc || storm_bc) {
+			pr_warn("Storm control UC: %08x, MC: %08x, BC: %08x\n",
+				storm_uc, storm_mc, storm_bc);
+	
+			sw_w32(storm_uc, RTL838X_STORM_CTRL_PORT_UC_EXCEED);
+			sw_w32(storm_mc, RTL838X_STORM_CTRL_PORT_MC_EXCEED);
+			sw_w32(storm_bc, RTL838X_STORM_CTRL_PORT_BC_EXCEED);
+	
+			triggered = true;
+		}
+	}
+#endif
+
 
 	if (atk) {
 		pr_debug("Attack prevention triggered: %08x\n", atk);
@@ -469,7 +500,7 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 
 	/* RX buffer overrun */
 	if (status & 0x000ff) {
-		pr_info("RX buffer overrun: status %x, mask: %x\n",
+		pr_debug("RX buffer overrun: status %x, mask: %x\n",
 			 status, sw_r32(priv->r->dma_if_intr_msk));
 		sw_w32(status, priv->r->dma_if_intr_sts);
 		rtl838x_rb_cleanup(priv, status & 0xff);
@@ -2037,7 +2068,7 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 		err = -ENXIO;
 		goto err_free;
 	}
-
+	pr_info("Allocate %ld bytes for DMA\n", rxrings * rxringlen * RING_BUFFER + sizeof(struct ring_b) + sizeof(struct notify_b));
 	/* Allocate buffer memory */
 	priv->membase = dmam_alloc_coherent(&pdev->dev, rxrings * rxringlen * RING_BUFFER
 				+ sizeof(struct ring_b) + sizeof(struct notify_b),
