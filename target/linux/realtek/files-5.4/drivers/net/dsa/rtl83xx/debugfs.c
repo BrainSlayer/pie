@@ -487,6 +487,10 @@ static const struct debugfs_reg32 port_ctrl_regs[] = {
 	{ .name = "port_isolation", .offset = RTL838X_PORT_ISO_CTRL(0), },
 	{ .name = "mac_force_mode", .offset = RTL838X_MAC_FORCE_MODE_CTRL, },
 };
+static const struct debugfs_reg32 port_ctrl_regs_839x[] = {
+	{ .name = "port_isolation", .offset = RTL839X_PORT_ISO_CTRL(0), },
+	{ .name = "mac_force_mode", .offset = RTL839X_MAC_FORCE_MODE_CTRL, },
+};
 
 void rtl838x_dbgfs_cleanup(struct rtl838x_switch_priv *priv)
 {
@@ -530,7 +534,11 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 	if (!port_ctrl_regset)
 		return -ENOMEM;
 
-	port_ctrl_regset->regs = port_ctrl_regs;
+	if (priv->family_id == RTL8380_FAMILY_ID)
+		port_ctrl_regset->regs = port_ctrl_regs;
+	else
+		port_ctrl_regset->regs = port_ctrl_regs_839x;
+
 	port_ctrl_regset->nregs = ARRAY_SIZE(port_ctrl_regs);
 	port_ctrl_regset->base = (void *)(RTL838X_SW_BASE + (port << 2));
 	debugfs_create_regset32("port_ctrl", 0400, port_dir, port_ctrl_regset);
@@ -654,7 +662,11 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 		goto err;
 	}
 
-	port_ctrl_regset->regs = port_ctrl_regs;
+	if (priv->family_id == RTL8380_FAMILY_ID)
+		port_ctrl_regset->regs = port_ctrl_regs;
+	else
+		port_ctrl_regset->regs = port_ctrl_regs_839x;
+
 	port_ctrl_regset->nregs = ARRAY_SIZE(port_ctrl_regs);
 	port_ctrl_regset->base = (void *)(RTL838X_SW_BASE + (priv->cpu_port << 2));
 	debugfs_create_regset32("port_ctrl", 0400, port_dir, port_ctrl_regset);

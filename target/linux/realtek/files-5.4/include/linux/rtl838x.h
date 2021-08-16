@@ -331,6 +331,15 @@
 
 /* Link aggregation (Trunking) */
 
+#define TRUNK_DISTRIBUTION_ALGO_SPA_BIT         0x01
+#define TRUNK_DISTRIBUTION_ALGO_SMAC_BIT        0x02
+#define TRUNK_DISTRIBUTION_ALGO_DMAC_BIT        0x04
+#define TRUNK_DISTRIBUTION_ALGO_SIP_BIT         0x08
+#define TRUNK_DISTRIBUTION_ALGO_DIP_BIT         0x10
+#define TRUNK_DISTRIBUTION_ALGO_SRC_L4PORT_BIT  0x20
+#define TRUNK_DISTRIBUTION_ALGO_DST_L4PORT_BIT  0x40
+#define TRUNK_DISTRIBUTION_ALGO_MASKALL         0x7F
+
 
 #define RTL930X_TRK_MBR_CTRL			(0xA41C)
 
@@ -968,6 +977,8 @@ struct rtl838x_switch_priv {
 	int n_lags;
 	u64 lags_port_members[MAX_LAGS];
 	struct net_device *lag_devs[MAX_LAGS];
+	u32 lag_primary[MAX_LAGS];
+	u32 is_lagmember[57];
 	u64 lagmembers;
 	struct notifier_block nb;  // TODO: change to different name
 	struct notifier_block ne_nb;
