@@ -395,11 +395,15 @@ static int __init rtl83xx_get_l2aging(struct rtl838x_switch_priv *priv)
 }
 
 /* Caller must hold priv->reg_mutex */
-int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port)
+int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port,struct netdev_lag_upper_info *info)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int i;
-
+	u32 algomsk = 0;
+	u32 algoidx = 0;
+	if (info->tx_type != NETDEV_LAG_TX_TYPE_HASH) {
+		return -EINVAL;
+	}
 	pr_info("%s: Adding port %d to LA-group %d\n", __func__, port, group);
 	if (group >= priv->n_lags) {
 		pr_err("Link Agrregation group too large.\n");
@@ -419,14 +423,46 @@ int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port)
 		pr_err("%s: Port already member of LAG: %d\n", __func__, i);
 		return -ENOSPC;
 	}
-	if (priv->r->trk_hash_idx_ctrl) {
-		sw_w32(0, priv->r->trk_hash_idx_ctrl);
-		sw_w32(0x7f, priv->r->trk_hash_ctrl);
+	switch(info->hash_type) {
+	case NETDEV_LAG_HASH_L2:
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_DMAC_BIT; //DMAC
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_SMAC_BIT; //DMAC
+	break;
+	case NETDEV_LAG_HASH_L23:
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_DMAC_BIT; //DMAC
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_SMAC_BIT; //DMAC
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_SIP_BIT; //source ip
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_DIP_BIT; //dest ip
+		algoidx = 1;
+	break;
+	case NETDEV_LAG_HASH_L34:
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_SRC_L4PORT_BIT; //sport
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_DST_L4PORT_BIT; //dport
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_SIP_BIT; //source ip
+		algomsk |= TRUNK_DISTRIBUTION_ALGO_DIP_BIT; //dest ip
+		algoidx = 2;
+	break;
+	default:
+		algomsk |= 0x7f;
+	}
+
+	if (priv->family_id == RTL8380_FAMILY_ID) {
+		algoidx &=1;
+		if (priv->r->trk_hash_idx_ctrl) {
+			sw_w32_mask(1 << (group % 8), algoidx << (group % 8), priv->r->trk_hash_idx_ctrl + ((group >> 3) << 2));
+			sw_w32(algomsk, priv->r->trk_hash_ctrl + (algoidx << 2));
+		}
+	}
+	if (priv->family_id == RTL8390_FAMILY_ID) {
+		if (priv->r->trk_hash_idx_ctrl) {
+			sw_w32_mask(3 << ((group & 0xf) << 1), algoidx << ((group & 0xf) << 1), priv->r->trk_hash_idx_ctrl + ((group >> 4) << 2));
+			sw_w32(algomsk, priv->r->trk_hash_ctrl + (algoidx << 2));
+		}
 	}
 	priv->r->mask_port_reg_be(0, BIT_ULL(port), priv->r->trk_mbr_ctr(group));
 	priv->lags_port_members[group] |= BIT_ULL(port);
 
-	pr_info("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
+	pr_debug("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
 	return 0;
 }
 
@@ -436,7 +472,7 @@ int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port)
 	struct rtl838x_switch_priv *priv = ds->priv;
 
 	pr_info("%s: Removing port %d from LA-group %d\n", __func__, port, group);
-
+	
 	if (group >= priv->n_lags) {
 		pr_err("Link Agrregation group too large.\n");
 		return -EINVAL;
@@ -616,7 +652,7 @@ int rtl83xx_l2_nexthop_rm(struct rtl838x_switch_priv *priv, struct rtl83xx_nexth
 
 	return 0;
 }
-
+#if 0
 static int rtl83xx_handle_changeupper(struct rtl838x_switch_priv *priv,
 				      struct net_device *ndev,
 				      struct netdev_notifier_changeupper_info *info)
@@ -666,6 +702,7 @@ out:
 	mutex_unlock(&priv->reg_mutex);
 	return 0;
 }
+#endif
 
 static int rtl83xx_netdevice_event(struct notifier_block *this,
 				   unsigned long event, void *ptr)
@@ -682,7 +719,7 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	priv = container_of(this, struct rtl838x_switch_priv, nb);
 	switch (event) {
 	case NETDEV_CHANGEUPPER:
-		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
+//		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
 		break;
 	}
 
@@ -1496,6 +1533,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		break;
 	}
 	memset(priv->mc_group_saves, -1, sizeof(priv->mc_group_saves));
+	memset(priv->lag_primary, -1, sizeof(priv->lag_primary));
 
 	priv->ds->num_lag_ids = priv->n_lags;
 
