@@ -794,7 +794,7 @@ static int rtl83xx_port_bridge_join(struct dsa_switch *ds, int port,
 	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
 	int i;
 
-	pr_debug("%s %x: %d %llx", __func__, (u32)priv, port, port_bitmap);
+	pr_info("%s %x: %d %llx", __func__, (u32)priv, port, port_bitmap);
 	if (priv->is_lagmember[port]) {
 		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
 		return 0;
@@ -838,7 +838,7 @@ static void rtl83xx_port_bridge_leave(struct dsa_switch *ds, int port,
 	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
 	int i;
 
-	pr_debug("%s %x: %d", __func__, (u32)priv, port);
+	pr_info("%s %x: %d", __func__, (u32)priv, port);
 	mutex_lock(&priv->reg_mutex);
 	for (i = 0; i < ds->num_ports; i++) {
 		/* Remove this port from the port matrix of the other ports
@@ -900,7 +900,7 @@ void rtl83xx_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 
 	priv->r->stp_get(priv, msti, port_state);
 
-	pr_debug("Current state, port %d: %d\n", port, (port_state[index] >> bit) & 3);
+	pr_info("Current state, port %d: %d\n", port, (port_state[index] >> bit) & 3);
 	port_state[index] &= ~(3 << bit);
 
 	switch (state) {
@@ -1034,7 +1034,7 @@ static void rtl83xx_vlan_add(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int v;
 
-	pr_debug("%s port %d, vid_end %d, vid_end %d, flags %x\n", __func__,
+	pr_info("%s port %d, vid_end %d, vid_end %d, flags %x\n", __func__,
 		port, vlan->vid_begin, vlan->vid_end, vlan->flags);
 
 	if (vlan->vid_begin > 4095 || vlan->vid_end > 4095) {
