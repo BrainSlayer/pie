@@ -1626,6 +1626,13 @@ static void rtl838x_packet_cntr_clear(int counter)
 	rtl_table_release(r);
 }
 
+void rtl838x_set_distribution_algorithm(int group, int algoidx, u32 algomsk)
+{
+	algoidx&=1; // RTL838X does only support 2 concurrent algorithms
+	sw_w32_mask(1 << (group % 8), algoidx << (group % 8), RTL838X_TRK_HASH_IDX_CTRL + ((group >> 3) << 2));
+	sw_w32(algomsk, RTL838X_TRK_HASH_CTRL + (algoidx << 2));
+}
+
 const struct rtl838x_reg rtl838x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -1723,6 +1730,8 @@ const struct rtl838x_reg rtl838x_reg = {
 	.vlan_ctrl = RTL838X_VLAN_CTRL,
 	.trk_hash_ctrl = RTL838X_TRK_HASH_CTRL,
 	.trk_hash_idx_ctrl = RTL838X_TRK_HASH_IDX_CTRL,
+	.set_distribution_algorithm = rtl838x_set_distribution_algorithm,
+
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
