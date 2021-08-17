@@ -1,8 +1,6 @@
-diff -urpN linux-5.10.59.old/.config.old linux-5.10.59/.config.old
-diff -urpN linux-5.10.59.old/.dep_files linux-5.10.59/.dep_files
 diff -urpN linux-5.10.59.old/drivers/net/bonding/bond_main.c linux-5.10.59/drivers/net/bonding/bond_main.c
---- linux-5.10.59.old/drivers/net/bonding/bond_main.c	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/drivers/net/bonding/bond_main.c	2021-08-17 21:27:16.629155829 +0700
+--- linux-5.10.59.old/drivers/net/bonding/bond_main.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/drivers/net/bonding/bond_main.c	2021-08-18 01:33:09.584221682 +0700
 @@ -2046,6 +2046,8 @@ int bond_enslave(struct net_device *bond
  		goto err_unregister;
  	}
@@ -12,10 +10,9 @@ diff -urpN linux-5.10.59.old/drivers/net/bonding/bond_main.c linux-5.10.59/drive
  	res = bond_sysfs_slave_add(new_slave);
  	if (res) {
  		slave_dbg(bond_dev, slave_dev, "Error %d calling bond_sysfs_slave_add\n", res);
-diff -urpN linux-5.10.59.old/drivers/net/bonding/bond_main.c.orig linux-5.10.59/drivers/net/bonding/bond_main.c.orig
 diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/chip.c linux-5.10.59/drivers/net/dsa/mv88e6xxx/chip.c
---- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/chip.c	2021-08-17 21:25:44.905057958 +0700
-+++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/chip.c	2021-08-17 21:27:58.229200215 +0700
+--- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/chip.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/chip.c	2021-08-18 01:33:09.584221682 +0700
 @@ -1389,15 +1389,32 @@ static int mv88e6xxx_mac_setup(struct mv
  
  static int mv88e6xxx_pvt_map(struct mv88e6xxx_chip *chip, int dev, int port)
@@ -348,10 +345,9 @@ diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/chip.c linux-5.10.59/driv
  	dev_set_drvdata(dev, ds);
  
  	return dsa_register_switch(ds);
-diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/chip.c.orig linux-5.10.59/drivers/net/dsa/mv88e6xxx/chip.c.orig
 diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/global2.c linux-5.10.59/drivers/net/dsa/mv88e6xxx/global2.c
---- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/global2.c	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/global2.c	2021-08-17 21:27:58.229200215 +0700
+--- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/global2.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/global2.c	2021-08-18 01:33:09.584221682 +0700
 @@ -126,8 +126,8 @@ int mv88e6xxx_g2_device_mapping_write(st
  
  /* Offset 0x07: Trunk Mask Table register */
@@ -375,8 +371,8 @@ diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/global2.c linux-5.10.59/d
  	const u16 port_mask = BIT(mv88e6xxx_num_ports(chip)) - 1;
  	u16 val = (id << 11) | (map & port_mask);
 diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/global2.h linux-5.10.59/drivers/net/dsa/mv88e6xxx/global2.h
---- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/global2.h	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/global2.h	2021-08-17 21:27:58.229200215 +0700
+--- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/global2.h	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/global2.h	2021-08-18 01:33:09.584221682 +0700
 @@ -101,6 +101,7 @@
  #define MV88E6XXX_G2_PVT_ADDR_OP_WRITE_PVLAN	0x3000
  #define MV88E6XXX_G2_PVT_ADDR_OP_READ		0x4000
@@ -397,8 +393,8 @@ diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/global2.h linux-5.10.59/d
  
  int mv88e6xxx_g2_device_mapping_write(struct mv88e6xxx_chip *chip, int target,
 diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.c linux-5.10.59/drivers/net/dsa/mv88e6xxx/port.c
---- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.c	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/port.c	2021-08-17 21:27:58.229200215 +0700
+--- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/port.c	2021-08-18 01:33:09.584221682 +0700
 @@ -815,6 +815,27 @@ int mv88e6xxx_port_set_message_port(stru
  	return mv88e6xxx_port_write(chip, port, MV88E6XXX_PORT_CTL1, val);
  }
@@ -427,10 +423,9 @@ diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.c linux-5.10.59/driv
  /* Offset 0x06: Port Based VLAN Map */
  
  int mv88e6xxx_port_set_vlan_map(struct mv88e6xxx_chip *chip, int port, u16 map)
-diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.c.orig linux-5.10.59/drivers/net/dsa/mv88e6xxx/port.c.orig
 diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.h linux-5.10.59/drivers/net/dsa/mv88e6xxx/port.h
---- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.h	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/port.h	2021-08-17 21:27:58.229200215 +0700
+--- linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.h	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/drivers/net/dsa/mv88e6xxx/port.h	2021-08-18 01:33:09.584221682 +0700
 @@ -168,6 +168,9 @@
  /* Offset 0x05: Port Control 1 */
  #define MV88E6XXX_PORT_CTL1			0x05
@@ -450,14 +445,9 @@ diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.h linux-5.10.59/driv
  int mv88e6165_port_set_jumbo_size(struct mv88e6xxx_chip *chip, int port,
  				  size_t size);
  int mv88e6095_port_egress_rate_limiting(struct mv88e6xxx_chip *chip, int port);
-diff -urpN linux-5.10.59.old/drivers/net/dsa/mv88e6xxx/port.h.orig linux-5.10.59/drivers/net/dsa/mv88e6xxx/port.h.orig
-diff -urpN linux-5.10.59.old/drivers/net/dsa/rtl83xx/.common.o.cmd linux-5.10.59/drivers/net/dsa/rtl83xx/.common.o.cmd
-diff -urpN linux-5.10.59.old/drivers/net/dsa/rtl83xx/.common.o.d linux-5.10.59/drivers/net/dsa/rtl83xx/.common.o.d
-diff -urpN linux-5.10.59.old/drivers/net/dsa/rtl83xx/.dsa.o.d linux-5.10.59/drivers/net/dsa/rtl83xx/.dsa.o.d
-Binary files linux-5.10.59.old/drivers/net/dsa/rtl83xx/common.o and linux-5.10.59/drivers/net/dsa/rtl83xx/common.o differ
 diff -urpN linux-5.10.59.old/include/net/dsa.h linux-5.10.59/include/net/dsa.h
---- linux-5.10.59.old/include/net/dsa.h	2021-08-17 21:25:45.045058107 +0700
-+++ linux-5.10.59/include/net/dsa.h	2021-08-17 21:27:20.953160439 +0700
+--- linux-5.10.59.old/include/net/dsa.h	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/include/net/dsa.h	2021-08-18 01:33:09.584221682 +0700
 @@ -149,8 +149,41 @@ struct dsa_switch_tree {
  
  	/* List of DSA links composing the routing table */
@@ -524,7 +514,26 @@ diff -urpN linux-5.10.59.old/include/net/dsa.h linux-5.10.59/include/net/dsa.h
  	size_t num_ports;
  };
  
-@@ -623,6 +666,13 @@ struct dsa_switch_ops {
+@@ -432,6 +475,18 @@ static inline bool dsa_port_is_vlan_filt
+ 		return dp->vlan_filtering;
+ }
+ 
++static inline
++struct net_device *dsa_port_to_bridge_port(const struct dsa_port *dp)
++{
++	if (!dp->bridge_dev)
++		return NULL;
++
++	if (dp->lag_dev)
++		return dp->lag_dev;
++
++	return dp->slave;
++}
++
+ typedef int dsa_fdb_dump_cb_t(const unsigned char *addr, u16 vid,
+ 			      bool is_static, void *data);
+ struct dsa_switch_ops {
+@@ -629,6 +684,13 @@ struct dsa_switch_ops {
  	void	(*crosschip_bridge_leave)(struct dsa_switch *ds, int tree_index,
  					  int sw_index, int port,
  					  struct net_device *br);
@@ -538,7 +547,7 @@ diff -urpN linux-5.10.59.old/include/net/dsa.h linux-5.10.59/include/net/dsa.h
  
  	/*
  	 * PTP functionality
-@@ -654,6 +704,16 @@ struct dsa_switch_ops {
+@@ -660,6 +722,16 @@ struct dsa_switch_ops {
  	int	(*port_change_mtu)(struct dsa_switch *ds, int port,
  				   int new_mtu);
  	int	(*port_max_mtu)(struct dsa_switch *ds, int port);
@@ -555,10 +564,9 @@ diff -urpN linux-5.10.59.old/include/net/dsa.h linux-5.10.59/include/net/dsa.h
  };
  
  #define DSA_DEVLINK_PARAM_DRIVER(_id, _name, _type, _cmodes)		\
-diff -urpN linux-5.10.59.old/include/net/dsa.h.orig linux-5.10.59/include/net/dsa.h.orig
 diff -urpN linux-5.10.59.old/net/dsa/dsa.c linux-5.10.59/net/dsa/dsa.c
---- linux-5.10.59.old/net/dsa/dsa.c	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/net/dsa/dsa.c	2021-08-17 21:28:02.325204583 +0700
+--- linux-5.10.59.old/net/dsa/dsa.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/net/dsa/dsa.c	2021-08-18 01:33:09.584221682 +0700
 @@ -220,11 +220,21 @@ static int dsa_switch_rcv(struct sk_buff
  	}
  
@@ -582,10 +590,9 @@ diff -urpN linux-5.10.59.old/net/dsa/dsa.c linux-5.10.59/net/dsa/dsa.c
  	if (unlikely(cpu_dp->ds->untag_bridge_pvid)) {
  		nskb = dsa_untag_bridge_pvid(skb);
  		if (!nskb) {
-diff -urpN linux-5.10.59.old/net/dsa/dsa.c.orig linux-5.10.59/net/dsa/dsa.c.orig
 diff -urpN linux-5.10.59.old/net/dsa/dsa2.c linux-5.10.59/net/dsa/dsa2.c
---- linux-5.10.59.old/net/dsa/dsa2.c	2021-08-17 21:25:44.569057599 +0700
-+++ linux-5.10.59/net/dsa/dsa2.c	2021-08-17 21:27:20.953160439 +0700
+--- linux-5.10.59.old/net/dsa/dsa2.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/net/dsa/dsa2.c	2021-08-18 01:33:09.584221682 +0700
 @@ -21,6 +21,65 @@
  static DEFINE_MUTEX(dsa2_mutex);
  LIST_HEAD(dsa_tree_list);
@@ -713,10 +720,9 @@ diff -urpN linux-5.10.59.old/net/dsa/dsa2.c linux-5.10.59/net/dsa/dsa2.c
  	dsa_tree_teardown_master(dst);
  
  	dsa_tree_teardown_switches(dst);
-diff -urpN linux-5.10.59.old/net/dsa/dsa2.c.orig linux-5.10.59/net/dsa/dsa2.c.orig
 diff -urpN linux-5.10.59.old/net/dsa/dsa_priv.h linux-5.10.59/net/dsa/dsa_priv.h
---- linux-5.10.59.old/net/dsa/dsa_priv.h	2021-08-17 21:25:44.553057582 +0700
-+++ linux-5.10.59/net/dsa/dsa_priv.h	2021-08-17 21:27:47.645188920 +0700
+--- linux-5.10.59.old/net/dsa/dsa_priv.h	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/net/dsa/dsa_priv.h	2021-08-18 01:42:18.952881506 +0700
 @@ -20,6 +20,9 @@ enum {
  	DSA_NOTIFIER_BRIDGE_LEAVE,
  	DSA_NOTIFIER_FDB_ADD,
@@ -755,7 +761,7 @@ diff -urpN linux-5.10.59.old/net/dsa/dsa_priv.h linux-5.10.59/net/dsa/dsa_priv.h
  int dsa_port_vlan_filtering(struct dsa_port *dp, bool vlan_filtering,
  			    struct switchdev_trans *trans);
  bool dsa_port_skip_vlan_configuration(struct dsa_port *dp);
-@@ -181,6 +198,22 @@ int dsa_port_link_register_of(struct dsa
+@@ -181,6 +198,71 @@ int dsa_port_link_register_of(struct dsa
  void dsa_port_link_unregister_of(struct dsa_port *dp);
  extern const struct phylink_mac_ops dsa_port_phylink_mac_ops;
  
@@ -765,7 +771,15 @@ diff -urpN linux-5.10.59.old/net/dsa/dsa_priv.h linux-5.10.59/net/dsa/dsa_priv.h
 +	/* Switchdev offloading can be configured on: */
 +
 +	if (dev == dp->slave)
-+		/* DSA ports directly connected to a bridge. */
++		/* DSA ports directly connected to a bridge, and event
++		 * was emitted for the ports themselves.
++		 */
++		return true;
++
++	if (dp->bridge_dev == dev)
++		/* DSA ports connected to a bridge, and event was emitted
++		 * for the bridge.
++		 */
 +		return true;
 +
 +	if (dp->lag_dev == dev)
@@ -775,10 +789,51 @@ diff -urpN linux-5.10.59.old/net/dsa/dsa_priv.h linux-5.10.59/net/dsa/dsa_priv.h
 +	return false;
 +}
 +
++static inline bool dsa_port_offloads_bridge_port(struct dsa_port *dp,
++						 struct net_device *dev)
++{
++	return dsa_port_to_bridge_port(dp) == dev;
++}
++
++static inline bool dsa_port_offloads_bridge(struct dsa_port *dp,
++					    struct net_device *bridge_dev)
++{
++	/* DSA ports connected to a bridge, and event was emitted
++	 * for the bridge.
++	 */
++	return dp->bridge_dev == bridge_dev;
++}
++
++/* Returns true if any port of this tree offloads the given net_device */
++static inline bool dsa_tree_offloads_bridge_port(struct dsa_switch_tree *dst,
++						 struct net_device *dev)
++{
++	struct dsa_port *dp;
++
++	list_for_each_entry(dp, &dst->ports, list)
++		if (dsa_port_offloads_bridge_port(dp, dev))
++			return true;
++
++	return false;
++}
++
++/* Returns true if any port of this tree offloads the given net_device */
++static inline bool dsa_tree_offloads_netdev(struct dsa_switch_tree *dst,
++					    struct net_device *dev)
++{
++	struct dsa_port *dp;
++
++	list_for_each_entry(dp, &dst->ports, list)
++		if (dsa_port_offloads_netdev(dp, dev))
++			return true;
++
++	return false;
++}
++
  /* slave.c */
  extern const struct dsa_device_ops notag_netdev_ops;
  void dsa_slave_mii_bus_init(struct dsa_switch *ds);
-@@ -271,6 +304,9 @@ int dsa_switch_register_notifier(struct
+@@ -271,6 +353,9 @@ int dsa_switch_register_notifier(struct
  void dsa_switch_unregister_notifier(struct dsa_switch *ds);
  
  /* dsa2.c */
@@ -789,9 +844,9 @@ diff -urpN linux-5.10.59.old/net/dsa/dsa_priv.h linux-5.10.59/net/dsa/dsa_priv.h
  
  #endif
 diff -urpN linux-5.10.59.old/net/dsa/port.c linux-5.10.59/net/dsa/port.c
---- linux-5.10.59.old/net/dsa/port.c	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/net/dsa/port.c	2021-08-17 21:27:20.953160439 +0700
-@@ -193,6 +193,85 @@ void dsa_port_bridge_leave(struct dsa_po
+--- linux-5.10.59.old/net/dsa/port.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/net/dsa/port.c	2021-08-18 01:33:09.584221682 +0700
+@@ -193,6 +193,99 @@ void dsa_port_bridge_leave(struct dsa_po
  	dsa_port_set_state_now(dp, BR_STATE_FORWARDING);
  }
  
@@ -831,17 +886,31 @@ diff -urpN linux-5.10.59.old/net/dsa/port.c linux-5.10.59/net/dsa/port.c
 +		.lag = lag,
 +		.info = uinfo,
 +	};
++	struct net_device *bridge_dev;
 +	int err;
 +
 +	dsa_lag_map(dp->ds->dst, lag);
 +	dp->lag_dev = lag;
 +
 +	err = dsa_port_notify(dp, DSA_NOTIFIER_LAG_JOIN, &info);
-+	if (err) {
-+		dp->lag_dev = NULL;
-+		dsa_lag_unmap(dp->ds->dst, lag);
-+	}
++	if (err)
++		goto err_lag_join;
 +
++	bridge_dev = netdev_master_upper_dev_get(lag);
++	if (!bridge_dev || !netif_is_bridge_master(bridge_dev))
++		return 0;
++
++	err = dsa_port_bridge_join(dp, bridge_dev);
++	if (err)
++		goto err_bridge_join;
++
++	return 0;
++
++err_bridge_join:
++	dsa_port_notify(dp, DSA_NOTIFIER_LAG_LEAVE, &info);
++err_lag_join:
++	dp->lag_dev = NULL;
++	dsa_lag_unmap(dp->ds->dst, lag);
 +	return err;
 +}
 +
@@ -877,57 +946,121 @@ diff -urpN linux-5.10.59.old/net/dsa/port.c linux-5.10.59/net/dsa/port.c
  /* Must be called under rcu_read_lock() */
  static bool dsa_port_can_apply_vlan_filtering(struct dsa_port *dp,
  					      bool vlan_filtering)
-diff -urpN linux-5.10.59.old/net/dsa/port.c.orig linux-5.10.59/net/dsa/port.c.orig
 diff -urpN linux-5.10.59.old/net/dsa/slave.c linux-5.10.59/net/dsa/slave.c
---- linux-5.10.59.old/net/dsa/slave.c	2021-08-17 21:25:44.753057795 +0700
-+++ linux-5.10.59/net/dsa/slave.c	2021-08-17 21:27:20.953160439 +0700
-@@ -277,6 +277,9 @@ static int dsa_slave_port_attr_set(struc
- 	struct dsa_port *dp = dsa_slave_to_port(dev);
- 	int ret;
+--- linux-5.10.59.old/net/dsa/slave.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/net/dsa/slave.c	2021-08-18 01:33:09.584221682 +0700
+@@ -279,23 +279,41 @@ static int dsa_slave_port_attr_set(struc
  
-+	if (!dsa_port_offloads_netdev(dp, attr->orig_dev))
-+		return -EOPNOTSUPP;
-+
  	switch (attr->id) {
  	case SWITCHDEV_ATTR_ID_PORT_STP_STATE:
++		if (!dsa_port_offloads_bridge_port(dp, attr->orig_dev))
++			return -EOPNOTSUPP;
++
  		ret = dsa_port_set_state(dp, attr->u.stp_state, trans);
-@@ -337,7 +340,7 @@ static int dsa_slave_vlan_add(struct net
+ 		break;
+ 	case SWITCHDEV_ATTR_ID_BRIDGE_VLAN_FILTERING:
++		if (!dsa_port_offloads_bridge(dp, attr->orig_dev))
++			return -EOPNOTSUPP;
++
+ 		ret = dsa_port_vlan_filtering(dp, attr->u.vlan_filtering,
+ 					      trans);
+ 		break;
+ 	case SWITCHDEV_ATTR_ID_BRIDGE_AGEING_TIME:
++		if (!dsa_port_offloads_bridge(dp, attr->orig_dev))
++			return -EOPNOTSUPP;
++
+ 		ret = dsa_port_ageing_time(dp, attr->u.ageing_time, trans);
+ 		break;
+ 	case SWITCHDEV_ATTR_ID_PORT_PRE_BRIDGE_FLAGS:
++		if (!dsa_port_offloads_bridge_port(dp, attr->orig_dev))
++			return -EOPNOTSUPP;
++
+ 		ret = dsa_port_pre_bridge_flags(dp, attr->u.brport_flags,
+ 						trans, NULL);
+ 		break;
+ 	case SWITCHDEV_ATTR_ID_PORT_BRIDGE_FLAGS:
++		if (!dsa_port_offloads_bridge_port(dp, attr->orig_dev))
++			return -EOPNOTSUPP;
++
+ 		ret = dsa_port_bridge_flags(dp, attr->u.brport_flags, trans, NULL);
+ 		break;
+ 	case SWITCHDEV_ATTR_ID_BRIDGE_MROUTER:
++		if (!dsa_port_offloads_bridge(dp, attr->orig_dev))
++			return -EOPNOTSUPP;
++
+ 		ret = dsa_port_mrouter(dp->cpu_dp, attr->u.mrouter, trans, NULL);
+ 		break;
+ 	default:
+@@ -337,9 +355,6 @@ static int dsa_slave_vlan_add(struct net
  	struct switchdev_obj_port_vlan vlan;
  	int vid, err;
  
 -	if (obj->orig_dev != dev)
-+	if (!dsa_port_offloads_netdev(dp, obj->orig_dev))
- 		return -EOPNOTSUPP;
- 
+-		return -EOPNOTSUPP;
+-
  	if (dsa_port_skip_vlan_configuration(dp))
-@@ -394,7 +397,7 @@ static int dsa_slave_port_obj_add(struct
+ 		return 0;
+ 
+@@ -394,11 +409,13 @@ static int dsa_slave_port_obj_add(struct
  
  	switch (obj->id) {
  	case SWITCHDEV_OBJ_ID_PORT_MDB:
 -		if (obj->orig_dev != dev)
-+		if (!dsa_port_offloads_netdev(dp, obj->orig_dev))
++		if (!dsa_port_offloads_bridge_port(dp, obj->orig_dev))
  			return -EOPNOTSUPP;
  		err = dsa_port_mdb_add(dp, SWITCHDEV_OBJ_PORT_MDB(obj), trans);
  		break;
-@@ -424,7 +427,7 @@ static int dsa_slave_vlan_del(struct net
+ 	case SWITCHDEV_OBJ_ID_HOST_MDB:
++		if (!dsa_port_offloads_bridge(dp, obj->orig_dev))
++			return -EOPNOTSUPP;
+ 		/* DSA can directly translate this to a normal MDB add,
+ 		 * but on the CPU port.
+ 		 */
+@@ -406,6 +423,9 @@ static int dsa_slave_port_obj_add(struct
+ 				       trans);
+ 		break;
+ 	case SWITCHDEV_OBJ_ID_PORT_VLAN:
++		if (!dsa_port_offloads_bridge_port(dp, obj->orig_dev))
++			return -EOPNOTSUPP;
++
+ 		err = dsa_slave_vlan_add(dev, obj, trans);
+ 		break;
+ 	default:
+@@ -424,9 +444,6 @@ static int dsa_slave_vlan_del(struct net
  	struct switchdev_obj_port_vlan *vlan;
  	int vid, err;
  
 -	if (obj->orig_dev != dev)
-+	if (!dsa_port_offloads_netdev(dp, obj->orig_dev))
- 		return -EOPNOTSUPP;
- 
+-		return -EOPNOTSUPP;
+-
  	if (dsa_port_skip_vlan_configuration(dp))
-@@ -453,7 +456,7 @@ static int dsa_slave_port_obj_del(struct
+ 		return 0;
+ 
+@@ -453,17 +470,22 @@ static int dsa_slave_port_obj_del(struct
  
  	switch (obj->id) {
  	case SWITCHDEV_OBJ_ID_PORT_MDB:
 -		if (obj->orig_dev != dev)
-+		if (!dsa_port_offloads_netdev(dp, obj->orig_dev))
++		if (!dsa_port_offloads_bridge_port(dp, obj->orig_dev))
  			return -EOPNOTSUPP;
  		err = dsa_port_mdb_del(dp, SWITCHDEV_OBJ_PORT_MDB(obj));
  		break;
-@@ -1995,6 +1998,46 @@ static int dsa_slave_changeupper(struct
+ 	case SWITCHDEV_OBJ_ID_HOST_MDB:
++		if (!dsa_port_offloads_bridge(dp, obj->orig_dev))
++			return -EOPNOTSUPP;
+ 		/* DSA can directly translate this to a normal MDB add,
+ 		 * but on the CPU port.
+ 		 */
+ 		err = dsa_port_mdb_del(dp->cpu_dp, SWITCHDEV_OBJ_PORT_MDB(obj));
+ 		break;
+ 	case SWITCHDEV_OBJ_ID_PORT_VLAN:
++		if (!dsa_port_offloads_bridge_port(dp, obj->orig_dev))
++			return -EOPNOTSUPP;
++
+ 		err = dsa_slave_vlan_del(dev, obj);
+ 		break;
+ 	default:
+@@ -1995,6 +2017,46 @@ static int dsa_slave_changeupper(struct
  			dsa_port_bridge_leave(dp, info->upper_dev);
  			err = NOTIFY_OK;
  		}
@@ -974,7 +1107,7 @@ diff -urpN linux-5.10.59.old/net/dsa/slave.c linux-5.10.59/net/dsa/slave.c
  	}
  
  	return err;
-@@ -2080,10 +2123,26 @@ static int dsa_slave_netdevice_event(str
+@@ -2080,10 +2142,26 @@ static int dsa_slave_netdevice_event(str
  		break;
  	}
  	case NETDEV_CHANGEUPPER:
@@ -1003,10 +1136,25 @@ diff -urpN linux-5.10.59.old/net/dsa/slave.c linux-5.10.59/net/dsa/slave.c
  	}
  
  	return NOTIFY_DONE;
-diff -urpN linux-5.10.59.old/net/dsa/slave.c.orig linux-5.10.59/net/dsa/slave.c.orig
+@@ -2231,6 +2309,15 @@ static int dsa_slave_switchdev_event(str
+ 			if (!fdb_info->added_by_user &&
+ 			    !dp->ds->assisted_learning_on_cpu_port)
+ 				return NOTIFY_DONE;
++
++			/* When the bridge learns an address on an offloaded
++			 * LAG we don't want to send traffic to the CPU, the
++			 * other ports bridged with the LAG should be able to
++			 * autonomously forward towards it.
++			 */
++			if (dsa_tree_offloads_netdev(dp->ds->dst, dev))
++				return NOTIFY_DONE;
++
+ 		}
+ 
+ 		if (!dp->ds->ops->port_fdb_add || !dp->ds->ops->port_fdb_del)
 diff -urpN linux-5.10.59.old/net/dsa/switch.c linux-5.10.59/net/dsa/switch.c
---- linux-5.10.59.old/net/dsa/switch.c	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/net/dsa/switch.c	2021-08-17 21:27:20.953160439 +0700
+--- linux-5.10.59.old/net/dsa/switch.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/net/dsa/switch.c	2021-08-18 01:33:09.584221682 +0700
 @@ -178,6 +178,47 @@ static int dsa_switch_fdb_del(struct dsa
  	return ds->ops->port_fdb_del(ds, port, info->addr, info->vid);
  }
@@ -1036,7 +1184,7 @@ diff -urpN linux-5.10.59.old/net/dsa/switch.c linux-5.10.59/net/dsa/switch.c
 +						   info->port, info->lag,
 +						   info->info);
 +
-+	return 0;
++	return -EOPNOTSUPP;
 +}
 +
 +static int dsa_switch_lag_leave(struct dsa_switch *ds,
@@ -1049,7 +1197,7 @@ diff -urpN linux-5.10.59.old/net/dsa/switch.c linux-5.10.59/net/dsa/switch.c
 +		return ds->ops->crosschip_lag_leave(ds, info->sw_index,
 +						    info->port, info->lag);
 +
-+	return 0;
++	return -EOPNOTSUPP;
 +}
 +
  static bool dsa_switch_mdb_match(struct dsa_switch *ds, int port,
@@ -1071,10 +1219,9 @@ diff -urpN linux-5.10.59.old/net/dsa/switch.c linux-5.10.59/net/dsa/switch.c
  	case DSA_NOTIFIER_MDB_ADD:
  		err = dsa_switch_mdb_add(ds, info);
  		break;
-diff -urpN linux-5.10.59.old/net/dsa/switch.c.orig linux-5.10.59/net/dsa/switch.c.orig
 diff -urpN linux-5.10.59.old/net/dsa/tag_dsa.c linux-5.10.59/net/dsa/tag_dsa.c
---- linux-5.10.59.old/net/dsa/tag_dsa.c	2021-08-15 19:00:27.000000000 +0700
-+++ linux-5.10.59/net/dsa/tag_dsa.c	2021-08-17 21:28:02.325204583 +0700
+--- linux-5.10.59.old/net/dsa/tag_dsa.c	2021-08-18 01:44:57.333078456 +0700
++++ linux-5.10.59/net/dsa/tag_dsa.c	2021-08-18 01:33:09.584221682 +0700
 @@ -82,7 +82,19 @@ static struct sk_buff *dsa_rcv(struct sk
  	source_device = dsa_header[0] & 0x1f;
  	source_port = (dsa_header[1] >> 3) & 0x1f;
@@ -1096,5 +1243,3 @@ diff -urpN linux-5.10.59.old/net/dsa/tag_dsa.c linux-5.10.59/net/dsa/tag_dsa.c
  	if (!skb->dev)
  		return NULL;
  
-diff -urpN linux-5.10.59.old/net/dsa/tag_dsa.c.orig linux-5.10.59/net/dsa/tag_dsa.c.orig
-diff -urpN linux-5.10.59.old/net/dsa/tag_dsa.c.rej linux-5.10.59/net/dsa/tag_dsa.c.rej
