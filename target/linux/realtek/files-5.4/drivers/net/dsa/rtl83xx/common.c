@@ -445,20 +445,7 @@ int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port,struct netdev_lag
 	default:
 		algomsk |= 0x7f;
 	}
-
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-		algoidx &=1;
-		if (priv->r->trk_hash_idx_ctrl) {
-			sw_w32_mask(1 << (group % 8), algoidx << (group % 8), priv->r->trk_hash_idx_ctrl + ((group >> 3) << 2));
-			sw_w32(algomsk, priv->r->trk_hash_ctrl + (algoidx << 2));
-		}
-	}
-	if (priv->family_id == RTL8390_FAMILY_ID) {
-		if (priv->r->trk_hash_idx_ctrl) {
-			sw_w32_mask(3 << ((group & 0xf) << 1), algoidx << ((group & 0xf) << 1), priv->r->trk_hash_idx_ctrl + ((group >> 4) << 2));
-			sw_w32(algomsk, priv->r->trk_hash_ctrl + (algoidx << 2));
-		}
-	}
+	priv->r->set_distribution_algorithm(group, algoidx, algomsk);
 	priv->r->mask_port_reg_be(0, BIT_ULL(port), priv->r->trk_mbr_ctr(group));
 	priv->lags_port_members[group] |= BIT_ULL(port);
 

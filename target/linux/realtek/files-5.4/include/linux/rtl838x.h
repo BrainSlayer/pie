@@ -146,12 +146,34 @@
 #define RTL931X_MAC_RX_PAUSE_STS		(0x0F00)
 
 /* MAC link state bits */
-#define FORCE_EN				(1 << 0)
-#define FORCE_LINK_EN				(1 << 1)
-#define NWAY_EN					(1 << 2)
-#define DUPLX_MODE				(1 << 3)
-#define TX_PAUSE_EN				(1 << 6)
-#define RX_PAUSE_EN				(1 << 7)
+#define RTL830X_FORCE_EN				(1 << 0)
+#define RTL830X_FORCE_LINK_EN				(1 << 1)
+#define RTL830X_NWAY_EN					(1 << 2)
+#define RTL830X_DUPLEX_MODE				(1 << 3)
+#define RTL830X_TX_PAUSE_EN				(1 << 6)
+#define RTL830X_RX_PAUSE_EN				(1 << 7)
+#define RTL830X_MAC_FORCE_FC_EN				(1 << 8)
+
+#define RTL839X_FORCE_EN				(1 << 0)
+#define RTL839X_FORCE_LINK_EN				(1 << 1)
+#define RTL839X_DUPLEX_MODE				(1 << 2)
+#define RTL839X_TX_PAUSE_EN				(1 << 5)
+#define RTL839X_RX_PAUSE_EN				(1 << 6)
+#define RTL839X_MAC_FORCE_FC_EN				(1 << 7)
+
+#define RTL930X_FORCE_EN				(1 << 0)
+#define RTL930X_FORCE_LINK_EN				(1 << 1)
+#define RTL930X_DUPLEX_MODE				(1 << 2)
+#define RTL930X_TX_PAUSE_EN				(1 << 7)
+#define RTL930X_RX_PAUSE_EN				(1 << 8)
+#define RTL930X_MAC_FORCE_FC_EN				(1 << 9)
+
+#define RTL931X_FORCE_EN				(1 << 0)
+#define RTL931X_FORCE_LINK_EN				(1 << 1)
+#define RTL931X_DUPLEX_MODE				(1 << 2)
+#define RTL931X_MAC_FORCE_FC_EN				(1 << 4)
+#define RTL931X_TX_PAUSE_EN				(1 << 16)
+#define RTL931X_RX_PAUSE_EN				(1 << 17)
 
 /* EEE */
 #define RTL838X_MAC_EEE_ABLTY			(0xa1a8)
@@ -340,11 +362,33 @@
 #define TRUNK_DISTRIBUTION_ALGO_DST_L4PORT_BIT  0x40
 #define TRUNK_DISTRIBUTION_ALGO_MASKALL         0x7F
 
+#define TRUNK_DISTRIBUTION_ALGO_L2_SPA_BIT         0x01
+#define TRUNK_DISTRIBUTION_ALGO_L2_SMAC_BIT        0x02
+#define TRUNK_DISTRIBUTION_ALGO_L2_DMAC_BIT        0x04
+#define TRUNK_DISTRIBUTION_ALGO_L2_VLAN_BIT         0x08
+#define TRUNK_DISTRIBUTION_ALGO_L2_MASKALL         0xF
+
+#define TRUNK_DISTRIBUTION_ALGO_L3_SPA_BIT         0x01
+#define TRUNK_DISTRIBUTION_ALGO_L3_SMAC_BIT        0x02
+#define TRUNK_DISTRIBUTION_ALGO_L3_DMAC_BIT        0x04
+#define TRUNK_DISTRIBUTION_ALGO_L3_VLAN_BIT         0x08
+#define TRUNK_DISTRIBUTION_ALGO_L3_SIP_BIT         0x10
+#define TRUNK_DISTRIBUTION_ALGO_L3_DIP_BIT         0x20
+#define TRUNK_DISTRIBUTION_ALGO_L3_SRC_L4PORT_BIT  0x40
+#define TRUNK_DISTRIBUTION_ALGO_L3_DST_L4PORT_BIT  0x80
+#define TRUNK_DISTRIBUTION_ALGO_L3_PROTO_BIT  0x100
+#define TRUNK_DISTRIBUTION_ALGO_L3_FLOW_LABEL_BIT  0x200
+#define TRUNK_DISTRIBUTION_ALGO_L3_MASKALL         0x3FF
+
 
 #define RTL930X_TRK_MBR_CTRL			(0xA41C)
+//#define RTL930X_TRK_HASH_IDX_CTRL 		()
+#define RTL930X_TRK_HASH_CTRL			(0x9F80)
 
 
 #define RTL931X_TRK_MBR_CTRL			(0xB8D0)
+//#define RTL931X_TRK_HASH_IDX_CTRL 		(0x3E20)
+#define RTL931X_TRK_HASH_CTRL			(0xBA70)
 
 #define RTL838X_TRK_MBR_CTR			(0x3E00)
 #define RTL838X_TRK_HASH_IDX_CTRL 		(0x3E20)
@@ -896,6 +940,7 @@ struct rtl838x_reg {
 	void (*enable_flood)(int port, bool enable);
 	void (*enable_mcast_flood)(int port, bool enable);
 	void (*enable_bcast_flood)(int port, bool enable);
+	void (*set_distribution_algorithm)(int group, int algoidx, u32 algomask);
 	u32 stat_port_rst;
 	u32 stat_rst;
 	u32 stat_port_std_mib;
