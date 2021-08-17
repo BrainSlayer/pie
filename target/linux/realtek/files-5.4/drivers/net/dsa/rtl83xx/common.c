@@ -1155,8 +1155,8 @@ static int rtl83xx_fib4_add(struct rtl838x_switch_priv *priv,
 		return 0;
 
 	// Do not offload routes to 192.168.100.x
-	if ((info->dst & 0xffffff00) == 0xc0a86400)
-		return 0;
+//	if ((info->dst & 0xffffff00) == 0xc0a86400)
+//		return 0;
 
 	// Do not offload routes to 127.x.x.x
 	if ((info->dst & 0xff000000) == 0x7f000000)
