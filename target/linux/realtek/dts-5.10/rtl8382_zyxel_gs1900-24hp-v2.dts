@@ -45,10 +45,6 @@
 	};
 };
 
-&uart1 {
-	status = "okay";
-};
-
 &mdio {
 	EXTERNAL_PHY(0)
 	EXTERNAL_PHY(1)

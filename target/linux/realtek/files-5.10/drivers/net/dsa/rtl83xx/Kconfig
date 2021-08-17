@@ -2,7 +2,11 @@
 config NET_DSA_RTL83XX
 	tristate "Realtek RTL838x/RTL839x switch support"
 	depends on RTL838X
+<<<<<<< HEAD
 	select NET_DSA_TAG_TRAILER
+=======
+	select NET_DSA_TAG_RTL83XX
+>>>>>>> c21f1f8bf7 (5.10 port)
 	help
 	  This driver adds support for Realtek RTL83xx series switching.
 

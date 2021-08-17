@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 // SPDX-License-Identifier: GPL-2.0-only
+=======
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 #include <net/dsa.h>
 #include <linux/if_bridge.h>
@@ -101,14 +104,22 @@ const struct rtl83xx_mib_desc rtl83xx_mib[] = {
 /* DSA callbacks */
 
 
+<<<<<<< HEAD
 static enum dsa_tag_protocol rtl83xx_get_tag_protocol(struct dsa_switch *ds,
 						      int port,
 						      enum dsa_tag_protocol mprot)
+=======
+static enum dsa_tag_protocol rtl83xx_get_tag_protocol(struct dsa_switch *ds, int port, enum dsa_tag_protocol mprot)
+>>>>>>> c21f1f8bf7 (5.10 port)
 {
 	/* The switch does not tag the frames, instead internally the header
 	 * structure for each packet is tagged accordingly.
 	 */
+<<<<<<< HEAD
 	return DSA_TAG_PROTO_TRAILER;
+=======
+	return DSA_TAG_PROTO_RTL83XX;
+>>>>>>> c21f1f8bf7 (5.10 port)
 }
 
 /*
@@ -119,7 +130,11 @@ static void rtl83xx_vlan_setup(struct rtl838x_switch_priv *priv)
 	struct rtl838x_vlan_info info;
 	int i;
 
+<<<<<<< HEAD
 	pr_info("In %s\n", __func__);
+=======
+	pr_debug("In %s\n", __func__);
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	priv->r->vlan_profile_setup(0);
 	priv->r->vlan_profile_setup(1);
@@ -184,10 +199,21 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 
 	ds->configure_vlan_while_not_filtering = true;
 
+<<<<<<< HEAD
+=======
+	priv->r->l2_learning_setup();
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	/* Enable MAC Polling PHY again */
 	rtl83xx_enable_phy_polling(priv);
 	pr_debug("Please wait until PHY is settled\n");
 	msleep(1000);
+<<<<<<< HEAD
+=======
+
+	priv->r->pie_init(priv);
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	return 0;
 }
 
@@ -197,7 +223,11 @@ static int rtl930x_setup(struct dsa_switch *ds)
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port_bitmap = BIT(priv->cpu_port);
 
+<<<<<<< HEAD
 	pr_info("%s called\n", __func__);
+=======
+	pr_debug("%s called\n", __func__);
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	// Enable CSTI STP mode
 //	sw_w32(1, RTL930X_ST_CTRL);
@@ -228,6 +258,11 @@ static int rtl930x_setup(struct dsa_switch *ds)
 
 	rtl83xx_enable_phy_polling(priv);
 
+<<<<<<< HEAD
+=======
+	priv->r->pie_init(priv);
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	return 0;
 }
 
@@ -389,6 +424,10 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 reg;
 	int speed_bit = priv->family_id == RTL8380_FAMILY_ID ? 4 : 3;
+<<<<<<< HEAD
+=======
+//	int force_fc = priv->family_id == RTL8380_FAMILY_ID ? RTL838X_MAC_FORCE_FC_EN : RTL839X_MAC_FORCE_FC_EN;
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	pr_debug("%s port %d, mode %x\n", __func__, port, mode);
 
@@ -417,7 +456,11 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	if (priv->family_id == RTL8380_FAMILY_ID) {
 		if (mode == MLO_AN_PHY || phylink_autoneg_inband(mode)) {
 			pr_debug("PHY autonegotiates\n");
+<<<<<<< HEAD
 			reg |= BIT(2);
+=======
+			reg |= RTL830X_NWAY_EN;
+>>>>>>> c21f1f8bf7 (5.10 port)
 			sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
 			rtl83xx_config_interface(port, state->interface);
 			return;
@@ -427,6 +470,7 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	if (mode != MLO_AN_FIXED)
 		pr_debug("Fixed state.\n");
 
+<<<<<<< HEAD
 	if (priv->family_id == RTL8380_FAMILY_ID) {
 		/* Clear id_mode_dis bit, and the existing port mode, let
 		 * RGMII_MODE_EN bet set by mac_link_{up,down}
@@ -441,6 +485,48 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	}
 
 	reg &= ~(3 << speed_bit);
+=======
+	/* Clear id_mode_dis bit, and the existing port mode, let
+	 * RGMII_MODE_EN bet set by mac_link_{up,down}
+	 */
+	switch(priv->family_id)
+	{
+	case RTL8380_FAMILY_ID:
+		reg &= ~(RTL830X_RX_PAUSE_EN | RTL830X_TX_PAUSE_EN);
+		if (state->pause & MLO_PAUSE_TXRX_MASK) {
+			if (state->pause & MLO_PAUSE_TX)
+				reg |= RTL830X_TX_PAUSE_EN;
+			reg |= RTL830X_RX_PAUSE_EN;
+		}
+	break;
+	case RTL8390_FAMILY_ID:
+		reg &= ~(RTL839X_RX_PAUSE_EN | RTL839X_TX_PAUSE_EN);
+		if (state->pause & MLO_PAUSE_TXRX_MASK) {
+			if (state->pause & MLO_PAUSE_TX)
+				reg |= RTL839X_TX_PAUSE_EN;
+			reg |= RTL839X_RX_PAUSE_EN;
+		}
+	break;
+	case RTL9300_FAMILY_ID:
+		reg &= ~(RTL930X_RX_PAUSE_EN | RTL930X_TX_PAUSE_EN);
+		if (state->pause & MLO_PAUSE_TXRX_MASK) {
+			if (state->pause & MLO_PAUSE_TX)
+				reg |= RTL930X_TX_PAUSE_EN;
+			reg |= RTL930X_RX_PAUSE_EN;
+		}
+	break;
+	case RTL9310_FAMILY_ID:
+		reg &= ~(RTL931X_RX_PAUSE_EN | RTL931X_TX_PAUSE_EN);
+		if (state->pause & MLO_PAUSE_TXRX_MASK) {
+			if (state->pause & MLO_PAUSE_TX)
+				reg |= RTL931X_TX_PAUSE_EN;
+			reg |= RTL931X_RX_PAUSE_EN;
+		}
+	break;
+	}
+	reg &= ~(3 << speed_bit);
+//	reg &= ~(1 << force_fc);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	switch (state->speed) {
 	case SPEED_1000:
 		reg |= 2 << speed_bit;
@@ -448,6 +534,7 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	case SPEED_100:
 		reg |= 1 << speed_bit;
 		break;
+<<<<<<< HEAD
 	}
 
 	if (priv->family_id == RTL8380_FAMILY_ID) {
@@ -461,6 +548,83 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	// Disable AN
 	if (priv->family_id == RTL8380_FAMILY_ID)
 		reg &= ~BIT(2);
+=======
+	case SPEED_10:
+		reg = 0;
+		break;
+	case SPEED_2500:
+		reg = 5 << speed_bit;
+		break;
+	case SPEED_5000:
+		reg = 6 << speed_bit;
+		break;
+	case SPEED_10000:
+		reg = 4 << speed_bit;
+	}
+	switch(priv->family_id)
+	{
+	case RTL8380_FAMILY_ID:
+		reg &= ~(RTL830X_DUPLEX_MODE | RTL830X_FORCE_LINK_EN);
+	break;
+	case RTL8390_FAMILY_ID:
+		reg &= ~(RTL839X_DUPLEX_MODE | RTL839X_FORCE_LINK_EN);
+	break;
+	case RTL9300_FAMILY_ID:
+		reg &= ~(RTL930X_DUPLEX_MODE | RTL930X_FORCE_LINK_EN);
+	break;
+	case RTL9310_FAMILY_ID:
+		reg &= ~(RTL931X_DUPLEX_MODE | RTL931X_FORCE_LINK_EN);
+	break;
+	}
+	if (priv->lagmembers & (1ULL << port)) {
+		switch(priv->family_id)
+		{
+		case RTL8380_FAMILY_ID:
+			reg |= (RTL830X_DUPLEX_MODE | RTL830X_FORCE_LINK_EN);
+		break;
+		case RTL8390_FAMILY_ID:
+			reg |= (RTL839X_DUPLEX_MODE | RTL839X_FORCE_LINK_EN);
+		break;
+		case RTL9300_FAMILY_ID:
+			reg |= (RTL930X_DUPLEX_MODE | RTL930X_FORCE_LINK_EN);
+		break;
+		case RTL9310_FAMILY_ID:
+			reg |= (RTL931X_DUPLEX_MODE | RTL931X_FORCE_LINK_EN);
+		break;
+		}
+	}
+
+	switch(priv->family_id)
+	{
+	case RTL8380_FAMILY_ID:
+		if (state->link)
+			reg |= RTL830X_FORCE_LINK_EN;
+		if (state->duplex == DUPLEX_FULL)
+			reg |= RTL830X_DUPLEX_MODE;
+	break;
+	case RTL8390_FAMILY_ID:
+		if (state->link)
+			reg |= RTL839X_FORCE_LINK_EN;
+		if (state->duplex == DUPLEX_FULL)
+			reg |= RTL839X_DUPLEX_MODE;
+	break;
+	case RTL9300_FAMILY_ID:
+		if (state->link)
+			reg |= RTL930X_FORCE_LINK_EN;
+		if (state->duplex == DUPLEX_FULL)
+			reg |= RTL930X_DUPLEX_MODE;
+	break;
+	case RTL9310_FAMILY_ID:
+		if (state->link)
+			reg |= RTL931X_FORCE_LINK_EN;
+		if (state->duplex == DUPLEX_FULL)
+			reg |= RTL931X_DUPLEX_MODE;
+	break;
+	}
+	// Disable AN
+	if (priv->family_id == RTL8380_FAMILY_ID)
+		reg &= ~RTL830X_NWAY_EN;
+>>>>>>> c21f1f8bf7 (5.10 port)
 	sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
 }
 
@@ -470,17 +634,28 @@ static void rtl83xx_phylink_mac_link_down(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 	/* Stop TX/RX to port */
+<<<<<<< HEAD
+=======
+	pr_debug("%s: port %d down\n", __func__, port);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	sw_w32_mask(0x3, 0, priv->r->mac_port_ctrl(port));
 }
 
 static void rtl83xx_phylink_mac_link_up(struct dsa_switch *ds, int port,
 				   unsigned int mode,
 				   phy_interface_t interface,
+<<<<<<< HEAD
 				   struct phy_device *phydev,
 				   int speed, int duplex,
 				   bool tx_pause, bool rx_pause)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
+=======
+				   struct phy_device *phydev, int speed, int duplex, bool tx_pause, bool rx_pause)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	pr_debug("%s: port %d up\n", __func__, port);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	/* Restart TX/RX to port */
 	sw_w32_mask(0, 0x3, priv->r->mac_port_ctrl(port));
 }
@@ -525,6 +700,34 @@ static int rtl83xx_get_sset_count(struct dsa_switch *ds, int port, int sset)
 	return ARRAY_SIZE(rtl83xx_mib);
 }
 
+<<<<<<< HEAD
+=======
+static u64 rtl83xx_mc_group_del_port(struct rtl838x_switch_priv *priv, int mc_group, int port);
+static u64 rtl83xx_mc_group_add_port(struct rtl838x_switch_priv *priv, int mc_group, int port);
+
+static void store_mcgroups(struct rtl838x_switch_priv *priv, int port)
+{
+	int mc_group;
+	for (mc_group = 0; mc_group < MAX_MC_GROUPS; mc_group++) {
+		u64 portmask = priv->r->read_mcast_pmask(mc_group);
+		if (portmask & BIT_ULL(port)) {
+			priv->mc_group_saves[mc_group] = port;
+			rtl83xx_mc_group_del_port(priv, mc_group, port);
+		}
+	}
+}
+static void load_mcgroups(struct rtl838x_switch_priv *priv, int port)
+{
+	int mc_group;
+	for (mc_group = 0; mc_group < MAX_MC_GROUPS; mc_group++) {
+		if (priv->mc_group_saves[mc_group] == port) {
+			rtl83xx_mc_group_add_port(priv, mc_group, port);
+			priv->mc_group_saves[mc_group] = -1;
+		}
+	}
+}
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 static int rtl83xx_port_enable(struct dsa_switch *ds, int port,
 				struct phy_device *phydev)
 {
@@ -532,6 +735,11 @@ static int rtl83xx_port_enable(struct dsa_switch *ds, int port,
 	u64 v;
 
 	pr_debug("%s: %x %d", __func__, (u32) priv, port);
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	priv->ports[port].enable = true;
 
 	/* enable inner tagging on egress, do not keep any tags */
@@ -543,14 +751,30 @@ static int rtl83xx_port_enable(struct dsa_switch *ds, int port,
 	if (dsa_is_cpu_port(ds, port))
 		return 0;
 
+<<<<<<< HEAD
 	/* add port to switch mask of CPU_PORT */
 	priv->r->traffic_enable(priv->cpu_port, port);
 
+=======
+
+	/* add port to switch mask of CPU_PORT */
+	priv->r->traffic_enable(priv->cpu_port, port);
+	load_mcgroups(priv, port);
+	
+	if (priv->is_lagmember[port]) {
+		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
+		return 0;
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 	/* add all other ports in the same bridge to switch mask of port */
 	v = priv->r->traffic_get(port);
 	v |= priv->ports[port].pm;
 	priv->r->traffic_set(port, v);
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	// TODO: Figure out if this is necessary
 	if (priv->family_id == RTL9300_FAMILY_ID) {
 		sw_w32_mask(0, BIT(port), RTL930X_L2_PORT_SABLK_CTRL);
@@ -560,6 +784,10 @@ static int rtl83xx_port_enable(struct dsa_switch *ds, int port,
 	return 0;
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 static void rtl83xx_port_disable(struct dsa_switch *ds, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
@@ -573,6 +801,10 @@ static void rtl83xx_port_disable(struct dsa_switch *ds, int port)
 	// BUG: This does not work on RTL931X
 	/* remove port from switch mask of CPU_PORT */
 	priv->r->traffic_disable(priv->cpu_port, port);
+<<<<<<< HEAD
+=======
+	store_mcgroups(priv, port);
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	/* remove all other ports in the same bridge from switch mask of port */
 	v = priv->r->traffic_get(port);
@@ -587,6 +819,10 @@ static int rtl83xx_set_mac_eee(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 
+<<<<<<< HEAD
+=======
+	pr_debug("%s: %d\n", __func__, port);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	if (e->eee_enabled && !priv->eee_enabled) {
 		pr_info("Globally enabling EEE\n");
 		priv->r->init_eee(priv, true);
@@ -606,6 +842,10 @@ static int rtl83xx_get_mac_eee(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 
+<<<<<<< HEAD
+=======
+	pr_debug("%s: %d\n", __func__, port);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	e->supported = SUPPORTED_100baseT_Full | SUPPORTED_1000baseT_Full;
 
 	priv->r->eee_port_ability(priv, e, port);
@@ -664,13 +904,25 @@ static int rtl83xx_port_bridge_join(struct dsa_switch *ds, int port,
 	int i;
 
 	pr_debug("%s %x: %d %llx", __func__, (u32)priv, port, port_bitmap);
+<<<<<<< HEAD
+=======
+	if (priv->is_lagmember[port]) {
+		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
+		return 0;
+	}
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	mutex_lock(&priv->reg_mutex);
 	for (i = 0; i < ds->num_ports; i++) {
 		/* Add this port to the port matrix of the other ports in the
 		 * same bridge. If the port is disabled, port matrix is kept
 		 * and not being setup until the port becomes enabled.
 		 */
+<<<<<<< HEAD
 		if (dsa_is_user_port(ds, i) && i != port) {
+=======
+		if (dsa_is_user_port(ds, i) && i != port && !priv->is_lagmember[i]) {
+>>>>>>> c21f1f8bf7 (5.10 port)
 			if (dsa_to_port(ds, i)->bridge_dev != bridge)
 				continue;
 			if (priv->ports[i].enable)
@@ -680,6 +932,10 @@ static int rtl83xx_port_bridge_join(struct dsa_switch *ds, int port,
 			port_bitmap |= BIT_ULL(i);
 		}
 	}
+<<<<<<< HEAD
+=======
+	load_mcgroups(priv, port);
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	/* Add all other ports to this port matrix. */
 	if (priv->ports[port].enable) {
@@ -713,13 +969,23 @@ static void rtl83xx_port_bridge_leave(struct dsa_switch *ds, int port,
 		if (dsa_is_user_port(ds, i) && i != port) {
 			if (dsa_to_port(ds, i)->bridge_dev != bridge)
 				continue;
+<<<<<<< HEAD
 			if (priv->ports[i].enable)
 				priv->r->traffic_disable(i, port);
 
+=======
+			if (priv->ports[i].enable) {
+				priv->r->traffic_disable(i, port);
+			}
+>>>>>>> c21f1f8bf7 (5.10 port)
 			priv->ports[i].pm |= BIT_ULL(port);
 			port_bitmap &= ~BIT_ULL(i);
 		}
 	}
+<<<<<<< HEAD
+=======
+	store_mcgroups(priv, port);
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	/* Add all other ports to this port matrix. */
 	if (priv->ports[port].enable) {
@@ -816,6 +1082,10 @@ void rtl930x_fast_age(struct dsa_switch *ds, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	pr_debug("FAST AGE port %d\n", port);
 	mutex_lock(&priv->reg_mutex);
 	sw_w32(port << 11, RTL930X_L2_TBL_FLUSH_CTRL + 4);
@@ -828,12 +1098,19 @@ void rtl930x_fast_age(struct dsa_switch *ds, int port)
 }
 
 static int rtl83xx_vlan_filtering(struct dsa_switch *ds, int port,
+<<<<<<< HEAD
 				  bool vlan_filtering,
 				  struct switchdev_trans *trans)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 
 	pr_debug("%s: port %d\n", __func__, port);
+=======
+				  bool vlan_filtering, struct switchdev_trans *trans)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	pr_debug("%s: port %d state %d\n", __func__, port, vlan_filtering);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	mutex_lock(&priv->reg_mutex);
 
 	if (vlan_filtering) {
@@ -847,14 +1124,25 @@ static int rtl83xx_vlan_filtering(struct dsa_switch *ds, int port,
 		 */
 		if (port != priv->cpu_port)
 			sw_w32_mask(0b10 << ((port % 16) << 1), 0b01 << ((port % 16) << 1),
+<<<<<<< HEAD
 				    priv->r->vlan_port_igr_filter + ((port >> 5) << 2));
 		sw_w32_mask(0, BIT(port % 32), priv->r->vlan_port_egr_filter + ((port >> 4) << 2));
+=======
+				    priv->r->vlan_port_igr_filter + ((port >> 4) << 2));
+		sw_w32_mask(0, BIT(port % 32), priv->r->vlan_port_egr_filter + ((port >> 5) << 2));
+		//sw_w32_mask(BIT(port % 32), 0, priv->r->vlan_port_egr_filter + ((port >> 5) << 2));  //BUG
+>>>>>>> c21f1f8bf7 (5.10 port)
 	} else {
 		/* Disable ingress and egress filtering */
 		if (port != priv->cpu_port)
 			sw_w32_mask(0b11 << ((port % 16) << 1), 0,
+<<<<<<< HEAD
 				    priv->r->vlan_port_igr_filter + ((port >> 5) << 2));
 		sw_w32_mask(BIT(port % 32), 0, priv->r->vlan_port_egr_filter + ((port >> 4) << 2));
+=======
+				    priv->r->vlan_port_igr_filter + ((port >> 4) << 2));
+		sw_w32_mask(BIT(port % 32), 0, priv->r->vlan_port_egr_filter + ((port >> 5) << 2));
+>>>>>>> c21f1f8bf7 (5.10 port)
 	}
 
 	/* Do we need to do something to the CPU-Port, too? */
@@ -1099,7 +1387,15 @@ static int rtl83xx_port_fdb_add(struct dsa_switch *ds, int port,
 	struct rtl838x_l2_entry e;
 	int err = 0, idx;
 	u64 seed = priv->r->l2_hash_seed(mac, vid);
+<<<<<<< HEAD
 
+=======
+	pr_debug("%s: %d\n", __func__, port);
+	if (priv->is_lagmember[port]) {
+		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
+		return 0;
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 	mutex_lock(&priv->reg_mutex);
 
 	idx = rtl83xx_find_l2_hash_entry(priv, seed, false, &e);
@@ -1135,12 +1431,20 @@ static int rtl83xx_port_fdb_del(struct dsa_switch *ds, int port,
 	int err = 0, idx;
 	u64 seed = priv->r->l2_hash_seed(mac, vid);
 
+<<<<<<< HEAD
 	pr_info("In %s, mac %llx, vid: %d\n", __func__, mac, vid);
+=======
+	pr_debug("In %s, mac %llx, vid: %d\n", __func__, mac, vid);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	mutex_lock(&priv->reg_mutex);
 
 	idx = rtl83xx_find_l2_hash_entry(priv, seed, true, &e);
 
+<<<<<<< HEAD
 	pr_info("Found entry index %d, key %d and bucket %d\n", idx, idx >> 2, idx & 3);
+=======
+	pr_debug("Found entry index %d, key %d and bucket %d\n", idx, idx >> 2, idx & 3);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	if (idx >= 0) {
 		e.valid = false;
 		dump_l2_entry(&e);
@@ -1168,8 +1472,13 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 	struct rtl838x_l2_entry e;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int i;
+<<<<<<< HEAD
 	u32 fid, pkey;
 	u64 mac;
+=======
+	u32 fid, pkey, key;
+	u64 mac, seed;
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	mutex_lock(&priv->reg_mutex);
 
@@ -1179,24 +1488,41 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 		if (!e.valid)
 			continue;
 
+<<<<<<< HEAD
 		if (e.port == port) {
+=======
+		if (e.port == port || e.port == RTL930X_PORT_IGNORE) {
+>>>>>>> c21f1f8bf7 (5.10 port)
 			fid = ((i >> 2) & 0x3ff) | (e.rvid & ~0x3ff);
 			mac = ether_addr_to_u64(&e.mac[0]);
 			pkey = priv->r->l2_hash_key(priv, priv->r->l2_hash_seed(mac, fid));
 			fid = (pkey & 0x3ff) | (fid & ~0x3ff);
+<<<<<<< HEAD
 			pr_info("-> index %d, key %x, bucket %d, dmac %016llx, fid: %x rvid: %x\n",
 				i, i >> 2, i & 0x3, mac, fid, e.rvid);
 			dump_l2_entry(&e);
 			u64 seed = priv->r->l2_hash_seed(mac, e.rvid);
 			u32 key = priv->r->l2_hash_key(priv, seed);
 			pr_info("seed: %016llx, key based on rvid: %08x\n", seed, key);
+=======
+			pr_debug("-> index %d, key %x, bucket %d, dmac %016llx, fid: %x rvid: %x\n",
+				i, i >> 2, i & 0x3, mac, fid, e.rvid);
+			dump_l2_entry(&e);
+			seed = priv->r->l2_hash_seed(mac, e.rvid);
+			key = priv->r->l2_hash_key(priv, seed);
+			pr_debug("seed: %016llx, key based on rvid: %08x\n", seed, key);
+>>>>>>> c21f1f8bf7 (5.10 port)
 			cb(e.mac, e.vid, e.is_static, data);
 		}
 		if (e.type == L2_MULTICAST) {
 			u64 portmask = priv->r->read_mcast_pmask(e.mc_portmask_index);
 			if (portmask & BIT_ULL(port)) {
 				dump_l2_entry(&e);
+<<<<<<< HEAD
 				pr_info("  PM: %016llx\n", portmask);
+=======
+				pr_debug("  PM: %016llx\n", portmask);
+>>>>>>> c21f1f8bf7 (5.10 port)
 			}
 		}
 	}
@@ -1234,10 +1560,22 @@ static int rtl83xx_mc_group_alloc(struct rtl838x_switch_priv *priv, int port)
 	if (mc_group >= MAX_MC_GROUPS - 1)
 		return -1;
 
+<<<<<<< HEAD
 	pr_debug("Using MC group %d\n", mc_group);
 	set_bit(mc_group, priv->mc_group_bm);
 	mc_group++;  // We cannot use group 0, as this is used for lookup miss flooding
 	portmask = BIT_ULL(port);
+=======
+	pr_debug("%s: %d\n", __func__, port);
+	if (priv->is_lagmember[port]) {
+		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
+		return 0;
+	}
+	pr_debug("Using MC group %d\n", mc_group);
+	set_bit(mc_group, priv->mc_group_bm);
+	mc_group++;  // We cannot use group 0, as this is used for lookup miss flooding
+	portmask = BIT_ULL(port) | BIT_ULL(priv->cpu_port); 
+>>>>>>> c21f1f8bf7 (5.10 port)
 	priv->r->write_mcast_pmask(mc_group, portmask);
 
 	return mc_group;
@@ -1247,6 +1585,14 @@ static u64 rtl83xx_mc_group_add_port(struct rtl838x_switch_priv *priv, int mc_gr
 {
 	u64 portmask = priv->r->read_mcast_pmask(mc_group);
 
+<<<<<<< HEAD
+=======
+	pr_debug("%s: %d\n", __func__, port);
+	if (priv->is_lagmember[port]) {
+		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
+		return portmask;
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 	portmask |= BIT_ULL(port);
 	priv->r->write_mcast_pmask(mc_group, portmask);
 
@@ -1257,10 +1603,24 @@ static u64 rtl83xx_mc_group_del_port(struct rtl838x_switch_priv *priv, int mc_gr
 {
 	u64 portmask = priv->r->read_mcast_pmask(mc_group);
 
+<<<<<<< HEAD
 	portmask &= ~BIT_ULL(port);
 	priv->r->write_mcast_pmask(mc_group, portmask);
 	if (!portmask)
 		clear_bit(mc_group, priv->mc_group_bm);
+=======
+	pr_debug("%s: %d\n", __func__, port);
+	if (priv->is_lagmember[port]) {
+		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
+		return portmask;
+	}
+	priv->r->write_mcast_pmask(mc_group, portmask);
+	if (portmask == BIT_ULL(priv->cpu_port)) {
+		portmask &= ~BIT_ULL(priv->cpu_port);
+		priv->r->write_mcast_pmask(mc_group, portmask);
+		clear_bit(mc_group, priv->mc_group_bm);
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	return portmask;
 }
@@ -1276,11 +1636,23 @@ static void rtl83xx_port_mdb_add(struct dsa_switch *ds, int port,
 	u64 seed = priv->r->l2_hash_seed(mac, vid);
 	int mc_group;
 
+<<<<<<< HEAD
+=======
+	pr_debug("%s: %d\n", __func__, port);
+	if (priv->is_lagmember[port]) {
+		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
+		return;
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 	pr_debug("In %s port %d, mac %llx, vid: %d\n", __func__, port, mac, vid);
 	mutex_lock(&priv->reg_mutex);
 
 	idx = rtl83xx_find_l2_hash_entry(priv, seed, false, &e);
+<<<<<<< HEAD
 
+=======
+	
+>>>>>>> c21f1f8bf7 (5.10 port)
 	// Found an existing or empty entry
 	if (idx >= 0) {
 		if (e.valid) {
@@ -1338,6 +1710,14 @@ int rtl83xx_port_mdb_del(struct dsa_switch *ds, int port,
 	int vid = mdb->vid;
 	u64 seed = priv->r->l2_hash_seed(mac, vid);
 	u64 portmask;
+<<<<<<< HEAD
+=======
+	pr_debug("%s: %d\n", __func__, port);
+	if (priv->is_lagmember[port]) {
+		pr_info("%s: %d is lag slave. ignore\n", __func__, port);
+		return 0;
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 	pr_debug("In %s, port %d, mac %llx, vid: %d\n", __func__, port, mac, vid);
 	mutex_lock(&priv->reg_mutex);
@@ -1378,12 +1758,24 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 				   bool ingress)
 {
 	/* We support 4 mirror groups, one destination port per group */
+<<<<<<< HEAD
 	int group;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int ctrl_reg, dpm_reg, spm_reg;	
 
 	pr_debug("In %s\n", __func__);
 
+=======
+	int group, err = 0;
+	struct rtl838x_switch_priv *priv = ds->priv;
+	struct rtl838x_vlan_info info;
+	int ctrl_reg, dpm_reg, spm_reg;
+	int v;
+	pr_debug("In %s\n", __func__);
+
+	mutex_lock(&priv->reg_mutex);
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	for (group = 0; group < 4; group++) {
 		if (priv->mirror_group_ports[group] == mirror->to_local_port)
 			break;
@@ -1395,6 +1787,7 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 		}
 	}
 
+<<<<<<< HEAD
 	if (group >= 4)
 		return -ENOSPC;
 
@@ -1422,14 +1815,49 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 		return -EEXIST;
 	}
 
+=======
+	if (group >= 4) {
+		err = -ENOSPC;
+		goto out;
+	}
+
+	ctrl_reg = priv->r->mir_ctrl + (group * 4);
+	dpm_reg = priv->r->mir_dpm + ((group << 2) * priv->port_width);
+	spm_reg = priv->r->mir_spm + ((group << 2) * priv->port_width);
+	pr_debug("Using group %d local port %d, port %d\n", group, mirror->to_local_port, port);
+	
+
+	if (priv->family_id == RTL8380_FAMILY_ID) {
+		/* Enable mirroring to port across VLANs (bit 11) */
+		sw_w32(1 << 11 | ( mirror->to_local_port << 4) | 1, ctrl_reg);
+	} else {
+		/* Enable mirroring to destination port */
+		sw_w32(( mirror->to_local_port << 4) | 1, ctrl_reg);
+	}
+
+	if (ingress && (priv->r->get_port_reg_be(spm_reg) & (1ULL << port))) {
+		err = -EEXIST;
+		goto out;
+	}
+	if ((!ingress) && (priv->r->get_port_reg_be(dpm_reg) & (1ULL << port))) {
+		err = -EEXIST;
+		goto out;
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 	if (ingress)
 		priv->r->mask_port_reg_be(0, 1ULL << port, spm_reg);
 	else
 		priv->r->mask_port_reg_be(0, 1ULL << port, dpm_reg);
 
 	priv->mirror_group_ports[group] = mirror->to_local_port;
+<<<<<<< HEAD
 	mutex_unlock(&priv->reg_mutex);
 	return 0;
+=======
+	out:
+	mutex_unlock(&priv->reg_mutex);
+	return err;
+>>>>>>> c21f1f8bf7 (5.10 port)
 }
 
 static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
@@ -1440,11 +1868,16 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 	int ctrl_reg, dpm_reg, spm_reg;
 
 	pr_debug("In %s\n", __func__);
+<<<<<<< HEAD
+=======
+	mutex_lock(&priv->reg_mutex);
+>>>>>>> c21f1f8bf7 (5.10 port)
 	for (group = 0; group < 4; group++) {
 		if (priv->mirror_group_ports[group] == mirror->to_local_port)
 			break;
 	}
 	if (group >= 4)
+<<<<<<< HEAD
 		return;
 
 	ctrl_reg = priv->r->mir_ctrl + group * 4;
@@ -1452,6 +1885,14 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 	spm_reg = priv->r->mir_spm + group * 4 * priv->port_width;
 
 	mutex_lock(&priv->reg_mutex);
+=======
+		goto out;
+
+	ctrl_reg = priv->r->mir_ctrl + group * 4;
+	dpm_reg = priv->r->mir_dpm + (group << 2) * priv->port_width;
+	spm_reg = priv->r->mir_spm + (group << 2) * priv->port_width;
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 	if (mirror->ingress) {
 		/* Ingress, clear source port matrix */
 		priv->r->mask_port_reg_be(1ULL << port, 0, spm_reg);
@@ -1459,6 +1900,7 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 		/* Egress, clear destination port matrix */
 		priv->r->mask_port_reg_be(1ULL << port, 0, dpm_reg);
 	}
+<<<<<<< HEAD
 
 	if (!(sw_r32(spm_reg) || sw_r32(dpm_reg))) {
 		priv->mirror_group_ports[group] = -1;
@@ -1466,6 +1908,218 @@ static void rtl83xx_port_mirror_del(struct dsa_switch *ds, int port,
 	}
 
 	mutex_unlock(&priv->reg_mutex);
+=======
+	
+	if (!(priv->r->get_port_reg_be(dpm_reg) & (1ULL << port)) && !(priv->r->get_port_reg_be(spm_reg) & (1ULL << port))) {
+
+		priv->mirror_group_ports[group] = -1;
+		sw_w32(0, ctrl_reg);
+	}
+	out:
+	mutex_unlock(&priv->reg_mutex);
+}
+
+static bool rtl83xx_lag_can_offload(struct dsa_switch *ds,
+				      struct net_device *lag,
+				      struct netdev_lag_upper_info *info)
+{
+	struct dsa_port *dp;
+	int id;
+
+	id = dsa_lag_id(ds->dst, lag);
+	if (id < 0 || id >= ds->num_lag_ids)
+		return false;
+
+	if (info->tx_type != NETDEV_LAG_TX_TYPE_HASH) {
+		return false;
+	}
+	if (info->hash_type != NETDEV_LAG_HASH_L2 && info->hash_type != NETDEV_LAG_HASH_L23)
+		return false;
+
+	return true;
+}
+
+static void add_portmatrix(struct dsa_switch *ds,int port)
+{
+	int i;
+	struct rtl838x_switch_priv *priv = ds->priv;
+	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
+
+	for (i = 0; i < ds->num_ports; i++) {
+		/* Add this port to the port matrix of the other ports in the
+		 * same bridge. If the port is disabled, port matrix is kept
+		 * and not being setup until the port becomes enabled.
+		 */
+		if (dsa_is_user_port(ds, i) && i != port && !priv->is_lagmember[i]) {
+			if (priv->ports[i].enable) {
+				priv->r->traffic_enable(i, port);
+			}
+			priv->ports[i].pm |= BIT_ULL(port);
+			port_bitmap |= BIT_ULL(i);
+		}
+		if (priv->is_lagmember[i] || i == port) {
+		
+			priv->ports[i].pm &= ~BIT_ULL(i);
+			port_bitmap &= ~BIT_ULL(i);
+		
+		}
+	}
+	load_mcgroups(priv, port);
+	/* Add all other ports to this port matrix. */
+	if (priv->ports[port].enable) {
+		priv->r->traffic_enable(priv->cpu_port, port);
+		v = priv->r->traffic_get(port);
+		v |= port_bitmap;
+		priv->r->traffic_set(port, v);
+	}
+	priv->ports[port].pm |= port_bitmap;
+
+
+}
+/* pointless? */
+static int rtl83xx_port_lag_change(struct dsa_switch *ds, int port)
+{
+	struct dsa_port *dp;
+	struct net_device *lag;
+	unsigned int id;
+	int num_tx, i,a;
+	struct rtl838x_switch_priv *priv = ds->priv;
+	u64 port_bitmap = BIT_ULL(priv->cpu_port), v;
+	pr_debug("%s: %d\n", __func__, port);
+	mutex_lock(&priv->reg_mutex);
+
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+
+void rtl83xx_port_stp_state_set(struct dsa_switch *ds, int port, u8 state);
+
+static int rtl83xx_port_lag_join(struct dsa_switch *ds, int port,
+				   struct net_device *lag,
+				   struct netdev_lag_upper_info *info)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	int i, err;
+
+	if (!rtl83xx_lag_can_offload(ds, lag, info))
+		return -EOPNOTSUPP;
+
+	mutex_lock(&priv->reg_mutex);
+
+	for (i = 0; i < priv->n_lags; i++) {
+		if ((!priv->lag_devs[i]) || (priv->lag_devs[i] == lag))
+			break;
+	}
+	if (port >= priv->cpu_port) {
+		err = -EINVAL;
+		goto out;
+	}
+	pr_info("port_lag_join: group %d, port %d\n",i, port); 
+	if (!priv->lag_devs[i])
+		priv->lag_devs[i] = lag;
+
+	if (priv->lag_primary[i]==-1) {
+		priv->lag_primary[i]=port;
+	} else
+		priv->is_lagmember[port] = 1;
+
+	priv->lagmembers |= (1ULL << port);
+
+	pr_debug("lag_members = %llX\n", priv->lagmembers);
+	err = rtl83xx_lag_add(priv->ds, i, port, info);
+	if (err) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+out:
+	mutex_unlock(&priv->reg_mutex);
+	return err;
+
+}
+
+static int rtl83xx_port_lag_leave(struct dsa_switch *ds, int port,
+				    struct net_device *lag)
+{
+	int i, group = -1, err;
+	struct rtl838x_switch_priv *priv = ds->priv;
+	
+	mutex_lock(&priv->reg_mutex);
+	for (i=0;i<priv->n_lags;i++) {
+		if (priv->lags_port_members[i] & BIT_ULL(port)) {
+			group = i;
+			break;
+		}
+	}
+	
+	if (group == -1) {
+		pr_info("port_lag_leave: port %d is not a member\n", port); 
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (port >= priv->cpu_port) {
+		err = -EINVAL;
+		goto out;
+	}
+	pr_info("port_lag_del: group %d, port %d\n",group, port); 
+	priv->lagmembers &=~ (1ULL << port);
+	priv->lag_primary[i] = -1;
+	priv->is_lagmember[port] = 0;
+	pr_debug("lag_members = %llX\n", priv->lagmembers);
+	err = rtl83xx_lag_del(priv->ds, group, port);
+	if (err) {
+		err = -EINVAL;
+		goto out;
+	}
+	if (!priv->lags_port_members[i])
+		priv->lag_devs[i] = NULL;
+
+out:
+	mutex_unlock(&priv->reg_mutex);
+	return 0;
+}
+static int rtl83xx_port_pre_bridge_flags(struct dsa_switch *ds, int port, unsigned long flags, struct netlink_ext_ack *extack)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+	unsigned long features = 0;
+	pr_debug("%s: %d %lX\n", __func__, port, flags);
+	if (priv->r->enable_learning)
+		    features |= BR_LEARNING;
+	if (priv->r->enable_flood)
+		    features |= BR_FLOOD;
+	if (priv->r->enable_mcast_flood)
+		    features |= BR_MCAST_FLOOD;
+	if (priv->r->enable_bcast_flood)
+		    features |= BR_BCAST_FLOOD;
+	if (flags & ~(features))
+		return -EINVAL;
+	
+	return 0;
+}
+
+static int rtl83xx_port_bridge_flags(struct dsa_switch *ds, int port, unsigned long flags, struct netlink_ext_ack *extack)
+{
+	struct rtl838x_switch_priv *priv = ds->priv;
+
+	pr_debug("%s: %d %lX\n", __func__, port, flags);
+	if (priv->r->enable_learning)
+		priv->r->enable_learning(port, !!(flags & BR_LEARNING));
+	    
+	if (priv->r->enable_flood)
+		priv->r->enable_flood(port, !!(flags & BR_FLOOD));
+
+	if (priv->r->enable_mcast_flood)
+		priv->r->enable_mcast_flood(port, !!(flags & BR_MCAST_FLOOD));
+
+	if (priv->r->enable_bcast_flood)
+		priv->r->enable_bcast_flood(port, !!(flags & BR_BCAST_FLOOD));
+
+	return 0;
+	
+>>>>>>> c21f1f8bf7 (5.10 port)
 }
 
 int dsa_phy_read(struct dsa_switch *ds, int phy_addr, int phy_reg)
@@ -1474,6 +2128,11 @@ int dsa_phy_read(struct dsa_switch *ds, int phy_addr, int phy_reg)
 	u32 offset = 0;
 	struct rtl838x_switch_priv *priv = ds->priv;
 
+<<<<<<< HEAD
+=======
+	pr_debug("%s: %X:%X\n", __func__, phy_addr, phy_reg);
+	if (priv->family_id == RTL8380_FAMILY_ID) {
+>>>>>>> c21f1f8bf7 (5.10 port)
 	if (phy_addr >= 24 && phy_addr <= 27
 		&& priv->ports[24].phy == PHY_RTL838X_SDS) {
 		if (phy_addr == 26)
@@ -1481,7 +2140,11 @@ int dsa_phy_read(struct dsa_switch *ds, int phy_addr, int phy_reg)
 		val = sw_r32(RTL838X_SDS4_FIB_REG0 + offset + (phy_reg << 2)) & 0xffff;
 		return val;
 	}
+<<<<<<< HEAD
 
+=======
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 	read_phy(phy_addr, 0, phy_reg, &val);
 	return val;
 }
@@ -1490,7 +2153,13 @@ int dsa_phy_write(struct dsa_switch *ds, int phy_addr, int phy_reg, u16 val)
 {
 	u32 offset = 0;
 	struct rtl838x_switch_priv *priv = ds->priv;
+<<<<<<< HEAD
 
+=======
+	pr_debug("%s: %X:%X\n", __func__, phy_addr, phy_reg);
+
+	if (priv->family_id == RTL8380_FAMILY_ID) {
+>>>>>>> c21f1f8bf7 (5.10 port)
 	if (phy_addr >= 24 && phy_addr <= 27
 	     && priv->ports[24].phy == PHY_RTL838X_SDS) {
 		if (phy_addr == 26)
@@ -1498,6 +2167,10 @@ int dsa_phy_write(struct dsa_switch *ds, int phy_addr, int phy_reg, u16 val)
 		sw_w32(val, RTL838X_SDS4_FIB_REG0 + offset + (phy_reg << 2));
 		return 0;
 	}
+<<<<<<< HEAD
+=======
+	}
+>>>>>>> c21f1f8bf7 (5.10 port)
 	return write_phy(phy_addr, 0, phy_reg, val);
 }
 
@@ -1545,6 +2218,15 @@ const struct dsa_switch_ops rtl83xx_switch_ops = {
 
 	.port_mirror_add	= rtl83xx_port_mirror_add,
 	.port_mirror_del	= rtl83xx_port_mirror_del,
+<<<<<<< HEAD
+=======
+
+	.port_lag_change	= rtl83xx_port_lag_change,
+	.port_lag_join		= rtl83xx_port_lag_join,
+	.port_lag_leave		= rtl83xx_port_lag_leave,
+	.port_pre_bridge_flags  = rtl83xx_port_pre_bridge_flags,
+	.port_bridge_flags  = rtl83xx_port_bridge_flags,
+>>>>>>> c21f1f8bf7 (5.10 port)
 };
 
 const struct dsa_switch_ops rtl930x_switch_ops = {
@@ -1589,4 +2271,13 @@ const struct dsa_switch_ops rtl930x_switch_ops = {
 	.port_mdb_add		= rtl83xx_port_mdb_add,
 	.port_mdb_del		= rtl83xx_port_mdb_del,
 
+<<<<<<< HEAD
+=======
+	.port_lag_change	= rtl83xx_port_lag_change,
+	.port_lag_join		= rtl83xx_port_lag_join,
+	.port_lag_leave		= rtl83xx_port_lag_leave,
+	
+	.port_pre_bridge_flags  = rtl83xx_port_pre_bridge_flags,
+	.port_bridge_flags  = rtl83xx_port_bridge_flags,
+>>>>>>> c21f1f8bf7 (5.10 port)
 };

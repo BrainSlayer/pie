@@ -4,7 +4,11 @@
 #define _NET_DSA_RTL83XX_H
 
 #include <net/dsa.h>
+<<<<<<< HEAD
 #include "rtl838x.h"
+=======
+#include <linux/rtl838x.h>
+>>>>>>> c21f1f8bf7 (5.10 port)
 
 
 #define RTL8380_VERSION_A 'A'
@@ -74,6 +78,18 @@ inline u32 rtl_table_data_r(struct table_reg *r, int i);
 inline void rtl_table_data_w(struct table_reg *r, u32 v, int i);
 
 void __init rtl83xx_setup_qos(struct rtl838x_switch_priv *priv);
+<<<<<<< HEAD
+=======
+
+int rtl83xx_l2_nexthop_rm(struct rtl838x_switch_priv *priv, struct rtl83xx_nexthop *nh);
+struct rtl83xx_route *rtl83xx_route_find_gw(struct rtl838x_switch_priv *priv, __be32 ip);
+struct rtl83xx_route *route_alloc(struct rtl838x_switch_priv *priv, u32 ip);
+
+int rtl83xx_packet_cntr_alloc(struct rtl838x_switch_priv *priv);
+
+int rtl83xx_port_is_under(const struct net_device * dev, struct rtl838x_switch_priv *priv);
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 int read_phy(u32 port, u32 page, u32 reg, u32 *val);
 int write_phy(u32 port, u32 page, u32 reg, u32 val);
 
@@ -118,6 +134,12 @@ int rtl9300_sds_power(int mac, int val);
 void rtl9300_sds_rst(int sds_num, u32 mode);
 void rtl930x_print_matrix(void);
 
+<<<<<<< HEAD
+=======
+int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port, struct netdev_lag_upper_info *info);
+int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port);
+
+>>>>>>> c21f1f8bf7 (5.10 port)
 /* RTL931x-specific */
 irqreturn_t rtl931x_switch_irq(int irq, void *dev_id);
 

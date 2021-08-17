@@ -56,12 +56,17 @@
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
-		frequency = <500000000>;
+		frequency = <700000000>;
 
 		cpu@0 {
-			compatible = "mips,mips4KEc";
+			compatible = "mips,mips34Kc";
 			reg = <0>;
 		};
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
 	};
 
 	chosen {
@@ -146,7 +151,6 @@
 
 			status = "disabled";
 		};
-
 	};
 
 	gpio0: gpio-controller@b8003500 {
@@ -161,7 +165,7 @@
 	gpio1: rtl8231-gpio {
 		compatible = "realtek,rtl8231-gpio";
 		#gpio-cells = <2>;
-		indirect-access-bus-id = <0>;
+		indirect-access-bus-id = <3>;
 		gpio-controller;
 
 		status = "disabled";
