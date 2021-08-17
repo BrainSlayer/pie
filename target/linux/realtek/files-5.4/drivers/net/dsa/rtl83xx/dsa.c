@@ -304,16 +304,6 @@ static int rtl83xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	if (port < 0 || port > priv->cpu_port)
 		return -EINVAL;
 
-#if 0
-	if (priv->lagmembers & (1ULL << port))	{
-		pr_info("%s: %d is lag member. force\n", __func__, port);
-		state->speed = SPEED_1000;
-		state->duplex = 1;
-		state->link = 1;
-		return 1;
-	}
-#endif
-
 	/*
 	 * On the RTL9300 for at least the RTL8226B PHY, the MAC-side link
 	 * state needs to be read twice in order to read a correct result.
@@ -403,7 +393,7 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 reg;
 	int speed_bit = priv->family_id == RTL8380_FAMILY_ID ? 4 : 3;
-	int force_fc = priv->family_id == RTL8380_FAMILY_ID ? 8 : 7;
+//	int force_fc = priv->family_id == RTL8380_FAMILY_ID ? RTL838X_MAC_FORCE_FC_EN : RTL839X_MAC_FORCE_FC_EN;
 
 	pr_debug("%s port %d, mode %x\n", __func__, port, mode);
 
@@ -432,7 +422,7 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	if (priv->family_id == RTL8380_FAMILY_ID) {
 		if (mode == MLO_AN_PHY || phylink_autoneg_inband(mode)) {
 			pr_debug("PHY autonegotiates\n");
-			reg |= BIT(2);
+			reg |= RTL830X_NWAY_EN;
 			sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
 			rtl83xx_config_interface(port, state->interface);
 			return;
@@ -442,33 +432,46 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	if (mode != MLO_AN_FIXED)
 		pr_debug("Fixed state.\n");
 
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-		/* Clear id_mode_dis bit, and the existing port mode, let
-		 * RGMII_MODE_EN bet set by mac_link_{up,down}
-		 */
-		reg &= ~(RX_PAUSE_EN | TX_PAUSE_EN);
-
+	/* Clear id_mode_dis bit, and the existing port mode, let
+	 * RGMII_MODE_EN bet set by mac_link_{up,down}
+	 */
+	switch(priv->family_id)
+	{
+	case RTL8380_FAMILY_ID:
+		reg &= ~(RTL830X_RX_PAUSE_EN | RTL830X_TX_PAUSE_EN);
 		if (state->pause & MLO_PAUSE_TXRX_MASK) {
 			if (state->pause & MLO_PAUSE_TX)
-				reg |= TX_PAUSE_EN;
-			reg |= RX_PAUSE_EN;
+				reg |= RTL830X_TX_PAUSE_EN;
+			reg |= RTL830X_RX_PAUSE_EN;
 		}
-	}
-	if (priv->family_id == RTL8390_FAMILY_ID) {
-		/* Clear id_mode_dis bit, and the existing port mode, let
-		 * RGMII_MODE_EN bet set by mac_link_{up,down}
-		 */
-		reg &= ~(1 << 5 | 1 << 6);
-
+	break;
+	case RTL8390_FAMILY_ID:
+		reg &= ~(RTL839X_RX_PAUSE_EN | RTL839X_TX_PAUSE_EN);
 		if (state->pause & MLO_PAUSE_TXRX_MASK) {
 			if (state->pause & MLO_PAUSE_TX)
-				reg |= 1 << 5;
-			reg |= 1 << 6;
+				reg |= RTL839X_TX_PAUSE_EN;
+			reg |= RTL839X_RX_PAUSE_EN;
 		}
+	break;
+	case RTL9300_FAMILY_ID:
+		reg &= ~(RTL930X_RX_PAUSE_EN | RTL930X_TX_PAUSE_EN);
+		if (state->pause & MLO_PAUSE_TXRX_MASK) {
+			if (state->pause & MLO_PAUSE_TX)
+				reg |= RTL930X_TX_PAUSE_EN;
+			reg |= RTL930X_RX_PAUSE_EN;
+		}
+	break;
+	case RTL9310_FAMILY_ID:
+		reg &= ~(RTL931X_RX_PAUSE_EN | RTL931X_TX_PAUSE_EN);
+		if (state->pause & MLO_PAUSE_TXRX_MASK) {
+			if (state->pause & MLO_PAUSE_TX)
+				reg |= RTL931X_TX_PAUSE_EN;
+			reg |= RTL931X_RX_PAUSE_EN;
+		}
+	break;
 	}
-
 	reg &= ~(3 << speed_bit);
-	reg &= ~(1 << force_fc);
+//	reg &= ~(1 << force_fc);
 	switch (state->speed) {
 	case SPEED_1000:
 		reg |= 2 << speed_bit;
@@ -476,40 +479,81 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	case SPEED_100:
 		reg |= 1 << speed_bit;
 		break;
+	case SPEED_10:
+		reg = 0;
+		break;
+	case SPEED_2500:
+		reg = 5 << speed_bit;
+		break;
+	case SPEED_5000:
+		reg = 6 << speed_bit;
+		break;
+	case SPEED_10000:
+		reg = 4 << speed_bit;
 	}
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-		reg &= ~(1<<3 | 1<<1);
-	}
-	if (priv->family_id == RTL8390_FAMILY_ID) {
-		reg &= ~(1<<2 | 1<<1);
+	switch(priv->family_id)
+	{
+	case RTL8380_FAMILY_ID:
+		reg &= ~(RTL830X_DUPLEX_MODE | RTL830X_FORCE_LINK_EN);
+	break;
+	case RTL8390_FAMILY_ID:
+		reg &= ~(RTL839X_DUPLEX_MODE | RTL839X_FORCE_LINK_EN);
+	break;
+	case RTL9300_FAMILY_ID:
+		reg &= ~(RTL930X_DUPLEX_MODE | RTL930X_FORCE_LINK_EN);
+	break;
+	case RTL9310_FAMILY_ID:
+		reg &= ~(RTL931X_DUPLEX_MODE | RTL931X_FORCE_LINK_EN);
+	break;
 	}
 	if (priv->lagmembers & (1ULL << port)) {
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-			reg |= 1<<1;
-			reg |= 1<<3;
-	}
-	if (priv->family_id == RTL8390_FAMILY_ID) {
-			reg |= 1<<1;
-			reg |= 1<<2;
-	}
-
-	}
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-		if (state->link)
-			reg |= 1<<1;
-		if (state->duplex == DUPLEX_FULL)
-			reg |= 1<<3;
-	}
-	if (priv->family_id == RTL8390_FAMILY_ID) {
-		if (state->link)
-			reg |= 1<<1;
-		if (state->duplex == DUPLEX_FULL)
-			reg |= 1<<2;
+		switch(priv->family_id)
+		{
+		case RTL8380_FAMILY_ID:
+			reg |= (RTL830X_DUPLEX_MODE | RTL830X_FORCE_LINK_EN);
+		break;
+		case RTL8390_FAMILY_ID:
+			reg |= (RTL839X_DUPLEX_MODE | RTL839X_FORCE_LINK_EN);
+		break;
+		case RTL9300_FAMILY_ID:
+			reg |= (RTL930X_DUPLEX_MODE | RTL930X_FORCE_LINK_EN);
+		break;
+		case RTL9310_FAMILY_ID:
+			reg |= (RTL931X_DUPLEX_MODE | RTL931X_FORCE_LINK_EN);
+		break;
+		}
 	}
 
+	switch(priv->family_id)
+	{
+	case RTL8380_FAMILY_ID:
+		if (state->link)
+			reg |= RTL830X_FORCE_LINK_EN;
+		if (state->duplex == DUPLEX_FULL)
+			reg |= RTL830X_DUPLEX_MODE;
+	break;
+	case RTL8390_FAMILY_ID:
+		if (state->link)
+			reg |= RTL839X_FORCE_LINK_EN;
+		if (state->duplex == DUPLEX_FULL)
+			reg |= RTL839X_DUPLEX_MODE;
+	break;
+	case RTL9300_FAMILY_ID:
+		if (state->link)
+			reg |= RTL930X_FORCE_LINK_EN;
+		if (state->duplex == DUPLEX_FULL)
+			reg |= RTL930X_DUPLEX_MODE;
+	break;
+	case RTL9310_FAMILY_ID:
+		if (state->link)
+			reg |= RTL931X_FORCE_LINK_EN;
+		if (state->duplex == DUPLEX_FULL)
+			reg |= RTL931X_DUPLEX_MODE;
+	break;
+	}
 	// Disable AN
 	if (priv->family_id == RTL8380_FAMILY_ID)
-		reg &= ~BIT(2);
+		reg &= ~RTL830X_NWAY_EN;
 	sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
 }
 

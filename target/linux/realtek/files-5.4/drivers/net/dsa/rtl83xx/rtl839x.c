@@ -1730,6 +1730,12 @@ static void rtl839x_packet_cntr_clear(int counter)
 	rtl_table_release(r);
 }
 
+void rtl839x_set_distribution_algorithm(int group, int algoidx, u32 algomsk)
+{
+	sw_w32_mask(3 << ((group & 0xf) << 1), algoidx << ((group & 0xf) << 1), RTL839X_TRK_HASH_IDX_CTRL + ((group >> 4) << 2));
+	sw_w32(algomsk, RTL839X_TRK_HASH_CTRL + (algoidx << 2));
+}
+
 const struct rtl838x_reg rtl839x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -1833,4 +1839,5 @@ const struct rtl838x_reg rtl839x_reg = {
 	.sflow_port_rate_ctrl = RTL839X_SFLOW_PORT_RATE_CTRL,
 	.trk_hash_ctrl = RTL839X_TRK_HASH_CTRL,
 	.trk_hash_idx_ctrl = RTL839X_TRK_HASH_IDX_CTRL,
+	.set_distribution_algorithm = rtl839x_set_distribution_algorithm,
 };
