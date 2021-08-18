@@ -110,7 +110,7 @@ struct notify_b {
 	u32			reserved2[8];
 };
 
-void rtl838x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
+static void rtl838x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
 {
 	prio &= 0x7;
 
@@ -127,7 +127,7 @@ void rtl838x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
 	}
 }
 
-void rtl839x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
+static void rtl839x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
 {
 	prio &= 0x7;
 
@@ -135,6 +135,7 @@ void rtl839x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
 		// cpu_tag[0] is reserved on the RTL83XX SoCs
 		h->cpu_tag[1] = 0x0100;
 		h->cpu_tag[2] = h->cpu_tag[3] = h->cpu_tag[4] = h->cpu_tag[5] = 0;
+		// h->cpu_tag[1] |= BIT(1) | BIT(0); // Bypass filter 1/2
 		if (dest_port >= 32) {
 			dest_port -= 32;
 			h->cpu_tag[2] = BIT(dest_port) >> 16;
@@ -143,35 +144,49 @@ void rtl839x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
 			h->cpu_tag[4] = BIT(dest_port) >> 16;
 			h->cpu_tag[5] = BIT(dest_port) & 0xffff;
 		}
-		h->cpu_tag[6] |= BIT(21); // Enable destination port mask use
+		h->cpu_tag[2] |= BIT(5); // Enable destination port mask use
 		// Set internal priority and AS_PRIO
 		if (prio >= 0)
 			h->cpu_tag[1] |= prio | BIT(3);
 	}
 }
 
-void rtl930x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
+static void rtl930x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
 {
 	h->cpu_tag[0] = 0x8000;
-	h->cpu_tag[1] = 0;  // TODO: Fill port and prio
-	h->cpu_tag[2] = 0;
+	h->cpu_tag[1] = h->cpu_tag[2] = 0;
+	if (prio >= 0)
+		h->cpu_tag[2] = BIT(13) | prio << 8; // Enable and set  Priority Queue
 	h->cpu_tag[3] = 0;
 	h->cpu_tag[4] = 0;
 	h->cpu_tag[5] = 0;
-	h->cpu_tag[6] = 0;
-	h->cpu_tag[7] = 0xffff;
+	h->cpu_tag[6] = BIT(dest_port) >> 16;
+	h->cpu_tag[7] = BIT(dest_port) & 0xffff;
 }
 
-void rtl931x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
+static void rtl931x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
 {
 	h->cpu_tag[0] = 0x8000;
-	h->cpu_tag[1] = 0;  // TODO: Fill port and prio
-	h->cpu_tag[2] = 0;
+	h->cpu_tag[1] = h->cpu_tag[2] = 0;
+	if (prio >= 0)
+		h->cpu_tag[2] = BIT(13) | prio << 8; // Enable and set  Priority Queue
 	h->cpu_tag[3] = 0;
-	h->cpu_tag[4] = 0;
-	h->cpu_tag[5] = 0;
-	h->cpu_tag[6] = 0;
-	h->cpu_tag[7] = 0xffff;
+	h->cpu_tag[4] = h->cpu_tag[5] = h->cpu_tag[6] = h->cpu_tag[7] = 0;
+	if (dest_port >= 32) {
+		dest_port -= 32;
+		h->cpu_tag[4] = BIT(dest_port) >> 16;
+		h->cpu_tag[5] = BIT(dest_port) & 0xffff;
+	} else {
+		h->cpu_tag[6] = BIT(dest_port) >> 16;
+		h->cpu_tag[7] = BIT(dest_port) & 0xffff;
+	}
+}
+
+static void rtl93xx_header_vlan_set(struct p_hdr *h, int vlan)
+{
+	h->cpu_tag[2] |= BIT(4); // Enable VLAN forwarding offload
+	h->cpu_tag[2] |= (vlan >> 8) & 0xf;
+	h->cpu_tag[3] |= (vlan & 0xff) << 8;
 }
 
 struct rtl838x_rx_q {
@@ -1191,6 +1206,11 @@ static int rtl838x_eth_tx(struct sk_buff *skb, struct net_device *dev)
 	spin_lock_irqsave(&priv->lock, flags);
 	len = skb->len;
 
+	pr_debug("SEND: %08x %08x %08x %08x %08x present %d, vp %04x vt %04x\n",
+		*((u32 *)skb->data), *((u32 *)skb->data + 1), *((u32 *)skb->data + 2),
+		*((u32 *)skb->data + 3), *((u32 *)skb->data + 4),
+		skb->vlan_present, skb->vlan_proto, skb->vlan_tci
+	);
 	/* Check for DSA tagging at the end of the buffer */
 	if (netdev_uses_dsa(dev) && skb->data[len-4] == 0x80 && skb->data[len-3] > 0
 			&& skb->data[len-3] < priv->cpu_port &&  skb->data[len-2] == 0x10
@@ -1215,7 +1235,7 @@ static int rtl838x_eth_tx(struct sk_buff *skb, struct net_device *dev)
 		h = &ring->tx_header[q][ring->c_tx[q]];
 		h->size = len;
 		h->len = len;
-		// On RTL8380 SoCs, small packet lengths being sent need adjustments
+		// On RTL8380 SoCs, the packet length being sent needs adjustment
 		if (priv->family_id == RTL8380_FAMILY_ID) {
 			if (len < ETH_ZLEN - 4)
 				h->len -= 4;
@@ -1347,6 +1367,7 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 			/* Make sure data is visible */
 			mb();
 			memcpy(skb->data, (u8 *)KSEG1ADDR(data), len);
+
 			/* Overwrite CRC with cpu_tag */
 			if (dsa) {
 				priv->r->decode_tag(h, &tag);
@@ -1523,6 +1544,15 @@ static void rtl838x_mac_pcs_get_state(struct phylink_config *config,
 		break;
 	case 2:
 		state->speed = SPEED_1000;
+		break;
+	case 5:
+		state->speed = SPEED_2500;
+		break;
+	case 6:
+		state->speed = SPEED_5000;
+		break;
+	case 4:
+		state->speed = SPEED_10000;
 		break;
 	default:
 		state->speed = SPEED_UNKNOWN;
@@ -1970,6 +2000,7 @@ static const struct net_device_ops rtl838x_eth_netdev_ops = {
 	.ndo_tx_timeout = rtl838x_eth_tx_timeout,
 	.ndo_set_features = rtl83xx_set_features,
 	.ndo_fix_features = rtl838x_fix_features,
+	.ndo_setup_tc = rtl83xx_setup_tc,
 };
 
 static const struct net_device_ops rtl839x_eth_netdev_ops = {
@@ -1983,6 +2014,7 @@ static const struct net_device_ops rtl839x_eth_netdev_ops = {
 	.ndo_tx_timeout = rtl838x_eth_tx_timeout,
 	.ndo_set_features = rtl83xx_set_features,
 	.ndo_fix_features = rtl838x_fix_features,
+	.ndo_setup_tc = rtl83xx_setup_tc,
 };
 
 static const struct net_device_ops rtl930x_eth_netdev_ops = {
@@ -1996,6 +2028,7 @@ static const struct net_device_ops rtl930x_eth_netdev_ops = {
 	.ndo_tx_timeout = rtl838x_eth_tx_timeout,
 	.ndo_set_features = rtl93xx_set_features,
 	.ndo_fix_features = rtl838x_fix_features,
+	.ndo_setup_tc = rtl83xx_setup_tc,
 };
 
 static const struct net_device_ops rtl931x_eth_netdev_ops = {
