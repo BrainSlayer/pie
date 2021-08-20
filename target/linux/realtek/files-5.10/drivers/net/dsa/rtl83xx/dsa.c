@@ -1354,6 +1354,7 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 			cb(e.mac, e.vid, e.is_static, data);
 	}
 
+	
 	mutex_unlock(&priv->reg_mutex);
 	return 0;
 }
@@ -1723,7 +1724,7 @@ static int rtl83xx_port_lag_join(struct dsa_switch *ds, int port,
 				   struct netdev_lag_upper_info *info)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	int i, err;
+	int i, err = 0;
 
 	if (!rtl83xx_lag_can_offload(ds, lag, info))
 		return -EOPNOTSUPP;
@@ -1756,8 +1757,6 @@ static int rtl83xx_port_lag_join(struct dsa_switch *ds, int port,
 		goto out;
 	}
 
-	mutex_unlock(&priv->reg_mutex);
-	return 0;
 out:
 	mutex_unlock(&priv->reg_mutex);
 	return err;
