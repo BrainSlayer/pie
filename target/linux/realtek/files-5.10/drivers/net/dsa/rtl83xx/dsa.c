@@ -1007,6 +1007,7 @@ static int rtl83xx_vlan_prepare(struct dsa_switch *ds, int port,
 	struct rtl838x_vlan_info info;
 	struct rtl838x_switch_priv *priv = ds->priv;
 
+	mutex_lock(&priv->reg_mutex);
 	priv->r->vlan_tables_read(0, &info);
 
 	pr_debug("VLAN 0: Tagged ports %llx, untag %llx, profile %d, MC# %d, UC# %d, FID %x\n",
