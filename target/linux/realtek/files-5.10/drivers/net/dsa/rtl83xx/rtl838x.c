@@ -1771,6 +1771,7 @@ const struct rtl838x_reg rtl838x_reg = {
 <<<<<<< HEAD
 =======
 	.pie_init = rtl838x_pie_init,
+	.pie_rule_read = rtl838x_pie_rule_read,
 	.pie_rule_write = rtl838x_pie_rule_write,
 	.pie_rule_add = rtl838x_pie_rule_add,
 	.pie_rule_rm = rtl838x_pie_rule_rm,
