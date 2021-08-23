@@ -104,12 +104,21 @@
 		phy24: ethernet-phy@24 {
 			reg = <24>;
 			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <1 8>;
 		};
 
 		phy25: ethernet-phy@25 {
 			reg = <25>;
 			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <2 8>;
 		};
+
+		phy26: ethernet-phy@26 {
+			reg = <26>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <3 8>;
+		};
+
 /*
 		phy26: ethernet-phy@26 {
 			compatible = "ethernet-phy-ieee802.3-c22";
@@ -182,13 +191,19 @@
 		port@24 {
 			reg = <24>;
 			label = "lan9";
-			phy-mode = "qsgmii";
+			phy-mode = "usxgmii";
 			phy-handle = <&phy24>;
 		};
 		port@25 {
 			reg = <25>;
 			label = "lan10";
-			phy-mode = "qsgmii";
+			phy-mode = "usxgmii";
+			phy-handle = <&phy25>;
+		};
+		port@26 {
+			reg = <26>;
+			label = "lan11";
+			phy-mode = "usxgmii";
 			phy-handle = <&phy25>;
 		};
 /*

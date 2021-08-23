@@ -154,7 +154,7 @@
 		gpio-controller;
 		#gpio-cells = <2>;
 		interrupt-parent = <&intc>;
-		interrupts = <31>;
+		interrupts = <13>;
 	};
 
 	ethernet0: ethernet@bb00a300 {
