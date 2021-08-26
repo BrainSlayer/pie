@@ -160,22 +160,6 @@ static inline int rtl931x_l2_port_new_sa_fwd(int p)
 	return RTL931X_L2_PORT_NEW_SA_FWD(p);
 }
 
-static u64 rtl931x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl838x_l2_entry *e)
-{
-	u64 entry = 0;
-
-	// TODO: Implement
-	return entry;
-}
-
-static u64 rtl931x_read_cam(int idx, struct rtl838x_l2_entry *e)
-{
-	u64 entry = 0;
-
-	// TODO: Implement
-	return entry;
-}
-
 irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 {
 	struct dsa_switch *ds = dev_id;
@@ -213,16 +197,16 @@ int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 	/* Clear both port registers */
 	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2);
 	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2 + 4);
-	sw_w32_mask(0, BIT(port), RTL931X_SMI_INDRT_ACCESS_CTRL_2+ (port % 32) * 4);
+	sw_w32_mask(0, BIT(port % 32), RTL931X_SMI_INDRT_ACCESS_CTRL_2 + (port / 32) * 4);
 
-	sw_w32_mask(0xffff0000, val << 16, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+	sw_w32_mask(0xffff, val, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
 
 	v = reg << 6 | page << 11 ;
 	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 
 	sw_w32(0x1ff, RTL931X_SMI_INDRT_ACCESS_CTRL_1);
 
-	v |= 1 << 3 | 1; /* Write operation and execute */
+	v |= BIT(4) | 1; /* Write operation and execute */
 	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 
 	do {
@@ -244,21 +228,20 @@ int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 
 	mutex_lock(&smi_lock);
 
-	sw_w32_mask(0xffff, port, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
-	v = reg << 6 | page << 11; // TODO: ACCESS Offset? Park page
-	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+	sw_w32(port << 5, RTL931X_SMI_INDRT_ACCESS_BC_PHYID_CTRL);
 
-	sw_w32(0x1ff, RTL931X_SMI_INDRT_ACCESS_CTRL_1);
-
-	v |= 1;
+	v = reg << 6 | page << 11 | 1;
 	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 
 	do {
 	} while (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0) & 0x1);
 
-	*val = (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) & 0xffff0000) >> 16;
+	v = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+	*val = (*val & 0xffff0000) >> 16;
 
-	pr_info("%s: port %d, page: %d, reg: %x, val: %x\n", __func__, port, page, reg, *val);
+	pr_debug("%s: port %d, page: %d, reg: %x, val: %x, v: %08x\n",
+		__func__, port, page, reg, *val, v);
 
 	mutex_unlock(&smi_lock);
 	return 0;
@@ -271,7 +254,7 @@ int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 {
 	int err = 0;
 	u32 v;
-	int type = 1; // TODO: For C45 PHYs need to set to 2
+	int type = 2; // TODO:2, for C45 PHYs need to set to 1 sometimes
 
 	mutex_lock(&smi_lock);
 
@@ -288,9 +271,11 @@ int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 		v = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 	} while (v & BIT(0));
 
-	// There is no error-checking via BIT 1 of v, as it does not seem to be set correctly
+	// Check for error condition
+	if (v & BIT(1))
+		err = -EIO;
 
-	*val = (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) & 0xffff);
+	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) >> 16;
 
 	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
 
@@ -314,7 +299,7 @@ int rtl931x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
 	sw_w32(port << 5, RTL931X_SMI_INDRT_ACCESS_BC_PHYID_CTRL);
 
 	// Set data to write
-	sw_w32_mask(0xffff << 16, val << 16, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+	sw_w32_mask(0xffff, val, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
 
 	// Set MMD device number and register to write to
 	sw_w32(devnum << 16 | (regnum & 0xffff), RTL931X_SMI_INDRT_ACCESS_MMD_CTRL);
@@ -342,8 +327,6 @@ void rtl931x_print_matrix(void)
 	pr_info("CPU_PORT> %16llx\n", ptr[52]);
 }
 
-<<<<<<< HEAD
-=======
 void rtl931x_set_distribution_algorithm(int group, int algoidx, u32 algomsk)
 {
 	u32 l3shift = 0;
@@ -385,7 +368,329 @@ void rtl931x_set_distribution_algorithm(int group, int algoidx, u32 algomsk)
 	sw_w32(newmask << l3shift, RTL931X_TRK_HASH_CTRL + (algoidx << 2));
 }
 
->>>>>>> c21f1f8bf7 (5.10 port)
+void rtl931x_set_receive_management_action(int port, rma_ctrl_t type, action_type_t action)
+{
+	u32 value = 0;
+	
+	/* hack for value mapping */
+	if (type == GRATARP && action == COPY2CPU)
+		action = TRAP2MASTERCPU;
+
+	switch(action) {
+	case FORWARD:
+	    value = 0;
+	break;
+	case DROP:
+	    value = 1;
+	break;
+	case TRAP2CPU:
+	    value = 2;
+	break;
+	case TRAP2MASTERCPU:
+	    value = 3;
+	break;
+	case FLOODALL:
+	    value = 4;
+	break;
+	default:
+	break;
+	}
+	
+	switch(type) {
+	case BPDU:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL931X_RMA_BPDU_CTRL + ((port / 10) << 2));
+	break;
+	case PTP:
+		//udp
+		sw_w32_mask(3 << 2, value << 2, RTL931X_RMA_PTP_CTRL + (port << 2));
+		//eth2
+		sw_w32_mask(3, value, RTL931X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case PTP_UDP:
+		sw_w32_mask(3 << 2, value << 2, RTL931X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case PTP_ETH2:
+		sw_w32_mask(3, value, RTL931X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case LLTP:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL931X_RMA_LLTP_CTRL + ((port / 10) << 2));
+	break;
+	case EAPOL:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL931X_RMA_EAPOL_CTRL + ((port / 10) << 2));
+	break;
+	case GRATARP:
+		sw_w32_mask(3 << ((port & 0xf) << 1), value << ((port & 0xf) << 1), RTL931X_TRAP_ARP_GRAT_PORT_ACT + ((port >> 4) << 2));
+	break;
+	}
+}
+
+u64 rtl931x_traffic_get(int source)
+{
+	u32 v;
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+
+	rtl_table_read(r, source);
+	v = sw_r32(rtl_table_data(r, 0));
+	rtl_table_release(r);
+	return v >> 3;
+}
+
+/*
+ * Enable traffic between a source port and a destination port matrix
+ */
+void rtl931x_traffic_set(int source, u64 dest_matrix)
+{
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+
+	sw_w32((dest_matrix << 3), rtl_table_data(r, 0));
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+void rtl931x_traffic_enable(int source, int dest)
+{
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	rtl_table_read(r, source);
+	sw_w32_mask(0, BIT(dest + 3), rtl_table_data(r, 0));
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+void rtl931x_traffic_disable(int source, int dest)
+{
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	rtl_table_read(r, source);
+	sw_w32_mask(BIT(dest + 3), 0, rtl_table_data(r, 0));
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+static u64 rtl931x_l2_hash_seed(u64 mac, u32 vid)
+{
+	u64 v = vid;
+
+	v <<= 48;
+	v |= mac;
+
+	return v;
+}
+
+/*
+ * Calculate both the block 0 and the block 1 hash by applyingthe same hash
+ * algorithm as the one used currently by the ASIC to the seed, and return
+ * both hashes in the lower and higher word of the return value since only 12 bit of
+ * the hash are significant
+ */
+static u32 rtl931x_l2_hash_key(struct rtl838x_switch_priv *priv, u64 seed)
+{
+	u32 k0, k1, h1, h2, h;
+
+	k0 = (u32) (((seed >> 55) & 0x1f) ^ ((seed >> 44) & 0x7ff)
+		^ ((seed >> 33) & 0x7ff) ^ ((seed >> 22) & 0x7ff)
+		^ ((seed >> 11) & 0x7ff) ^ (seed & 0x7ff));
+
+	h1 = (seed >> 11) & 0x7ff;
+	h1 = ((h1 & 0x1f) << 6) | ((h1 >> 5) & 0x3f);
+
+	h2 = (seed >> 33) & 0x7ff;
+	h2 = ((h2 & 0x3f) << 5)| ((h2 >> 6) & 0x3f);
+
+	k1 = (u32) (((seed << 55) & 0x1f) ^ ((seed >> 44) & 0x7ff) ^ h2
+		    ^ ((seed >> 22) & 0x7ff) ^ h1
+		    ^ (seed & 0x7ff));
+
+	// Algorithm choice for block 0
+	if (sw_r32(RTL931X_L2_CTRL) & BIT(0))
+		h = k1;
+	else
+		h = k0;
+
+	/* Algorithm choice for block 1
+	 * Since k0 and k1 are < 2048, adding 2048 will offset the hash into the second
+	 * half of hash-space
+	 * 2048 is in fact the hash-table size 16384 divided by 4 hashes per bucket
+	 * divided by 2 to divide the hash space in 2
+	 */
+	if (sw_r32(RTL931X_L2_CTRL) & BIT(1))
+		h |= (k1 + 2048) << 16;
+	else
+		h |= (k0 + 2048) << 16;
+
+	return h;
+}
+
+/*
+ * Fills an L2 entry structure from the SoC registers
+ */
+static void rtl931x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
+{
+	pr_debug("In %s valid?\n", __func__);
+	e->valid = !!(r[2] & BIT(31));
+	if (!e->valid)
+		return;
+
+	pr_debug("In %s is valid\n", __func__);
+	e->is_ip_mc = false;
+	e->is_ipv6_mc = false;
+
+	// TODO: Is there not a function to copy directly MAC memory?
+	e->mac[0] = (r[0] >> 24);
+	e->mac[1] = (r[0] >> 16);
+	e->mac[2] = (r[0] >> 8);
+	e->mac[3] = r[0];
+	e->mac[4] = (r[1] >> 24);
+	e->mac[5] = (r[1] >> 16);
+
+	e->next_hop = !!(r[2] & BIT(12));
+	e->rvid = r[1] & 0xfff;
+
+	/* Is it a unicast entry? check multicast bit */
+	if (!(e->mac[0] & 1)) {
+		e->type = L2_UNICAST;
+		e->is_static = !!(r[2] & BIT(14));
+		e->port = (r[2] >> 20) & 0x3ff;
+		// Check for trunk port
+		if (r[2] & BIT(30)) {
+			e->is_trunk = true;
+			e->stack_dev = (e->port >> 9) & 1;
+			e->trunk = e->port & 0x3f;
+		} else {
+			e->is_trunk = false;
+			e->stack_dev = (e->port >> 6) & 0xf;
+			e->port = e->port & 0x3f;
+		}
+
+		e->block_da = !!(r[2] & BIT(15));
+		e->block_sa = !!(r[2] & BIT(16));
+		e->suspended = !!(r[2] & BIT(13));
+		e->age = (r[2] >> 17) & 3;
+		e->valid = true;
+		// the UC_VID field in hardware is used for the VID or for the route id
+		if (e->next_hop) {
+			e->nh_route_id = r[2] & 0x7ff;
+			e->vid = 0;
+		} else {
+			e->vid = r[2] & 0xfff;
+			e->nh_route_id = 0;
+		}
+	} else {
+		e->valid = true;
+		e->type = L2_MULTICAST;
+		e->mc_portmask_index = (r[2] >> 16) & 0x3ff;
+	}
+}
+
+/*
+ * Fills the 3 SoC table registers r[] with the information of in the rtl838x_l2_entry
+ */
+static void rtl931x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
+{
+	u32 port;
+
+	if (!e->valid) {
+		r[0] = r[1] = r[2] = 0;
+		return;
+	}
+
+	r[2] = BIT(31);	// Set valid bit
+
+	r[0] = ((u32)e->mac[0]) << 24 | ((u32)e->mac[1]) << 16 
+		| ((u32)e->mac[2]) << 8 | ((u32)e->mac[3]);
+	r[1] = ((u32)e->mac[4]) << 24 | ((u32)e->mac[5]) << 16;
+
+	r[2] |= e->next_hop ? BIT(12) : 0;
+
+	if (e->type == L2_UNICAST) {
+		r[2] |= e->is_static ? BIT(14) : 0;
+		r[1] |= e->rvid & 0xfff;
+		r[2] |= (e->port & 0x3ff) << 20;
+		if (e->is_trunk) {
+			r[2] |= BIT(30);
+			port = e->stack_dev << 9 | (e->port & 0x3f);
+		} else {
+			port = (e->stack_dev & 0xf) << 6;
+			port |= e->port & 0x3f;
+		}
+		r[2] |= port << 20;
+		r[2] |= e->block_da ? BIT(15) : 0;
+		r[2] |= e->block_sa ? BIT(17) : 0;
+		r[2] |= e->suspended ? BIT(13) : 0;
+		r[2] |= (e->age & 0x3) << 17;
+		// the UC_VID field in hardware is used for the VID or for the route id
+		if (e->next_hop)
+			r[2] |= e->nh_route_id & 0x7ff;
+		else
+			r[2] |= e->vid & 0xfff;
+	} else { // L2_MULTICAST
+		r[2] |= (e->mc_portmask_index & 0x3ff) << 16;
+		r[2] |= e->mc_mac_index & 0x7ff;
+	}
+}
+
+/*
+ * Read an L2 UC or MC entry out of a hash bucket of the L2 forwarding table
+ * hash is the id of the bucket and pos is the position of the entry in that bucket
+ * The data read from the SoC is filled into rtl838x_l2_entry
+ */
+static u64 rtl931x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
+{
+        return 0;
+}
+
+static u64 rtl931x_read_cam(int idx, struct rtl838x_l2_entry *e)
+{
+		return 0;
+}
+
+static void rtl931x_write_cam(int idx, struct rtl838x_l2_entry *e)
+{
+}
+
+static void rtl931x_write_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
+{
+}
+static void rtl931x_vlan_fwd_on_inner(int port, bool is_set)
+{
+}
+
+static void rtl931x_vlan_profile_setup(int profile)
+{
+	pr_info("Leaving %s\n", __func__);
+}
+
+static u64 rtl931x_read_mcast_pmask(int idx)
+{
+	return 0;
+}
+
+static void rtl931x_write_mcast_pmask(int idx, u64 portmask)
+{
+}
+static void rtl931x_pie_init(struct rtl838x_switch_priv *priv)
+{
+}
+int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)
+{
+	return 0;
+}
+
+
+void rtl931x_vlan_port_pvidmode_set(int port, enum pbvlan_type type, enum pbvlan_mode mode) {
+	if (type == PBVLAN_TYPE_INNER)
+		sw_w32_mask(0x3 << 12, mode << 12, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
+	else
+		sw_w32_mask(0x3 << 26, mode << 26, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
+
+}
+
+void rtl931x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
+	if (type == PBVLAN_TYPE_INNER)
+		sw_w32_mask(0xfff, pvid, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
+	else
+		sw_w32_mask(0xfff << 14, pvid << 14, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
+
+}
+
 const struct rtl838x_reg rtl931x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -396,6 +701,10 @@ const struct rtl838x_reg rtl931x_reg = {
 	.stat_port_rst = RTL931X_STAT_PORT_RST,
 	.stat_rst = RTL931X_STAT_RST,
 	.stat_port_std_mib = 0,  // Not defined
+	.traffic_enable = rtl931x_traffic_enable,
+	.traffic_disable = rtl931x_traffic_disable,
+	.traffic_get = rtl931x_traffic_get,
+	.traffic_set = rtl931x_traffic_set,
 	.l2_ctrl_0 = RTL931X_L2_CTRL,
 	.l2_ctrl_1 = RTL931X_L2_AGE_CTRL,
 	.l2_port_aging_out = RTL931X_L2_PORT_AGE_CTRL,
@@ -412,6 +721,10 @@ const struct rtl838x_reg rtl931x_reg = {
 	.vlan_set_tagged = rtl931x_vlan_set_tagged,
 	.vlan_set_untagged = rtl931x_vlan_set_untagged,
 	.vlan_profile_dump = rtl931x_vlan_profile_dump,
+	.vlan_profile_setup = rtl931x_vlan_profile_setup,
+	.vlan_fwd_on_inner = rtl931x_vlan_fwd_on_inner,
+	.l3_setup = rtl931x_l3_setup,
+
 	.stp_get = rtl931x_stp_get,
 	.stp_set = rtl931x_stp_set,
 	.mac_force_mode_ctrl = rtl931x_mac_force_mode_ctrl,
@@ -428,16 +741,14 @@ const struct rtl838x_reg rtl931x_reg = {
 	.mac_tx_pause_sts = RTL931X_MAC_TX_PAUSE_STS,
 	.read_l2_entry_using_hash = rtl931x_read_l2_entry_using_hash,
 	.read_cam = rtl931x_read_cam,
-<<<<<<< HEAD
-	.vlan_port_egr_filter = RTL931X_VLAN_PORT_EGR_FLTR(0),
-	.vlan_port_igr_filter = RTL931X_VLAN_PORT_IGR_FLTR(0),
-//	.vlan_port_pb = does not exist
-	.vlan_port_tag_sts_ctrl = RTL931X_VLAN_PORT_TAG_CTRL,
-	.trk_mbr_ctr = rtl931x_trk_mbr_ctr,
-=======
+	.write_l2_entry_using_hash = rtl931x_write_l2_entry_using_hash,
+	.write_cam = rtl931x_write_cam,
+	.read_mcast_pmask = rtl931x_read_mcast_pmask,
+	.write_mcast_pmask = rtl931x_write_mcast_pmask,
 	.vlan_port_egr_filter = RTL931X_VLAN_PORT_EGR_FLTR,
 	.vlan_port_igr_filter = RTL931X_VLAN_PORT_IGR_FLTR,
-//	.vlan_port_pb = does not exist
+	.vlan_port_pvidmode_set = rtl931x_vlan_port_pvidmode_set,
+	.vlan_port_pvid_set = rtl931x_vlan_port_pvid_set,
 	.vlan_port_tag_sts_ctrl = RTL931X_VLAN_PORT_TAG_CTRL,
 	.trk_mbr_ctr = rtl931x_trk_mbr_ctr,
 	.rma_bpdu_ctrl = RTL931X_RMA_BPDU_CTRL,
@@ -460,6 +771,7 @@ const struct rtl838x_reg rtl931x_reg = {
 	.trk_hash_ctrl = RTL931X_TRK_HASH_CTRL,
 //	.trk_hash_idx_ctrl = RTL931X_TRK_HASH_IDX_CTRL,
 	.set_distribution_algorithm = rtl931x_set_distribution_algorithm,
->>>>>>> c21f1f8bf7 (5.10 port)
+	.set_receive_management_action = rtl931x_set_receive_management_action,
+	.pie_init = rtl931x_pie_init,
 };
 

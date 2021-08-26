@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
-<<<<<<< HEAD
-=======
 #include <linux/inetdevice.h>
 
->>>>>>> c21f1f8bf7 (5.10 port)
 #include "rtl83xx.h"
 
 extern struct mutex smi_lock;
 extern struct rtl83xx_soc_info soc_info;
 
-<<<<<<< HEAD
-=======
 /* Definition of the RTL930X-specific template field IDs as used in the PIE */
 enum template_field_id {
 	TEMPLATE_FIELD_SPM0 = 0,		// Source portmask ports 0-15
@@ -105,7 +100,6 @@ static enum template_field_id fixed_templates[N_FIXED_TEMPLATES][N_FIXED_FIELDS]
 	},
 };
 
->>>>>>> c21f1f8bf7 (5.10 port)
 void rtl930x_print_matrix(void)
 {
 	int i;
@@ -253,15 +247,9 @@ static void rtl930x_vlan_profile_setup(int profile)
 
 	// Enable routing of Ipv4/6 Unicast and IPv4/6 Multicast traffic
 	p[0] |= BIT(17) | BIT(16) | BIT(13) | BIT(12);
-<<<<<<< HEAD
-	p[2] = 0x1fffffff; // L2 unknown MC flooding portmask all ports, including the CPU-port
-	p[3] = 0x1fffffff; // IPv4 unknown MC flooding portmask
-	p[4] = 0x1fffffff; // IPv6 unknown MC flooding portmask
-=======
 	p[2] = 0x1fffffff; // L2 unknwon MC flooding portmask all ports, including the CPU-port
 	p[3] = 0x1fffffff; // IPv4 unknwon MC flooding portmask
 	p[4] = 0x1fffffff; // IPv6 unknwon MC flooding portmask
->>>>>>> c21f1f8bf7 (5.10 port)
 
 	sw_w32(p[0], RTL930X_VLAN_PROFILE_SET(profile));
 	sw_w32(p[1], RTL930X_VLAN_PROFILE_SET(profile) + 4);
@@ -271,8 +259,6 @@ static void rtl930x_vlan_profile_setup(int profile)
 	pr_info("Leaving %s\n", __func__);
 }
 
-<<<<<<< HEAD
-=======
 static void rtl930x_l2_learning_setup(void)
 {
 	// Portmask for flooding broadcast traffic
@@ -285,7 +271,6 @@ static void rtl930x_l2_learning_setup(void)
 	sw_w32((0x7fff << 2) | 0, RTL930X_L2_LRN_CONSTRT_CTRL);
 }
 
->>>>>>> c21f1f8bf7 (5.10 port)
 static void rtl930x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
 {
 	int i;
@@ -430,11 +415,7 @@ static void rtl930x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 		e->valid = true;
 		// the UC_VID field in hardware is used for the VID or for the route id
 		if (e->next_hop) {
-<<<<<<< HEAD
-			e->nh_route_id = r[2] & 0xfff;
-=======
 			e->nh_route_id = r[2] & 0x7ff;
->>>>>>> c21f1f8bf7 (5.10 port)
 			e->vid = 0;
 		} else {
 			e->vid = r[2] & 0xfff;
@@ -485,11 +466,7 @@ static void rtl930x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 		r[2] |= (e->age & 0x3) << 17;
 		// the UC_VID field in hardware is used for the VID or for the route id
 		if (e->next_hop)
-<<<<<<< HEAD
-			r[2] |= e->nh_route_id & 0xfff;
-=======
 			r[2] |= e->nh_route_id & 0x7ff;
->>>>>>> c21f1f8bf7 (5.10 port)
 		else
 			r[2] |= e->vid & 0xfff;
 	} else { // L2_MULTICAST
@@ -560,10 +537,7 @@ static void rtl930x_write_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_
 		e->mac[0], e->mac[1], e->mac[2], e->mac[3],e->mac[4],e->mac[5]);
 
 	rtl930x_fill_l2_row(r, e);
-<<<<<<< HEAD
-=======
 	pr_info("%s: %d: %08x %08x %08x\n", __func__, idx, r[0], r[1], r[2]);
->>>>>>> c21f1f8bf7 (5.10 port)
 
 	for (i= 0; i < 3; i++)
 		sw_w32(r[i], rtl_table_data(q, i));
@@ -623,83 +597,6 @@ static void dump_l2_entry(struct rtl838x_l2_entry *e)
 		e->stack_dev, e->nh_route_id, e->port);
 }
 
-<<<<<<< HEAD
-/*
- * Add an L2 nexthop entry for the L3 routing system in the SoC
- * Use VID and MAC in rtl838x_l2_entry to identify either a free slot in the L2 hash table
- * or mark an existing entry as a nexthop by setting it's nexthop bit
- * Called from the L3 layer
- * The index in the L2 hash table is filled into nh->l2_id;
- */
-static int rtl930x_l2_nexthop_add(struct rtl838x_switch_priv *priv, struct rtl838x_nexthop *nh)
-{
-	struct rtl838x_l2_entry e;
-	u64 seed = rtl930x_l2_hash_seed(nh->mac, nh->vid);
-	u32 key = rtl930x_l2_hash_key(priv, seed);
-	int i, idx = -1;
-	u64 entry;
-
-	pr_info("%s searching for %08llx vid %d with key %d, seed: %016llx\n",
-		__func__, nh->mac, nh->vid, key, seed);
-	
-	e.type = L2_UNICAST;
-	e.rvid = nh->fid; // Verify its the forwarding ID!!! l2_entry.un.unicast.fid
-	u64_to_ether_addr(nh->mac, &e.mac[0]);
-	e.port = RTL930X_PORT_IGNORE;
-
-	// Loop over all entries in the hash-bucket and over the second block on 93xx SoCs
-	for (i = 0; i < priv->l2_bucket_size; i++) {
-		entry = rtl930x_read_l2_entry_using_hash(key, i, &e);
-		pr_info("%s i: %d, entry %016llx, seed %016llx\n", __func__, i, entry, seed);
-		if (e.valid && e.next_hop)
-			continue;
-		if (!e.valid || ((entry & 0x0fffffffffffffffULL) == seed)) {
-			idx = i > 3 ? ((key >> 14) & 0xffff) | i >> 1
-					: ((key << 2) | i) & 0xffff;
-			break;
-		}
-	}
-
-	pr_info("%s: found idx %d and i %d\n", __func__, idx, i);
-
-	if (idx < 0) {
-		pr_err("%s: No more L2 forwarding entries available\n", __func__);
-		return -1;
-	}
-
-	// Found an existing or empty entry, make it a nexthop entry
-	pr_info("%s BEFORE -> key %d, pos: %d, index: %d\n", __func__, key, i, idx);
-	dump_l2_entry(&e);
-	nh->l2_id = idx;
-
-	// Found an existing (e->valid is true) or empty entry, make it a nexthop entry
-	if (e.valid) {
-		nh->port = e.port;
-		nh->fid = e.rvid;
-		nh->vid = e.vid;
-		nh->dev_id = e.stack_dev;
-	} else {
-		e.valid = true;
-		e.is_static = false;
-		e.vid = nh->vid;
-		e.rvid = nh->fid;
-		e.port = RTL930X_PORT_IGNORE;
-		u64_to_ether_addr(nh->mac, &e.mac[0]);
-	}
-	e.next_hop = true;
-	// For nexthop entries, the vid field in the table is used to denote the dest mac_id
-	e.nh_route_id = nh->mac_id;
-	pr_info("%s AFTER\n", __func__);
-	dump_l2_entry(&e);
-
-	rtl930x_write_l2_entry_using_hash(idx >> 2, idx & 0x3, &e);
-
-	// _dal_longan_l2_nexthop_add
-	return 0;
-}
-
-=======
->>>>>>> c21f1f8bf7 (5.10 port)
 static u64 rtl930x_read_mcast_pmask(int idx)
 {
 	u32 portmask;
@@ -802,11 +699,7 @@ irqreturn_t rtl930x_switch_irq(int irq, void *dev_id)
 	sw_w32(ports, RTL930X_ISR_PORT_LINK_STS_CHG);
 	pr_info("RTL9300 Link change: status: %x, ports %x\n", status, ports);
 
-<<<<<<< HEAD
-	rtl9300_dump_debug();
-=======
 //	rtl9300_dump_debug();
->>>>>>> c21f1f8bf7 (5.10 port)
 
 	for (i = 0; i < 28; i++) {
 		if (ports & BIT(i)) {
@@ -1080,8 +973,6 @@ static void rtl930x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 	priv->eee_enabled = enable;
 }
 
-<<<<<<< HEAD
-=======
 #define HASH_PICK(val, lsb, len)   ((val & (((1 << len) - 1) << lsb)) >> lsb)
 
 static u32 rtl930x_l3_hash4(u32 ip, int algorithm, bool move_dip)
@@ -2477,7 +2368,70 @@ void rtl930x_set_distribution_algorithm(int group, int algoidx, u32 algomsk)
 	sw_w32(newmask << l3shift, RTL930X_TRK_HASH_CTRL + (algoidx << 2));
 }
 
->>>>>>> c21f1f8bf7 (5.10 port)
+void rtl930x_set_receive_management_action(int port, rma_ctrl_t type, action_type_t action)
+{
+	u32 value = 0;
+	
+	switch(action) {
+	case FORWARD:
+	    value = 0;
+	break;
+	case DROP:
+	    value = 1;
+	break;
+	case TRAP2CPU:
+	    value = 2;
+	break;
+	case TRAP2MASTERCPU:
+	    value = 3;
+	break;
+	case FLOODALL:
+	    value = 4;
+	break;
+	}
+	switch(type) {
+	case BPDU:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL930X_RMA_BPDU_CTRL + ((port / 10) << 2));
+	break;
+	case PTP:
+		//udp
+		sw_w32_mask(3 << 2, value << 2, RTL930X_RMA_PTP_CTRL + (port << 2));
+		//eth2
+		sw_w32_mask(3, value, RTL930X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case PTP_UDP:
+		sw_w32_mask(3 << 2, value << 2, RTL930X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case PTP_ETH2:
+		sw_w32_mask(3, value, RTL930X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case LLTP:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL930X_RMA_LLTP_CTRL + ((port / 10) << 2));
+	break;
+	case EAPOL:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL930X_RMA_EAPOL_CTRL + ((port / 10) << 2));
+	break;
+	default:
+	break;
+	}
+}
+
+void rtl930x_vlan_port_pvidmode_set(int port, enum pbvlan_type type, enum pbvlan_mode mode) {
+	if (type == PBVLAN_TYPE_INNER)
+		sw_w32_mask(0x3, mode ,RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+	else
+		sw_w32_mask(0x3 << 14, mode << 14 ,RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+
+}
+
+void rtl930x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
+	if (type == PBVLAN_TYPE_INNER)
+		sw_w32_mask(0xfff << 2, pvid << 2 ,RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+	else
+		sw_w32_mask(0xfff << 16, pvid << 16 ,RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+
+}
+
 const struct rtl838x_reg rtl930x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -2529,22 +2483,15 @@ const struct rtl838x_reg rtl930x_reg = {
 	.read_cam = rtl930x_read_cam,
 	.write_cam = rtl930x_write_cam,
 	.vlan_port_egr_filter = RTL930X_VLAN_PORT_EGR_FLTR,
-<<<<<<< HEAD
-	.vlan_port_igr_filter = RTL930X_VLAN_PORT_IGR_FLTR(0),
-=======
 	.vlan_port_igr_filter = RTL930X_VLAN_PORT_IGR_FLTR,
->>>>>>> c21f1f8bf7 (5.10 port)
-	.vlan_port_pb = RTL930X_VLAN_PORT_PB_VLAN,
+	.vlan_port_pvidmode_set = rtl930x_vlan_port_pvidmode_set,
+	.vlan_port_pvid_set = rtl930x_vlan_port_pvid_set,
 	.vlan_port_tag_sts_ctrl = RTL930X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl930x_trk_mbr_ctr,
 	.rma_bpdu_fld_pmask = RTL930X_RMA_BPDU_FLD_PMSK,
 	.init_eee = rtl930x_init_eee,
 	.port_eee_set = rtl930x_port_eee_set,
 	.eee_port_ability = rtl930x_eee_port_ability,
-<<<<<<< HEAD
-	.read_mcast_pmask = rtl930x_read_mcast_pmask,
-	.write_mcast_pmask = rtl930x_write_mcast_pmask,
-=======
 	.l2_hash_seed = rtl930x_l2_hash_seed,
 	.l2_hash_key = rtl930x_l2_hash_key,
 	.read_mcast_pmask = rtl930x_read_mcast_pmask,
@@ -2590,5 +2537,5 @@ const struct rtl838x_reg rtl930x_reg = {
 	.trk_hash_ctrl = RTL930X_TRK_HASH_CTRL,
 //	.trk_hash_idx_ctrl = RTL930X_TRK_HASH_IDX_CTRL,
 	.set_distribution_algorithm = rtl930x_set_distribution_algorithm,
->>>>>>> c21f1f8bf7 (5.10 port)
+	.set_receive_management_action = rtl930x_set_receive_management_action,
 };

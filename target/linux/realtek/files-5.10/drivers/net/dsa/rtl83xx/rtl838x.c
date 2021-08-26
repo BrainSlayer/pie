@@ -1,17 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
-<<<<<<< HEAD
-=======
 #include <net/nexthop.h>
 
->>>>>>> c21f1f8bf7 (5.10 port)
 #include "rtl83xx.h"
 
 extern struct mutex smi_lock;
 
-<<<<<<< HEAD
-=======
 // see_dal_maple_acl_log2PhyTmplteField and src/app/diag_v2/src/diag_acl.c
 /* Definition of the RTL838X-specific template field IDs as used in the PIE */
 enum template_field_id {
@@ -102,7 +97,6 @@ static enum template_field_id fixed_templates[N_FIXED_TEMPLATES][N_FIXED_FIELDS]
 	},
 };
 
->>>>>>> c21f1f8bf7 (5.10 port)
 void rtl838x_print_matrix(void)
 {
 	unsigned volatile int *ptr8;
@@ -278,10 +272,7 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 	e->is_ipv6_mc = !!(r[0] & BIT(21));
 	e->type = L2_INVALID;
 
-<<<<<<< HEAD
-=======
 	pr_debug("%s: REGISTERS %08x %08x %08x\n", __func__, r[0], r[1], r[2]);
->>>>>>> c21f1f8bf7 (5.10 port)
 	if (!e->is_ip_mc && !e->is_ipv6_mc) {
 		e->mac[0] = (r[1] >> 20);
 		e->mac[1] = (r[1] >> 12);
@@ -305,10 +296,7 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 				pr_info("Found next hop entry, need to read extra data\n");
 				e->nh_vlan_target = !!(r[0] & BIT(9));
 				e->nh_route_id = r[0] & 0x1ff;
-<<<<<<< HEAD
-=======
 				e->vid = e->rvid;
->>>>>>> c21f1f8bf7 (5.10 port)
 			}
 			e->age = (r[0] >> 17) & 0x3;
 			e->valid = true;
@@ -320,11 +308,7 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 			else
 				e->type = L2_UNICAST;
 		} else { // L2 multicast
-<<<<<<< HEAD
-			pr_info("Got L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
-=======
 			pr_debug("Got L2 MC entry: %08x %08x %08x\n", r[0], r[1], r[2]);
->>>>>>> c21f1f8bf7 (5.10 port)
 			e->valid = true;
 			e->type = L2_MULTICAST;
 			e->mc_portmask_index = (r[0] >> 12) & 0x1ff;
@@ -332,14 +316,8 @@ static void rtl838x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 	} else { // IPv4 and IPv6 multicast
 		e->valid = true;
 		e->mc_portmask_index = (r[0] >> 12) & 0x1ff;
-<<<<<<< HEAD
-		e->mc_gip = r[1];
-		e->mc_sip = r[2];
-		e->rvid = r[0] & 0xfff;
-=======
 		e->mc_gip = (r[1] << 20) | (r[2] >> 12);
 		e->rvid = r[2] & 0xfff;
->>>>>>> c21f1f8bf7 (5.10 port)
 	}
 	if (e->is_ip_mc)
 		e->type = IP4_MULTICAST;
@@ -378,26 +356,11 @@ static void rtl838x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 			if (e->next_hop) {
 				r[1] |= BIT(28);
 				r[0] |= e->nh_vlan_target ? BIT(9) : 0;
-<<<<<<< HEAD
-				r[0] |= e->nh_route_id &0x1ff;
-=======
 				r[0] |= e->nh_route_id & 0x1ff;
->>>>>>> c21f1f8bf7 (5.10 port)
 			}
 			r[0] |= (e->age & 0x3) << 17;
 		} else { // L2 Multicast
 			r[0] |= (e->mc_portmask_index & 0x1ff) << 12;
-<<<<<<< HEAD
-			r[2] |= e->rvid & 0xfff;
-			r[0] |= e->vid & 0xfff;
-			pr_info("FILL MC: %08x %08x %08x\n", r[0], r[1], r[2]);
-		}
-	} else { // IPv4 and IPv6 multicast
-		r[1] = e->mc_gip;
-		r[2] = e->mc_sip;
-		r[0] |= e->rvid;
-	}
-=======
 			r[0] |= e->vid & 0xfff;
 			r[2] |= e->rvid & 0xfff;
 			pr_info("FILL MC: %08x %08x %08x\n", r[0], r[1], r[2]);
@@ -409,7 +372,6 @@ static void rtl838x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 		r[2] |= e->rvid;
 	}
 	pr_info("%s: REGISTERS %08x %08x %08x\n", __func__, r[0], r[1], r[2]);
->>>>>>> c21f1f8bf7 (5.10 port)
 }
 
 /*
@@ -435,11 +397,7 @@ static u64 rtl838x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2
 	if (!e->valid)
 		return 0;
 
-<<<<<<< HEAD
-	entry = (((u64) r[1]) << 32) | (r[2] & 0xfffff000) | (r[0] & 0xfff);
-=======
 	entry = (((u64) r[1]) << 32) | (r[2]);  // mac and vid concatenated as hash seed
->>>>>>> c21f1f8bf7 (5.10 port)
 	return entry;
 }
 
@@ -480,11 +438,7 @@ static u64 rtl838x_read_cam(int idx, struct rtl838x_l2_entry *e)
 	pr_debug("Found in CAM: R1 %x R2 %x R3 %x\n", r[0], r[1], r[2]);
 
 	// Return MAC with concatenated VID ac concatenated ID
-<<<<<<< HEAD
-	entry = (((u64) r[1]) << 32) | (r[2] & 0xfffff000) | (r[0] & 0xfff);
-=======
 	entry = (((u64) r[1]) << 32) | r[2];
->>>>>>> c21f1f8bf7 (5.10 port)
 	return entry;
 }
 
@@ -503,10 +457,7 @@ static void rtl838x_write_cam(int idx, struct rtl838x_l2_entry *e)
 	rtl_table_release(q);
 }
 
-<<<<<<< HEAD
-=======
 
->>>>>>> c21f1f8bf7 (5.10 port)
 static u64 rtl838x_read_mcast_pmask(int idx)
 {
 	u32 portmask;
@@ -546,16 +497,6 @@ static void rtl838x_vlan_profile_setup(int profile)
 	rtl838x_write_mcast_pmask(UNKNOWN_MC_PMASK, 0x1fffffff);
 }
 
-<<<<<<< HEAD
-static inline int rtl838x_vlan_port_egr_filter(int port)
-{
-	return RTL838X_VLAN_PORT_EGR_FLTR;
-}
-
-static inline int rtl838x_vlan_port_igr_filter(int port)
-{
-	return RTL838X_VLAN_PORT_IGR_FLTR(port);
-=======
 static void rtl838x_l2_learning_setup(void)
 {
 	/* Set portmask for broadcast traffic and unknown unicast address flooding
@@ -611,7 +552,6 @@ static void rtl838x_enable_mcast_flood(int port, bool enable)
 static void rtl838x_enable_bcast_flood(int port, bool enable)
 {
 
->>>>>>> c21f1f8bf7 (5.10 port)
 }
 
 static void rtl838x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
@@ -738,8 +678,6 @@ static void rtl838x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 	priv->eee_enabled = enable;
 }
 
-<<<<<<< HEAD
-=======
 static void rtl838x_pie_lookup_enable(struct rtl838x_switch_priv *priv, int index)
 {
 	int block = index / PIE_BLOCK_SIZE;
@@ -1695,7 +1633,39 @@ void rtl838x_set_distribution_algorithm(int group, int algoidx, u32 algomsk)
 	sw_w32(algomsk, RTL838X_TRK_HASH_CTRL + (algoidx << 2));
 }
 
->>>>>>> c21f1f8bf7 (5.10 port)
+void rtl838x_set_receive_management_action(int port, rma_ctrl_t type, action_type_t action)
+{
+	switch(type) {
+	case BPDU:
+		sw_w32_mask(3 << ((port & 0xf) << 1), (action & 0x3) << ((port & 0xf) << 1), RTL838X_RMA_BPDU_CTRL + ((port >> 4) << 2));
+	break;
+	case PTP:
+		sw_w32_mask(3 << ((port & 0xf) << 1), (action & 0x3) << ((port & 0xf) << 1), RTL838X_RMA_PTP_CTRL + ((port >> 4) << 2));
+	break;
+	case LLTP:
+		sw_w32_mask(3 << ((port & 0xf) << 1), (action & 0x3) << ((port & 0xf) << 1), RTL838X_RMA_LLTP_CTRL + ((port >> 4) << 2));
+	break;
+	default:
+	break;
+	}
+}
+
+void rtl838x_vlan_port_pvidmode_set(int port, enum pbvlan_type type, enum pbvlan_mode mode) {
+	if (type == PBVLAN_TYPE_INNER)
+		sw_w32_mask(0x3, mode ,RTL838X_VLAN_PORT_PB_VLAN + (port << 2));
+	else
+		sw_w32_mask(0x3 << 14, mode << 14 ,RTL838X_VLAN_PORT_PB_VLAN + (port << 2));
+
+}
+
+void rtl838x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
+	if (type == PBVLAN_TYPE_INNER)
+		sw_w32_mask(0xfff << 2, pvid << 2 ,RTL838X_VLAN_PORT_PB_VLAN + (port << 2));
+	else
+		sw_w32_mask(0xfff << 16, pvid << 16 ,RTL838X_VLAN_PORT_PB_VLAN + (port << 2));
+
+}
+
 const struct rtl838x_reg rtl838x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -1748,19 +1718,12 @@ const struct rtl838x_reg rtl838x_reg = {
 	.read_cam = rtl838x_read_cam,
 	.write_cam = rtl838x_write_cam,
 	.vlan_port_egr_filter = RTL838X_VLAN_PORT_EGR_FLTR,
-<<<<<<< HEAD
-	.vlan_port_igr_filter = RTL838X_VLAN_PORT_IGR_FLTR(0),
-=======
 	.vlan_port_igr_filter = RTL838X_VLAN_PORT_IGR_FLTR,
->>>>>>> c21f1f8bf7 (5.10 port)
-	.vlan_port_pb = RTL838X_VLAN_PORT_PB_VLAN,
+	.vlan_port_pvidmode_set = rtl838x_vlan_port_pvidmode_set,
+	.vlan_port_pvid_set = rtl838x_vlan_port_pvid_set,
 	.vlan_port_tag_sts_ctrl = RTL838X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl838x_trk_mbr_ctr,
 	.rma_bpdu_fld_pmask = RTL838X_RMA_BPDU_FLD_PMSK,
-<<<<<<< HEAD
-	.spcl_trap_eapol_ctrl = RTL838X_SPCL_TRAP_EAPOL_CTRL,
-=======
->>>>>>> c21f1f8bf7 (5.10 port)
 	.init_eee = rtl838x_init_eee,
 	.port_eee_set = rtl838x_port_eee_set,
 	.eee_port_ability = rtl838x_eee_port_ability,
@@ -1768,8 +1731,6 @@ const struct rtl838x_reg rtl838x_reg = {
 	.l2_hash_key = rtl838x_l2_hash_key,
 	.read_mcast_pmask = rtl838x_read_mcast_pmask,
 	.write_mcast_pmask = rtl838x_write_mcast_pmask,
-<<<<<<< HEAD
-=======
 	.pie_init = rtl838x_pie_init,
 	.pie_rule_read = rtl838x_pie_rule_read,
 	.pie_rule_write = rtl838x_pie_rule_write,
@@ -1805,8 +1766,7 @@ const struct rtl838x_reg rtl838x_reg = {
 	.trk_hash_ctrl = RTL838X_TRK_HASH_CTRL,
 	.trk_hash_idx_ctrl = RTL838X_TRK_HASH_IDX_CTRL,
 	.set_distribution_algorithm = rtl838x_set_distribution_algorithm,
-
->>>>>>> c21f1f8bf7 (5.10 port)
+	.set_receive_management_action = rtl838x_set_receive_management_action,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
