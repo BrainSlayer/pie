@@ -331,6 +331,7 @@ static int rtl83xx_stats_flower(struct rtl838x_switch_priv *priv,
 	return 0;
 }
 
+
 static int rtl83xx_setup_tc_cls_flower(struct rtl838x_switch_priv *priv,
 				       struct flow_cls_offload *cls_flower)
 {

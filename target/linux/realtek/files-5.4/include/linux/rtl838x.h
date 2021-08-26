@@ -144,6 +144,8 @@
 #define RTL839X_MAC_RX_PAUSE_STS		(0x03c0)
 #define RTL930X_MAC_RX_PAUSE_STS		(0xCB30)
 #define RTL931X_MAC_RX_PAUSE_STS		(0x0F00)
+#define RTL930X_MAC_LINK_MEDIA_STS		(0xCB14)
+
 
 /* MAC link state bits */
 #define RTL830X_FORCE_EN				(1 << 0)
@@ -434,6 +436,25 @@
 	value/mask = 3 << ((port&0xF) << 1)
 */
 
+typedef enum {
+	BPDU = 0,
+	PTP,
+	PTP_UDP,
+	PTP_ETH2,
+	LLTP,
+	EAPOL,
+	GRATARP,
+} rma_ctrl_t;
+
+typedef enum {
+	FORWARD = 0,
+	DROP,
+	TRAP2CPU,
+	FLOODALL,
+	TRAP2MASTERCPU,
+	COPY2CPU,
+} action_type_t;
+
 
 #define RTL838X_RMA_BPDU_CTRL		(0x4330) 
 #define RTL839X_RMA_BPDU_CTRL		(0x122C)
@@ -452,7 +473,7 @@
 
 #define RTL930X_RMA_EAPOL_CTRL		(0x9F08)
 #define RTL931X_RMA_EAPOL_CTRL		(0x8930)
-
+#define RTL931X_TRAP_ARP_GRAT_PORT_ACT  (0x8C04)
 
 /* QoS */
 #define RTL838X_QM_INTPRI2QID_CTRL		(0x5F00)
@@ -583,7 +604,6 @@ struct rtl838x_port {
 	enum phy_type phy;
 	bool is10G;
 	bool is2G5;
-	u8 sds_num;
 	const struct dsa_port *dp;
 };
 
@@ -917,6 +937,7 @@ struct rtl838x_reg {
 	void (*write_mcast_pmask)(int idx, u64 portmask);
 	void (*vlan_fwd_on_inner)(int port, bool is_set);
 	void (*pie_init)(struct rtl838x_switch_priv *priv);
+	int (*pie_rule_read)(struct rtl838x_switch_priv *priv, int idx, struct  pie_rule *pr);
 	int (*pie_rule_write)(struct rtl838x_switch_priv *priv, int idx, struct pie_rule *pr);
 	int (*pie_rule_add)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
 	void (*pie_rule_rm)(struct rtl838x_switch_priv *priv, struct pie_rule *rule);
@@ -941,6 +962,7 @@ struct rtl838x_reg {
 	void (*enable_mcast_flood)(int port, bool enable);
 	void (*enable_bcast_flood)(int port, bool enable);
 	void (*set_distribution_algorithm)(int group, int algoidx, u32 algomask);
+	void (*set_receive_management_action)(int port, rma_ctrl_t type, action_type_t action);
 	u32 stat_port_rst;
 	u32 stat_rst;
 	u32 stat_port_std_mib;

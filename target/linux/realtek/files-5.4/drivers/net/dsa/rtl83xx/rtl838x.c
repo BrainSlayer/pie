@@ -1633,6 +1633,23 @@ void rtl838x_set_distribution_algorithm(int group, int algoidx, u32 algomsk)
 	sw_w32(algomsk, RTL838X_TRK_HASH_CTRL + (algoidx << 2));
 }
 
+void rtl838x_set_receive_management_action(int port, rma_ctrl_t type, action_type_t action)
+{
+	switch(type) {
+	case BPDU:
+		sw_w32_mask(3 << ((port & 0xf) << 1), (action & 0x3) << ((port & 0xf) << 1), RTL838X_RMA_BPDU_CTRL + ((port >> 4) << 2));
+	break;
+	case PTP:
+		sw_w32_mask(3 << ((port & 0xf) << 1), (action & 0x3) << ((port & 0xf) << 1), RTL838X_RMA_PTP_CTRL + ((port >> 4) << 2));
+	break;
+	case LLTP:
+		sw_w32_mask(3 << ((port & 0xf) << 1), (action & 0x3) << ((port & 0xf) << 1), RTL838X_RMA_LLTP_CTRL + ((port >> 4) << 2));
+	break;
+	default:
+	break;
+	}
+}
+
 const struct rtl838x_reg rtl838x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -1698,6 +1715,7 @@ const struct rtl838x_reg rtl838x_reg = {
 	.read_mcast_pmask = rtl838x_read_mcast_pmask,
 	.write_mcast_pmask = rtl838x_write_mcast_pmask,
 	.pie_init = rtl838x_pie_init,
+	.pie_rule_read = rtl838x_pie_rule_read,
 	.pie_rule_write = rtl838x_pie_rule_write,
 	.pie_rule_add = rtl838x_pie_rule_add,
 	.pie_rule_rm = rtl838x_pie_rule_rm,
@@ -1731,7 +1749,7 @@ const struct rtl838x_reg rtl838x_reg = {
 	.trk_hash_ctrl = RTL838X_TRK_HASH_CTRL,
 	.trk_hash_idx_ctrl = RTL838X_TRK_HASH_IDX_CTRL,
 	.set_distribution_algorithm = rtl838x_set_distribution_algorithm,
-
+	.set_receive_management_action = rtl838x_set_receive_management_action,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)
