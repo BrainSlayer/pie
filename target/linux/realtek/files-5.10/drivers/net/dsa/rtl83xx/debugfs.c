@@ -342,7 +342,7 @@ static ssize_t port_838x_bpdu_action_read(struct file *filp, char __user *buffer
 	struct dsa_switch *ds = p->dp->ds;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port = p->dp->index;
-	int value = sw_r32(priv->r->rma_bpdu_ctrl + ((port / priv->r->rma_bpdu_ctrl_div) << 2)) >> (((port % priv->r->rma_bpdu_ctrl_div) <<1) & 0x3);
+	int value = sw_r32(priv->r->rma_bpdu_ctrl + ((port / priv->r->rma_bpdu_ctrl_div) << 2)) >> (((port % priv->r->rma_bpdu_ctrl_div) <<1) & 0x3) >> (((port % priv->r->rma_bpdu_ctrl_div) << 1) & 0x3);
 
 	if (value < 0)
 		return -EINVAL;
@@ -381,7 +381,7 @@ static ssize_t port_838x_ptp_action_read(struct file *filp, char __user *buffer,
 	struct dsa_switch *ds = p->dp->ds;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port = p->dp->index;
-	int value = sw_r32(priv->r->rma_ptp_ctrl + ((port / priv->r->rma_ptp_ctrl_div) << 2)) >> (((port % priv->r->rma_ptp_ctrl_div) <<1) & 0x3);
+	int value = sw_r32(priv->r->rma_ptp_ctrl + ((port / priv->r->rma_ptp_ctrl_div) << 2)) >> (((port % priv->r->rma_ptp_ctrl_div) <<1) & 0x3) >> (((port % priv->r->rma_ptp_ctrl_div) << 1) & 0x3);
 
 	if (value < 0)
 		return -EINVAL;
@@ -419,7 +419,7 @@ static ssize_t port_838x_lltp_action_read(struct file *filp, char __user *buffer
 	struct dsa_switch *ds = p->dp->ds;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port = p->dp->index;
-	int value = sw_r32(priv->r->rma_lltp_ctrl + ((port / priv->r->rma_lltp_ctrl_div) << 2)) >> (((port % priv->r->rma_lltp_ctrl_div) <<1) & 0x3);
+	int value = sw_r32(priv->r->rma_lltp_ctrl + ((port / priv->r->rma_lltp_ctrl_div) << 2)) >> (((port % priv->r->rma_lltp_ctrl_div) <<1) & 0x3) >> (((port % priv->r->rma_lltp_ctrl_div) << 1) & 0x3);
 
 	if (value < 0)
 		return -EINVAL;
@@ -451,9 +451,6 @@ static const struct file_operations port_838x_action_lltp_fops = {
 };
 
 
-
-
-
 static ssize_t port_838x_eapol_action_read(struct file *filp, char __user *buffer, size_t count,
 				loff_t *ppos)
 {
@@ -461,7 +458,7 @@ static ssize_t port_838x_eapol_action_read(struct file *filp, char __user *buffe
 	struct dsa_switch *ds = p->dp->ds;
 	struct rtl838x_switch_priv *priv = ds->priv;
 	u32 port = p->dp->index;
-	int value = sw_r32(priv->r->rma_eapol_ctrl + ((port / priv->r->rma_eapol_ctrl_div) << 2)) >> (((port % priv->r->rma_eapol_ctrl_div) <<1) & 0x3);
+	int value = sw_r32(priv->r->rma_eapol_ctrl + ((port / priv->r->rma_eapol_ctrl_div) << 2)) >> (((port % priv->r->rma_eapol_ctrl_div) <<1) & 0x3) >> (((port % priv->r->rma_eapol_ctrl_div) << 1) & 0x3);
 
 	if (value < 0)
 		return -EINVAL;
