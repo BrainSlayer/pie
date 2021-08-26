@@ -383,6 +383,62 @@ void rtl931x_set_distribution_algorithm(int group, int algoidx, u32 algomsk)
 	sw_w32(newmask << l3shift, RTL931X_TRK_HASH_CTRL + (algoidx << 2));
 }
 
+void rtl931x_set_receive_management_action(int port, rma_ctrl_t type, action_type_t action)
+{
+	u32 value = 0;
+	
+	/* hack for value mapping */
+	if (type == GRATARP && action == COPY2CPU)
+		action = TRAP2MASTERCPU;
+
+	switch(action) {
+	case FORWARD:
+	    value = 0;
+	break;
+	case DROP:
+	    value = 1;
+	break;
+	case TRAP2CPU:
+	    value = 2;
+	break;
+	case TRAP2MASTERCPU:
+	    value = 3;
+	break;
+	case FLOODALL:
+	    value = 4;
+	break;
+	default:
+	break;
+	}
+	
+	switch(type) {
+	case BPDU:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL931X_RMA_BPDU_CTRL + ((port / 10) << 2));
+	break;
+	case PTP:
+		//udp
+		sw_w32_mask(3 << 2, value << 2, RTL931X_RMA_PTP_CTRL + (port << 2));
+		//eth2
+		sw_w32_mask(3, value, RTL931X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case PTP_UDP:
+		sw_w32_mask(3 << 2, value << 2, RTL931X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case PTP_ETH2:
+		sw_w32_mask(3, value, RTL931X_RMA_PTP_CTRL + (port << 2));
+	break;
+	case LLTP:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL931X_RMA_LLTP_CTRL + ((port / 10) << 2));
+	break;
+	case EAPOL:
+		sw_w32_mask(7 << ((port % 10) * 3), value << ((port % 10) * 3), RTL931X_RMA_EAPOL_CTRL + ((port / 10) << 2));
+	break;
+	case GRATARP:
+		sw_w32_mask(3 << ((port & 0xf) << 1), value << ((port & 0xf) << 1), RTL931X_TRAP_ARP_GRAT_PORT_ACT + ((port >> 4) << 2));
+	break;
+	}
+}
+
 const struct rtl838x_reg rtl931x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -450,5 +506,6 @@ const struct rtl838x_reg rtl931x_reg = {
 	.trk_hash_ctrl = RTL931X_TRK_HASH_CTRL,
 //	.trk_hash_idx_ctrl = RTL931X_TRK_HASH_IDX_CTRL,
 	.set_distribution_algorithm = rtl931x_set_distribution_algorithm,
+	.set_receive_management_action = rtl931x_set_receive_management_action,
 };
 
