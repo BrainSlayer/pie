@@ -143,6 +143,13 @@ static void rtl83xx_vlan_setup(struct rtl838x_switch_priv *priv)
 		priv->r->vlan_fwd_on_inner(i, true);
 }
 
+static void rtl83xx_setup_bpdu_traps(struct rtl838x_switch_priv *priv)
+{
+	int i;
+	for (i = 0; i < priv->cpu_port; i++)
+		priv->r->set_receive_management_action(i, BPDU, TRAP2CPU);
+}
+
 static int rtl83xx_setup(struct dsa_switch *ds)
 {
 	int i;
@@ -179,6 +186,8 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 	rtl83xx_init_stats(priv);
 
 	rtl83xx_vlan_setup(priv);
+
+	rtl83xx_setup_bpdu_traps(priv);
 
 	ds->configure_vlan_while_not_filtering = true;
 
@@ -729,6 +738,9 @@ static void rtl93xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	case SPEED_2500:
 		reg |= 5 << 3;
 		break;
+	case SPEED_5000:
+		reg = 6 << 3;
+		break;
 	case SPEED_1000:
 		pr_info("Setting PHY speed to 1000M\n");
 		// BUG: SDS-num is hard-coded!
@@ -745,10 +757,10 @@ static void rtl93xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	}
 
 	if (state->link)
-		reg |= FORCE_LINK_EN;
+		reg |= RTL930X_FORCE_LINK_EN;
 
 	if (state->duplex == DUPLEX_FULL)
-			reg |= BIT(2);
+			reg |= RTL930X_DUPLEX_MODE;
 
 	reg |= 1; // Force Link up
 	sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
@@ -782,7 +794,7 @@ static void rtl83xx_phylink_mac_link_up(struct dsa_switch *ds, int port,
 				   struct phy_device *phydev)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	pr_debug("%s: port %d up\n", __func__, port);
+
 	/* Restart TX/RX to port */
 	sw_w32_mask(0, 0x3, priv->r->mac_port_ctrl(port));
 }
@@ -797,6 +809,7 @@ static void rtl93xx_phylink_mac_link_up(struct dsa_switch *ds, int port,
 	/* Restart TX/RX to port */
 	sw_w32_mask(0, 0x3, priv->r->mac_port_ctrl(port));
 }
+
 static void rtl83xx_get_strings(struct dsa_switch *ds,
 				int port, u32 stringset, u8 *data)
 {
@@ -1226,6 +1239,7 @@ static int rtl83xx_vlan_prepare(struct dsa_switch *ds, int port,
 	struct rtl838x_vlan_info info;
 	struct rtl838x_switch_priv *priv = ds->priv;
 
+	mutex_lock(&priv->reg_mutex);
 	priv->r->vlan_tables_read(0, &info);
 
 	pr_debug("VLAN 0: Tagged ports %llx, untag %llx, profile %d, MC# %d, UC# %d, FID %x\n",
@@ -1572,6 +1586,7 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 			cb(e.mac, e.vid, e.is_static, data);
 	}
 
+	
 	mutex_unlock(&priv->reg_mutex);
 	return 0;
 }
@@ -1941,7 +1956,7 @@ static int rtl83xx_port_lag_join(struct dsa_switch *ds, int port,
 				   struct netdev_lag_upper_info *info)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	int i, err;
+	int i, err = 0;
 
 	if (!rtl83xx_lag_can_offload(ds, lag, info))
 		return -EOPNOTSUPP;
@@ -1974,8 +1989,6 @@ static int rtl83xx_port_lag_join(struct dsa_switch *ds, int port,
 		goto out;
 	}
 
-	mutex_unlock(&priv->reg_mutex);
-	return 0;
 out:
 	mutex_unlock(&priv->reg_mutex);
 	return err;
@@ -2113,6 +2126,7 @@ const struct dsa_switch_ops rtl83xx_switch_ops = {
 	.phylink_mac_config	= rtl83xx_phylink_mac_config,
 	.phylink_mac_link_down	= rtl83xx_phylink_mac_link_down,
 	.phylink_mac_link_up	= rtl83xx_phylink_mac_link_up,
+
 
 	.get_strings		= rtl83xx_get_strings,
 	.get_ethtool_stats	= rtl83xx_get_ethtool_stats,
