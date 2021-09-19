@@ -1,0 +1,78 @@
+diff -urpN linux-5.10.64.old/arch/mips/Kconfig linux-5.10.64/arch/mips/Kconfig
+diff -urpN linux-5.10.64.old/arch/mips/Makefile linux-5.10.64/arch/mips/Makefile
+--- linux-5.10.64.old/arch/mips/Makefile	2021-09-19 18:09:59.370631458 +0700
++++ linux-5.10.64/arch/mips/Makefile	2021-09-16 15:13:25.864858387 +0700
+@@ -307,11 +307,10 @@ endif
+ 
+ KBUILD_AFLAGS	+= $(cflags-y)
+ KBUILD_CFLAGS	+= $(cflags-y)
+-KBUILD_CPPFLAGS += -DVMLINUX_LOAD_ADDRESS=$(load-y) -DLINKER_LOAD_ADDRESS=$(load-ld)
++KBUILD_CPPFLAGS += -DVMLINUX_LOAD_ADDRESS=$(load-y)
+ KBUILD_CPPFLAGS += -DDATAOFFSET=$(if $(dataoffset-y),$(dataoffset-y),0)
+ 
+ bootvars-y	= VMLINUX_LOAD_ADDRESS=$(load-y) \
+-		  LINKER_LOAD_ADDRESS=$(load-ld) \
+ 		  VMLINUX_ENTRY_ADDRESS=$(entry-y) \
+ 		  PLATFORM="$(platform-y)" \
+ 		  ITS_INPUTS="$(its-y)"
+diff -urpN linux-5.10.64.old/arch/mips/kernel/head.S linux-5.10.64/arch/mips/kernel/head.S
+--- linux-5.10.64.old/arch/mips/kernel/head.S	2021-09-19 18:09:59.554631239 +0700
++++ linux-5.10.64/arch/mips/kernel/head.S	2021-09-16 16:08:30.460202513 +0700
+@@ -60,16 +60,22 @@
+ 	.endm
+ 
+ #ifndef CONFIG_NO_EXCEPT_FILL
++#warning "trouble"
+ 	/*
+ 	 * Reserved space for exception handlers.
+ 	 * Necessary for machines which link their kernels at KSEG0.
+-	 */
+ 	.fill	0x400
++	 */
+ #endif
+ 
+ EXPORT(_stext)
+ 
+ #ifdef CONFIG_BOOT_RAW
++	lui		t0, 0x0042
++	addiu 		t0, t0, 0xb654
++	lui		t1, 0xbb00
++	addiu 		t1, t1, 0x0600
++	sw		t0, 0x0(t1) 
+ 	/*
+ 	 * Give us a fighting chance of running if execution beings at the
+ 	 * kernel load address.	 This is needed because this platform does
+@@ -79,16 +85,15 @@ FEXPORT(__kernel_entry)
+ 	j	kernel_entry
+ #endif /* CONFIG_BOOT_RAW */
+ 
+-#ifdef CONFIG_IMAGE_CMDLINE_HACK
+-	.ascii	"CMDLINE:"
+-EXPORT(__image_cmdline)
+-	.fill	0x400
+-#endif /* CONFIG_IMAGE_CMDLINE_HACK */
+-
+ 	__REF
+ 
+ NESTED(kernel_entry, 16, sp)			# kernel entry point
+ 
++	lui		t0, 0x0042
++	addiu 		t0, t0, 0x8654
++	lui		t1, 0xbb00
++	addiu 		t1, t1, 0x0600
++	sw		t0, 0x0(t1) 
+ 	kernel_entry_setup			# cpu specific setup
+ 
+ 	setup_c0_status_pri
+diff -urpN linux-5.10.64.old/arch/mips/kernel/vmlinux.lds.S linux-5.10.64/arch/mips/kernel/vmlinux.lds.S
+--- linux-5.10.64.old/arch/mips/kernel/vmlinux.lds.S	2021-09-12 13:58:28.000000000 +0700
++++ linux-5.10.64/arch/mips/kernel/vmlinux.lds.S	2021-09-16 15:30:55.068616780 +0700
+@@ -55,7 +55,7 @@ SECTIONS
+ 	/* . = 0xa800000000300000; */
+ 	. = 0xffffffff80300000;
+ #endif
+-	. = LINKER_LOAD_ADDRESS;
++	. = 0x80220000;
+ 	/* read-only */
+ 	_text = .;	/* Text and read-only data */
+ 	.text : {
