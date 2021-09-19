@@ -135,12 +135,19 @@ static void rtl83xx_vlan_setup(struct rtl838x_switch_priv *priv)
 		priv->r->vlan_set_tagged(i, &info);
 
 	// reset PVIDs; defaults to 1 on reset
+<<<<<<< HEAD
 	for (i = 0; i <= priv->ds->num_ports; i++) {
 		priv->r->vlan_port_pvid_set(i, PBVLAN_TYPE_INNER, 0);
 		priv->r->vlan_port_pvid_set(i, PBVLAN_TYPE_OUTER, 0);
 		priv->r->vlan_port_pvidmode_set(i, PBVLAN_TYPE_INNER, PBVLAN_MODE_UNTAG_AND_PRITAG);
 		priv->r->vlan_port_pvidmode_set(i, PBVLAN_TYPE_OUTER, PBVLAN_MODE_UNTAG_AND_PRITAG);
 	}
+=======
+	if (priv->r->vlan_port_pb)
+	for (i = 0; i <= priv->ds->num_ports; i++)
+		sw_w32(0, priv->r->vlan_port_pb + (i << 2));
+
+>>>>>>> 14116ac1b5 (rtl9313 support)
 	// Set forwarding action based on inner VLAN tag
 	for (i = 0; i < priv->cpu_port; i++)
 		priv->r->vlan_fwd_on_inner(i, true);
@@ -1294,10 +1301,15 @@ static void rtl83xx_vlan_add(struct dsa_switch *ds, int port,
 			if (!v)
 				continue;
 			/* Set both inner and outer PVID of the port */
+<<<<<<< HEAD
 			priv->r->vlan_port_pvid_set(port, PBVLAN_TYPE_INNER, v);
 			priv->r->vlan_port_pvid_set(port, PBVLAN_TYPE_OUTER, v);
 			priv->r->vlan_port_pvidmode_set(port, PBVLAN_TYPE_INNER, PBVLAN_MODE_UNTAG_AND_PRITAG);
 			priv->r->vlan_port_pvidmode_set(port, PBVLAN_TYPE_OUTER, PBVLAN_MODE_UNTAG_AND_PRITAG);
+=======
+			if (priv->r->vlan_port_pb)
+				sw_w32((v << 16) | v << 2, priv->r->vlan_port_pb + (port << 2));
+>>>>>>> 14116ac1b5 (rtl9313 support)
 			priv->ports[port].pvid = vlan->vid_end;
 		}
 	}
@@ -1354,12 +1366,18 @@ static int rtl83xx_vlan_del(struct dsa_switch *ds, int port,
 
 	for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
 		/* Reset to default if removing the current PVID */
+<<<<<<< HEAD
 		if (v == pvid) {
 			priv->r->vlan_port_pvid_set(port, PBVLAN_TYPE_INNER, 0);
 			priv->r->vlan_port_pvid_set(port, PBVLAN_TYPE_OUTER, 0);
 			priv->r->vlan_port_pvidmode_set(port, PBVLAN_TYPE_INNER, PBVLAN_MODE_UNTAG_AND_PRITAG);
 			priv->r->vlan_port_pvidmode_set(port, PBVLAN_TYPE_OUTER, PBVLAN_MODE_UNTAG_AND_PRITAG);
 		}
+=======
+		if (priv->r->vlan_port_pb)
+		if (v == pvid)
+			sw_w32(0, priv->r->vlan_port_pb + (port << 2));
+>>>>>>> 14116ac1b5 (rtl9313 support)
 
 		/* Get port memberships of this vlan */
 		priv->r->vlan_tables_read(v, &info);

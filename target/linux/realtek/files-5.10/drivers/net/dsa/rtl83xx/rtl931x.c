@@ -673,6 +673,7 @@ int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)
 {
 	return 0;
 }
+<<<<<<< HEAD
 
 
 void rtl931x_vlan_port_pvidmode_set(int port, enum pbvlan_type type, enum pbvlan_mode mode) {
@@ -691,6 +692,8 @@ void rtl931x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
 
 }
 
+=======
+>>>>>>> 14116ac1b5 (rtl9313 support)
 const struct rtl838x_reg rtl931x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,

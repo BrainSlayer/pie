@@ -382,12 +382,16 @@ static int rtl838x_gpio_probe(struct platform_device *pdev)
 	case 0x9302:
 		pr_info("Found RTL9302 GPIO\n");
 		break;
+	case 0x9313:
+		pr_info("Found RTL9313 GPIO\n");
+		break;
 	default:
 		pr_err("Unknown GPIO chip id (%04x)\n", gpios->id);
 		return -ENODEV;
 	}
-
-	if (soc_info.family == RTL8380_FAMILY_ID) {
+	
+	switch(soc_info.family) {
+	case RTL8380_FAMILY_ID:
 		gpios->led_glb_ctrl = RTL838X_LED_GLB_CTRL;
 		gpios->led_sw_ctrl = RTL838X_LED_SW_CTRL;
 		gpios->led_sw_p_ctrl = rtl838x_led_sw_p_ctrl;
@@ -395,9 +399,8 @@ static int rtl838x_gpio_probe(struct platform_device *pdev)
 		gpios->ext_gpio_dir = rtl838x_ext_gpio_dir;
 		gpios->ext_gpio_data = rtl838x_ext_gpio_data;
 		gpios->irq = 31;
-	}
-
-	if (soc_info.family == RTL8390_FAMILY_ID) {
+	break;
+	case RTL8390_FAMILY_ID:
 		gpios->led_glb_ctrl = RTL839X_LED_GLB_CTRL;
 		gpios->led_sw_ctrl = RTL839X_LED_SW_CTRL;
 		gpios->led_sw_p_ctrl = rtl839x_led_sw_p_ctrl;
@@ -405,10 +408,14 @@ static int rtl838x_gpio_probe(struct platform_device *pdev)
 		gpios->ext_gpio_dir = rtl839x_ext_gpio_dir;
 		gpios->ext_gpio_data = rtl839x_ext_gpio_data;
 		gpios->irq = 31;
-	}
-
-	if (soc_info.family == RTL9300_FAMILY_ID) {
-		gpios->irq = 13;
+	break;
+	case RTL9300_FAMILY_ID:
+		gpios->irq = 13 + 9;
+	break;
+	case RTL9310_FAMILY_ID:
+		gpios->irq = 20 + 9;
+	break;
+	break;
 	}
 
 	gpios->gc.label = "rtl838x";

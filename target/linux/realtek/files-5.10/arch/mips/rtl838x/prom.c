@@ -37,6 +37,48 @@ void __init prom_free_prom_memory(void)
 
 }
 
+
+void prom_console_init(void)
+{
+	/* UART 16550A is initialized by the bootloader */
+}
+
+#ifdef CONFIG_EARLY_PRINTK
+#define rtl838x_r8(reg)		__raw_readb(reg)
+#define rtl838x_w8(val, reg)	__raw_writeb(val, reg)
+
+void unregister_prom_console(void)
+{
+
+}
+
+void disable_early_printk(void)
+{
+
+}
+
+void prom_putchar(char c)
+{
+	unsigned int retry = 0;
+
+	do {
+		if (retry++ >= 30000) {
+			/* Reset Tx FIFO */
+			rtl838x_w8(TXRST | CHAR_TRIGGER_14, UART0_FCR);
+			return;
+		}
+	} while ((rtl838x_r8(UART0_LSR) & LSR_THRE) == TxCHAR_AVAIL);
+
+	/* Send Character */
+	rtl838x_w8(c, UART0_THR);
+}
+
+char prom_getchar(void)
+{
+	return '\0';
+}
+#endif
+
 void __init device_tree_init(void)
 {
 	if (!fdt_check_header(&__appended_dtb)) {
