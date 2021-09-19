@@ -390,6 +390,12 @@ static int rtl838x_gpio_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 	
+	gpios->gc.label = "rtl838x";
+	gpios->gc.parent = dev;
+	gpios->gc.owner = THIS_MODULE;
+	gpios->gc.can_sleep = true;
+	gpios->dev = dev;
+	gpios->gc.base = 0;
 	switch(soc_info.family) {
 	case RTL8380_FAMILY_ID:
 		gpios->led_glb_ctrl = RTL838X_LED_GLB_CTRL;
@@ -399,33 +405,6 @@ static int rtl838x_gpio_probe(struct platform_device *pdev)
 		gpios->ext_gpio_dir = rtl838x_ext_gpio_dir;
 		gpios->ext_gpio_data = rtl838x_ext_gpio_data;
 		gpios->irq = 31;
-	break;
-	case RTL8390_FAMILY_ID:
-		gpios->led_glb_ctrl = RTL839X_LED_GLB_CTRL;
-		gpios->led_sw_ctrl = RTL839X_LED_SW_CTRL;
-		gpios->led_sw_p_ctrl = rtl839x_led_sw_p_ctrl;
-		gpios->led_sw_p_en_ctrl = rtl839x_led_sw_p_en_ctrl;
-		gpios->ext_gpio_dir = rtl839x_ext_gpio_dir;
-		gpios->ext_gpio_data = rtl839x_ext_gpio_data;
-		gpios->irq = 31;
-	break;
-	case RTL9300_FAMILY_ID:
-		gpios->irq = 13 + 9;
-	break;
-	case RTL9310_FAMILY_ID:
-		gpios->irq = 20 + 9;
-	break;
-	break;
-	}
-
-	gpios->gc.label = "rtl838x";
-	gpios->gc.parent = dev;
-	gpios->gc.owner = THIS_MODULE;
-	gpios->gc.can_sleep = true;
-	gpios->dev = dev;
-	gpios->gc.base = 0;
-
-	if (soc_info.family != RTL9300_FAMILY_ID) {
 		/* 0-31: internal
 		* 32-63, LED control register
 		* 64-95: PORT-LED 0
@@ -439,7 +418,31 @@ static int rtl838x_gpio_probe(struct platform_device *pdev)
 		gpios->gc.set = rtl838x_gpio_set;
 		gpios->gc.get = rtl838x_gpio_get;
 		gpios->gc.get_direction = rtl838x_get_direction;
-	} else {
+	break;
+	case RTL8390_FAMILY_ID:
+		gpios->led_glb_ctrl = RTL839X_LED_GLB_CTRL;
+		gpios->led_sw_ctrl = RTL839X_LED_SW_CTRL;
+		gpios->led_sw_p_ctrl = rtl839x_led_sw_p_ctrl;
+		gpios->led_sw_p_en_ctrl = rtl839x_led_sw_p_en_ctrl;
+		gpios->ext_gpio_dir = rtl839x_ext_gpio_dir;
+		gpios->ext_gpio_data = rtl839x_ext_gpio_data;
+		gpios->irq = 31;
+		/* 0-31: internal
+		* 32-63, LED control register
+		* 64-95: PORT-LED 0
+		* 96-127: PORT-LED 1
+		* 128-159: PORT-LED 2
+		*/
+		gpios->gc.ngpio = 160;
+
+		gpios->gc.direction_input = rtl838x_direction_input;
+		gpios->gc.direction_output = rtl838x_direction_output;
+		gpios->gc.set = rtl838x_gpio_set;
+		gpios->gc.get = rtl838x_gpio_get;
+		gpios->gc.get_direction = rtl838x_get_direction;
+	break;
+	case RTL9300_FAMILY_ID:
+		gpios->irq = 13;
 		gpios->gc.ngpio = 32;
 
 		gpios->gc.direction_input = rtl930x_direction_input;
@@ -447,6 +450,17 @@ static int rtl838x_gpio_probe(struct platform_device *pdev)
 		gpios->gc.set = rtl930x_gpio_set;
 		gpios->gc.get = rtl930x_gpio_get;
 		gpios->gc.get_direction = rtl930x_get_direction;
+	break;
+	case RTL9310_FAMILY_ID:
+		gpios->irq = 20;
+		gpios->gc.ngpio = 32;
+
+		gpios->gc.direction_input = rtl930x_direction_input;
+		gpios->gc.direction_output = rtl930x_direction_output;
+		gpios->gc.set = rtl930x_gpio_set;
+		gpios->gc.get = rtl930x_gpio_get;
+		gpios->gc.get_direction = rtl930x_get_direction;
+	break;
 	}
 
 	if (of_property_read_bool(np, "take-port-leds")) {
