@@ -1,0 +1,220 @@
+/dts-v1/;
+
+#include "rtl931x.dtsi"
+
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	compatible = "zyxel,xs1900-10", "realtek,rtl838x-soc";
+	model = "Zyxel XS1900-10";
+
+	aliases {
+		led-boot = &led_sys;
+		led-failsafe = &led_sys;
+		led-running = &led_sys;
+		led-upgrade = &led_sys;
+	};	
+
+	chosen {
+		bootargs = "console=ttyS0,115200";
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_sys: sys {
+			label = "gs1900_46:green:sys";
+			gpios = <&gpio0 46 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&gpio0 {
+	indirect-access-bus-id = <0>;
+};
+
+&spi0 {
+	status = "okay";
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "u-boot";
+				reg = <0x0 0x40000>;
+				read-only;
+			};
+			partition@40000 {
+				label = "u-boot-env";
+				reg = <0x40000 0x10000>;
+				read-only;
+			};
+			partition@50000 {
+				label = "u-boot-env2";
+				reg = <0x50000 0x10000>;
+				read-only;
+			};
+			partition@60000 {
+				label = "jffs";
+				reg = <0x60000 0x100000>;
+			};
+			partition@160000 {
+				label = "jffs2";
+				reg = <0x160000 0x100000>;
+			};
+			partition@b260000 {
+				label = "runtime";
+				reg = <0x260000 0x6d0000>;
+				compatible = "denx,uimage";
+			};
+			partition@930000 {
+				label = "runtime2";
+				reg = <0x930000 0x6d0000>;
+			};
+		};
+	};
+};
+
+&ethernet0 {
+	mdio: mdio-bus {
+		compatible = "realtek,rtl838x-mdio";
+		regmap = <&ethernet0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		
+		/* External phy ARQ813 */
+		phy0: ethernet-phy@0 {
+			reg = <0>;
+			compatible = "ethernet-phy-ieee802.3-c22";
+		};
+		phy10: ethernet-phy@1 {
+			reg = <10>;
+			compatible = "ethernet-phy-ieee802.3-c22";
+		};
+		phy18: ethernet-phy@2 {
+			reg = <18>;
+			compatible = "ethernet-phy-ieee802.3-c22";
+		};
+		phy26: ethernet-phy@3 {
+			reg = <26>;
+			compatible = "ethernet-phy-ieee802.3-c22";
+		};
+		phy34: ethernet-phy@4 {
+			reg = <34>;
+			compatible = "ethernet-phy-ieee802.3-c22";
+		};
+		phy45: ethernet-phy@5 {
+			reg = <45>;
+			compatible = "ethernet-phy-ieee802.3-c22";
+		};
+		phy6: ethernet-phy@6 {
+			reg = <6>;
+			compatible = "ethernet-phy-ieee802.3-c22";
+		};
+		phy7: ethernet-phy@7 {
+			reg = <7>;
+			compatible = "ethernet-phy-ieee802.3-c22";
+		};
+
+		/* RTL9313 Internal Serdes */
+		phy48: ethernet-phy@48 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			phy-is-integrated;
+			reg = <48>;
+		};
+		phy49: ethernet-phy@49 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			phy-is-integrated;
+			reg = <49>;
+		};
+
+	};
+};
+
+&switch0 {
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			label = "lan1";
+			phy-handle = <&phy0>;
+			phy-mode = "qsgmii";
+		};
+		port@10 {
+			reg = <10>;
+			label = "lan2";
+			phy-handle = <&phy10>;
+			phy-mode = "qsgmii";
+		};
+		port@18 {
+			reg = <18>;
+			label = "lan3";
+			phy-handle = <&phy18>;
+			phy-mode = "qsgmii";
+		};
+		port@26 {
+			reg = <26>;
+			label = "lan4";
+			phy-handle = <&phy26>;
+			phy-mode = "qsgmii";
+		};
+		port@34 {
+			reg = <34>;
+			label = "lan5";
+			phy-handle = <&phy34>;
+			phy-mode = "qsgmii";
+		};
+		port@45 {
+			reg = <45>;
+			label = "lan6";
+			phy-handle = <&phy45>;
+			phy-mode = "qsgmii";
+		};
+		port@6 {
+			reg = <6>;
+			label = "lan7";
+			phy-handle = <&phy6>;
+			phy-mode = "qsgmii";
+		};
+		port@7 {
+			reg = <7>;
+			label = "lan8";
+			phy-handle = <&phy7>;
+			phy-mode = "qsgmii";
+		};
+
+		/* RTL9313 Internal SerDes */
+		port@48 {
+			reg = <48>;
+			label = "lan49";
+			phy-mode = "internal";
+			phy-handle = <&phy48>;
+		};
+		port@49 {
+			reg = <49>;
+			label = "lan50";
+			phy-mode = "internal";
+			phy-handle = <&phy49>;
+		};
+
+		/* CPU-Port */
+		port@52 {
+			ethernet = <&ethernet0>;
+			reg = <52>;
+			phy-mode = "qsgmii";
+			fixed-link {
+				speed = <1000>;
+				full-duplex;
+			};
+		};
+	};
+};
