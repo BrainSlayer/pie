@@ -1509,6 +1509,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->n_pie_blocks = 32;
 		priv->port_ignore = 0x3f;
 		priv->n_counters = 0; // TODO: Figure out logs on RTL9310
+		return -EINVAL;
 		break;
 	}
 	memset(priv->mc_group_saves, -1, sizeof(priv->mc_group_saves));
@@ -1572,7 +1573,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	rtl83xx_get_l2aging(priv);
 
 	rtl83xx_setup_qos(priv);
-
+	
 	priv->r->l3_setup(priv);
 
 	/* Clear all destination ports for mirror groups */

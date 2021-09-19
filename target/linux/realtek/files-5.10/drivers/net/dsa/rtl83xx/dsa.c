@@ -135,6 +135,7 @@ static void rtl83xx_vlan_setup(struct rtl838x_switch_priv *priv)
 		priv->r->vlan_set_tagged(i, &info);
 
 	// reset PVIDs; defaults to 1 on reset
+	if (priv->r->vlan_port_pb)
 	for (i = 0; i <= priv->ds->num_ports; i++)
 		sw_w32(0, priv->r->vlan_port_pb + (i << 2));
 
@@ -207,6 +208,7 @@ static int rtl930x_setup(struct dsa_switch *ds)
 {
 	int i;
 	struct rtl838x_switch_priv *priv = ds->priv;
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 	u32 port_bitmap = BIT(priv->cpu_port);
 
 	pr_debug("%s called\n", __func__);
@@ -214,33 +216,43 @@ static int rtl930x_setup(struct dsa_switch *ds)
 	// Enable CSTI STP mode
 //	sw_w32(1, RTL930X_ST_CTRL);
 
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 	/* Disable MAC polling the PHY so that we can start configuration */
 	sw_w32(0, RTL930X_SMI_POLL_CTRL);
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 
 	// Disable all ports except CPU port
 	for (i = 0; i < ds->num_ports; i++)
 		priv->ports[i].enable = false;
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 	priv->ports[priv->cpu_port].enable = true;
 
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 	for (i = 0; i < priv->cpu_port; i++) {
 		if (priv->ports[i].phy) {
 			priv->r->traffic_set(i, BIT_ULL(priv->cpu_port) | BIT_ULL(i));
 			port_bitmap |= BIT_ULL(i);
 		}
 	}
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 	priv->r->traffic_set(priv->cpu_port, port_bitmap);
 
 	rtl930x_print_matrix();
 
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 	// TODO: Initialize statistics
 
 	rtl83xx_vlan_setup(priv);
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 
 	ds->configure_vlan_while_not_filtering = true;
 
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 	rtl83xx_enable_phy_polling(priv);
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 
 	priv->r->pie_init(priv);
+	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 
 	return 0;
 }
@@ -1283,7 +1295,8 @@ static void rtl83xx_vlan_add(struct dsa_switch *ds, int port,
 			if (!v)
 				continue;
 			/* Set both inner and outer PVID of the port */
-			sw_w32((v << 16) | v << 2, priv->r->vlan_port_pb + (port << 2));
+			if (priv->r->vlan_port_pb)
+				sw_w32((v << 16) | v << 2, priv->r->vlan_port_pb + (port << 2));
 			priv->ports[port].pvid = vlan->vid_end;
 		}
 	}
@@ -1340,6 +1353,7 @@ static int rtl83xx_vlan_del(struct dsa_switch *ds, int port,
 
 	for (v = vlan->vid_begin; v <= vlan->vid_end; v++) {
 		/* Reset to default if removing the current PVID */
+		if (priv->r->vlan_port_pb)
 		if (v == pvid)
 			sw_w32(0, priv->r->vlan_port_pb + (port << 2));
 

@@ -9,27 +9,6 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
  arch/mips/kernel/module.c      | 279 ++++++++++++++++++++++++++++++++++++++++-
  3 files changed, 284 insertions(+), 5 deletions(-)
 
---- a/arch/mips/Makefile
-+++ b/arch/mips/Makefile
-@@ -98,8 +98,18 @@ all-$(CONFIG_SYS_SUPPORTS_ZBOOT)+= vmlin
- cflags-y			+= -G 0 -mno-abicalls -fno-pic -pipe -mno-branch-likely
- cflags-y			+= -msoft-float
- LDFLAGS_vmlinux			+= -G 0 -static -n -nostdlib
-+ifdef CONFIG_64BIT
- KBUILD_AFLAGS_MODULE		+= -mlong-calls
- KBUILD_CFLAGS_MODULE		+= -mlong-calls
-+else
-+  ifdef CONFIG_DYNAMIC_FTRACE
-+    KBUILD_AFLAGS_MODULE	+= -mlong-calls
-+    KBUILD_CFLAGS_MODULE	+= -mlong-calls
-+  else
-+    KBUILD_AFLAGS_MODULE	+= -mno-long-calls
-+    KBUILD_CFLAGS_MODULE	+= -mno-long-calls
-+  endif
-+endif
- 
- ifeq ($(CONFIG_RELOCATABLE),y)
- LDFLAGS_vmlinux			+= --emit-relocs
 --- a/arch/mips/include/asm/module.h
 +++ b/arch/mips/include/asm/module.h
 @@ -12,6 +12,11 @@ struct mod_arch_specific {

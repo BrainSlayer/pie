@@ -160,22 +160,6 @@ static inline int rtl931x_l2_port_new_sa_fwd(int p)
 	return RTL931X_L2_PORT_NEW_SA_FWD(p);
 }
 
-static u64 rtl931x_read_l2_entry_using_hash(u32 hash, u32 position, struct rtl838x_l2_entry *e)
-{
-	u64 entry = 0;
-
-	// TODO: Implement
-	return entry;
-}
-
-static u64 rtl931x_read_cam(int idx, struct rtl838x_l2_entry *e)
-{
-	u64 entry = 0;
-
-	// TODO: Implement
-	return entry;
-}
-
 irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 {
 	struct dsa_switch *ds = dev_id;
@@ -439,6 +423,255 @@ void rtl931x_set_receive_management_action(int port, rma_ctrl_t type, action_typ
 	}
 }
 
+u64 rtl931x_traffic_get(int source)
+{
+	u32 v;
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+
+	rtl_table_read(r, source);
+	v = sw_r32(rtl_table_data(r, 0));
+	rtl_table_release(r);
+	return v >> 3;
+}
+
+/*
+ * Enable traffic between a source port and a destination port matrix
+ */
+void rtl931x_traffic_set(int source, u64 dest_matrix)
+{
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+
+	sw_w32((dest_matrix << 3), rtl_table_data(r, 0));
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+void rtl931x_traffic_enable(int source, int dest)
+{
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	rtl_table_read(r, source);
+	sw_w32_mask(0, BIT(dest + 3), rtl_table_data(r, 0));
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+void rtl931x_traffic_disable(int source, int dest)
+{
+	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	rtl_table_read(r, source);
+	sw_w32_mask(BIT(dest + 3), 0, rtl_table_data(r, 0));
+	rtl_table_write(r, source);
+	rtl_table_release(r);
+}
+
+static u64 rtl931x_l2_hash_seed(u64 mac, u32 vid)
+{
+	u64 v = vid;
+
+	v <<= 48;
+	v |= mac;
+
+	return v;
+}
+
+/*
+ * Calculate both the block 0 and the block 1 hash by applyingthe same hash
+ * algorithm as the one used currently by the ASIC to the seed, and return
+ * both hashes in the lower and higher word of the return value since only 12 bit of
+ * the hash are significant
+ */
+static u32 rtl931x_l2_hash_key(struct rtl838x_switch_priv *priv, u64 seed)
+{
+	u32 k0, k1, h1, h2, h;
+
+	k0 = (u32) (((seed >> 55) & 0x1f) ^ ((seed >> 44) & 0x7ff)
+		^ ((seed >> 33) & 0x7ff) ^ ((seed >> 22) & 0x7ff)
+		^ ((seed >> 11) & 0x7ff) ^ (seed & 0x7ff));
+
+	h1 = (seed >> 11) & 0x7ff;
+	h1 = ((h1 & 0x1f) << 6) | ((h1 >> 5) & 0x3f);
+
+	h2 = (seed >> 33) & 0x7ff;
+	h2 = ((h2 & 0x3f) << 5)| ((h2 >> 6) & 0x3f);
+
+	k1 = (u32) (((seed << 55) & 0x1f) ^ ((seed >> 44) & 0x7ff) ^ h2
+		    ^ ((seed >> 22) & 0x7ff) ^ h1
+		    ^ (seed & 0x7ff));
+
+	// Algorithm choice for block 0
+	if (sw_r32(RTL931X_L2_CTRL) & BIT(0))
+		h = k1;
+	else
+		h = k0;
+
+	/* Algorithm choice for block 1
+	 * Since k0 and k1 are < 2048, adding 2048 will offset the hash into the second
+	 * half of hash-space
+	 * 2048 is in fact the hash-table size 16384 divided by 4 hashes per bucket
+	 * divided by 2 to divide the hash space in 2
+	 */
+	if (sw_r32(RTL931X_L2_CTRL) & BIT(1))
+		h |= (k1 + 2048) << 16;
+	else
+		h |= (k0 + 2048) << 16;
+
+	return h;
+}
+
+/*
+ * Fills an L2 entry structure from the SoC registers
+ */
+static void rtl931x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
+{
+	pr_debug("In %s valid?\n", __func__);
+	e->valid = !!(r[2] & BIT(31));
+	if (!e->valid)
+		return;
+
+	pr_debug("In %s is valid\n", __func__);
+	e->is_ip_mc = false;
+	e->is_ipv6_mc = false;
+
+	// TODO: Is there not a function to copy directly MAC memory?
+	e->mac[0] = (r[0] >> 24);
+	e->mac[1] = (r[0] >> 16);
+	e->mac[2] = (r[0] >> 8);
+	e->mac[3] = r[0];
+	e->mac[4] = (r[1] >> 24);
+	e->mac[5] = (r[1] >> 16);
+
+	e->next_hop = !!(r[2] & BIT(12));
+	e->rvid = r[1] & 0xfff;
+
+	/* Is it a unicast entry? check multicast bit */
+	if (!(e->mac[0] & 1)) {
+		e->type = L2_UNICAST;
+		e->is_static = !!(r[2] & BIT(14));
+		e->port = (r[2] >> 20) & 0x3ff;
+		// Check for trunk port
+		if (r[2] & BIT(30)) {
+			e->is_trunk = true;
+			e->stack_dev = (e->port >> 9) & 1;
+			e->trunk = e->port & 0x3f;
+		} else {
+			e->is_trunk = false;
+			e->stack_dev = (e->port >> 6) & 0xf;
+			e->port = e->port & 0x3f;
+		}
+
+		e->block_da = !!(r[2] & BIT(15));
+		e->block_sa = !!(r[2] & BIT(16));
+		e->suspended = !!(r[2] & BIT(13));
+		e->age = (r[2] >> 17) & 3;
+		e->valid = true;
+		// the UC_VID field in hardware is used for the VID or for the route id
+		if (e->next_hop) {
+			e->nh_route_id = r[2] & 0x7ff;
+			e->vid = 0;
+		} else {
+			e->vid = r[2] & 0xfff;
+			e->nh_route_id = 0;
+		}
+	} else {
+		e->valid = true;
+		e->type = L2_MULTICAST;
+		e->mc_portmask_index = (r[2] >> 16) & 0x3ff;
+	}
+}
+
+/*
+ * Fills the 3 SoC table registers r[] with the information of in the rtl838x_l2_entry
+ */
+static void rtl931x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
+{
+	u32 port;
+
+	if (!e->valid) {
+		r[0] = r[1] = r[2] = 0;
+		return;
+	}
+
+	r[2] = BIT(31);	// Set valid bit
+
+	r[0] = ((u32)e->mac[0]) << 24 | ((u32)e->mac[1]) << 16 
+		| ((u32)e->mac[2]) << 8 | ((u32)e->mac[3]);
+	r[1] = ((u32)e->mac[4]) << 24 | ((u32)e->mac[5]) << 16;
+
+	r[2] |= e->next_hop ? BIT(12) : 0;
+
+	if (e->type == L2_UNICAST) {
+		r[2] |= e->is_static ? BIT(14) : 0;
+		r[1] |= e->rvid & 0xfff;
+		r[2] |= (e->port & 0x3ff) << 20;
+		if (e->is_trunk) {
+			r[2] |= BIT(30);
+			port = e->stack_dev << 9 | (e->port & 0x3f);
+		} else {
+			port = (e->stack_dev & 0xf) << 6;
+			port |= e->port & 0x3f;
+		}
+		r[2] |= port << 20;
+		r[2] |= e->block_da ? BIT(15) : 0;
+		r[2] |= e->block_sa ? BIT(17) : 0;
+		r[2] |= e->suspended ? BIT(13) : 0;
+		r[2] |= (e->age & 0x3) << 17;
+		// the UC_VID field in hardware is used for the VID or for the route id
+		if (e->next_hop)
+			r[2] |= e->nh_route_id & 0x7ff;
+		else
+			r[2] |= e->vid & 0xfff;
+	} else { // L2_MULTICAST
+		r[2] |= (e->mc_portmask_index & 0x3ff) << 16;
+		r[2] |= e->mc_mac_index & 0x7ff;
+	}
+}
+
+/*
+ * Read an L2 UC or MC entry out of a hash bucket of the L2 forwarding table
+ * hash is the id of the bucket and pos is the position of the entry in that bucket
+ * The data read from the SoC is filled into rtl838x_l2_entry
+ */
+static u64 rtl931x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
+{
+        return 0;
+}
+
+static u64 rtl931x_read_cam(int idx, struct rtl838x_l2_entry *e)
+{
+		return 0;
+}
+
+static void rtl931x_write_cam(int idx, struct rtl838x_l2_entry *e)
+{
+}
+
+static void rtl931x_write_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
+{
+}
+static void rtl931x_vlan_fwd_on_inner(int port, bool is_set)
+{
+}
+
+static void rtl931x_vlan_profile_setup(int profile)
+{
+	pr_info("Leaving %s\n", __func__);
+}
+
+static u64 rtl931x_read_mcast_pmask(int idx)
+{
+	return 0;
+}
+
+static void rtl931x_write_mcast_pmask(int idx, u64 portmask)
+{
+}
+static void rtl931x_pie_init(struct rtl838x_switch_priv *priv)
+{
+}
+int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)
+{
+	return 0;
+}
 const struct rtl838x_reg rtl931x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -449,6 +682,10 @@ const struct rtl838x_reg rtl931x_reg = {
 	.stat_port_rst = RTL931X_STAT_PORT_RST,
 	.stat_rst = RTL931X_STAT_RST,
 	.stat_port_std_mib = 0,  // Not defined
+	.traffic_enable = rtl931x_traffic_enable,
+	.traffic_disable = rtl931x_traffic_disable,
+	.traffic_get = rtl931x_traffic_get,
+	.traffic_set = rtl931x_traffic_set,
 	.l2_ctrl_0 = RTL931X_L2_CTRL,
 	.l2_ctrl_1 = RTL931X_L2_AGE_CTRL,
 	.l2_port_aging_out = RTL931X_L2_PORT_AGE_CTRL,
@@ -465,6 +702,10 @@ const struct rtl838x_reg rtl931x_reg = {
 	.vlan_set_tagged = rtl931x_vlan_set_tagged,
 	.vlan_set_untagged = rtl931x_vlan_set_untagged,
 	.vlan_profile_dump = rtl931x_vlan_profile_dump,
+	.vlan_profile_setup = rtl931x_vlan_profile_setup,
+	.vlan_fwd_on_inner = rtl931x_vlan_fwd_on_inner,
+	.l3_setup = rtl931x_l3_setup,
+
 	.stp_get = rtl931x_stp_get,
 	.stp_set = rtl931x_stp_set,
 	.mac_force_mode_ctrl = rtl931x_mac_force_mode_ctrl,
@@ -481,6 +722,10 @@ const struct rtl838x_reg rtl931x_reg = {
 	.mac_tx_pause_sts = RTL931X_MAC_TX_PAUSE_STS,
 	.read_l2_entry_using_hash = rtl931x_read_l2_entry_using_hash,
 	.read_cam = rtl931x_read_cam,
+	.write_l2_entry_using_hash = rtl931x_write_l2_entry_using_hash,
+	.write_cam = rtl931x_write_cam,
+	.read_mcast_pmask = rtl931x_read_mcast_pmask,
+	.write_mcast_pmask = rtl931x_write_mcast_pmask,
 	.vlan_port_egr_filter = RTL931X_VLAN_PORT_EGR_FLTR,
 	.vlan_port_igr_filter = RTL931X_VLAN_PORT_IGR_FLTR,
 //	.vlan_port_pb = does not exist
@@ -507,5 +752,6 @@ const struct rtl838x_reg rtl931x_reg = {
 //	.trk_hash_idx_ctrl = RTL931X_TRK_HASH_IDX_CTRL,
 	.set_distribution_algorithm = rtl931x_set_distribution_algorithm,
 	.set_receive_management_action = rtl931x_set_receive_management_action,
+	.pie_init = rtl931x_pie_init,
 };
 

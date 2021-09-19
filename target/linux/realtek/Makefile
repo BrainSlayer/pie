@@ -3,7 +3,7 @@
 include $(TOPDIR)/rules.mk
 
 ARCH:=mips
-CPU_TYPE:=4kec
+CPU_TYPE:=24kc
 BOARD:=realtek
 BOARDNAME:=Realtek MIPS
 DEVICE_TYPE:=basic
