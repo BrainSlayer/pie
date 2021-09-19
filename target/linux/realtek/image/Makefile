@@ -167,6 +167,15 @@ define Device/zyxel_gs1900-8hp-v2
 endef
 TARGET_DEVICES += zyxel_gs1900-8hp-v2
 
+define Device/zyxel_gs1900-24hp-v2
+  $(Device/zyxel_gs1900)
+  SOC := rtl8382
+  DEVICE_MODEL := GS1900-24HP
+  DEVICE_VARIANT := v2
+  ZYXEL_VERS := ABTP
+endef
+TARGET_DEVICES += zyxel_gs1900-24hp-v2
+
 define Device/zyxel_gs1900-48
   SOC := rtl8393
   IMAGE_SIZE := 13952k
@@ -209,5 +218,25 @@ define Device/zyxel_xgs1250-12
 endef
 TARGET_DEVICES += zyxel_xgs1250-12
 
+
+define Device/edgecore_ecs4100-12ph
+  SOC := rtl8392
+  IMAGE_SIZE := 14336k
+  DEVICE_VENDOR := Edgecore
+  DEVICE_MODEL := ECS4100-12PH
+  DEVICE_PACKAGES += lua-rs232
+endef
+TARGET_DEVICES += edgecore_ecs4100-12ph
+
+define Device/edgecore_ecs4125-10p
+  KERNEL_LOADADDR = 0x80220000
+  KERNEL_ENTRY = 0x80220000
+  SOC := rtl9313
+  IMAGE_SIZE := 14336k
+  DEVICE_VENDOR := Edgecore
+  DEVICE_MODEL := ECS4125-10P
+  DEVICE_PACKAGES += lua-rs232
+endef
+TARGET_DEVICES += edgecore_ecs4125-10p
 
 $(eval $(call BuildImage))
