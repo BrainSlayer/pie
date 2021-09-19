@@ -1,26 +1,28 @@
-diff -urpN linux-5.4.139.old/include/net/dsa.h linux-5.4.139/include/net/dsa.h
---- linux-5.4.139.old/include/net/dsa.h	2021-08-12 11:07:00.456095739 +0700
-+++ linux-5.4.139/include/net/dsa.h	2021-08-12 11:11:24.556448045 +0700
-@@ -43,6 +43,7 @@ struct phylink_link_state;
- #define DSA_TAG_PROTO_SJA1105_VALUE		13
- #define DSA_TAG_PROTO_KSZ8795_VALUE		14
+diff -urpN linux-5.10.64.old/include/net/dsa.h linux-5.10.64/include/net/dsa.h
+--- linux-5.10.64.old/include/net/dsa.h	2021-09-19 12:14:46.261659376 +0700
++++ linux-5.10.64/include/net/dsa.h	2021-09-19 12:15:28.557626605 +0700
+@@ -45,6 +45,7 @@ struct phylink_link_state;
+ #define DSA_TAG_PROTO_OCELOT_VALUE		15
+ #define DSA_TAG_PROTO_AR9331_VALUE		16
  #define DSA_TAG_PROTO_RTL4_A_VALUE		17
 +#define DSA_TAG_PROTO_RTL83XX_VALUE		18
+ #define DSA_TAG_PROTO_BRCM_LEGACY_VALUE		22
  
  enum dsa_tag_protocol {
- 	DSA_TAG_PROTO_NONE		= DSA_TAG_PROTO_NONE_VALUE,
-@@ -61,6 +62,7 @@ enum dsa_tag_protocol {
- 	DSA_TAG_PROTO_SJA1105		= DSA_TAG_PROTO_SJA1105_VALUE,
- 	DSA_TAG_PROTO_KSZ8795		= DSA_TAG_PROTO_KSZ8795_VALUE,
+@@ -67,6 +68,7 @@ enum dsa_tag_protocol {
+ 	DSA_TAG_PROTO_OCELOT		= DSA_TAG_PROTO_OCELOT_VALUE,
+ 	DSA_TAG_PROTO_AR9331		= DSA_TAG_PROTO_AR9331_VALUE,
  	DSA_TAG_PROTO_RTL4_A		= DSA_TAG_PROTO_RTL4_A_VALUE,
 +	DSA_TAG_PROTO_RTL83XX		= DSA_TAG_PROTO_RTL83XX_VALUE,
  };
  
  struct packet_type;
-diff -urpN linux-5.4.139.old/net/dsa/Kconfig linux-5.4.139/net/dsa/Kconfig
---- linux-5.4.139.old/net/dsa/Kconfig	2021-08-12 11:08:44.196228650 +0700
-+++ linux-5.4.139/net/dsa/Kconfig	2021-08-12 11:09:01.260252005 +0700
-@@ -120,4 +120,10 @@ config NET_DSA_TAG_TRAILER
+diff -urpN linux-5.10.64.old/include/net/dsa.h.orig linux-5.10.64/include/net/dsa.h.orig
+diff -urpN linux-5.10.64.old/include/net/dsa.h.rej linux-5.10.64/include/net/dsa.h.rej
+diff -urpN linux-5.10.64.old/net/dsa/Kconfig linux-5.10.64/net/dsa/Kconfig
+--- linux-5.10.64.old/net/dsa/Kconfig	2021-09-19 12:14:46.265659373 +0700
++++ linux-5.10.64/net/dsa/Kconfig	2021-09-19 12:15:01.129647855 +0700
+@@ -135,4 +135,10 @@ config NET_DSA_TAG_TRAILER
  	  Say Y or M if you want to enable support for tagging frames at
  	  with a trailed. e.g. Marvell 88E6060.
  
@@ -31,14 +33,15 @@ diff -urpN linux-5.4.139.old/net/dsa/Kconfig linux-5.4.139/net/dsa/Kconfig
 +	    the RTL83XX chipsets.
 +
  endif
-diff -urpN linux-5.4.139.old/net/dsa/Makefile linux-5.4.139/net/dsa/Makefile
---- linux-5.4.139.old/net/dsa/Makefile	2021-08-12 11:08:44.196228650 +0700
-+++ linux-5.4.139/net/dsa/Makefile	2021-08-12 11:09:01.260252005 +0700
-@@ -15,3 +15,4 @@ obj-$(CONFIG_NET_DSA_TAG_MTK) += tag_mtk
+diff -urpN linux-5.10.64.old/net/dsa/Kconfig.orig linux-5.10.64/net/dsa/Kconfig.orig
+diff -urpN linux-5.10.64.old/net/dsa/Makefile linux-5.10.64/net/dsa/Makefile
+--- linux-5.10.64.old/net/dsa/Makefile	2021-09-19 12:14:46.265659373 +0700
++++ linux-5.10.64/net/dsa/Makefile	2021-09-19 12:15:01.129647855 +0700
+@@ -18,3 +18,4 @@ obj-$(CONFIG_NET_DSA_TAG_OCELOT) += tag_
  obj-$(CONFIG_NET_DSA_TAG_QCA) += tag_qca.o
  obj-$(CONFIG_NET_DSA_TAG_SJA1105) += tag_sja1105.o
  obj-$(CONFIG_NET_DSA_TAG_TRAILER) += tag_trailer.o
 +obj-$(CONFIG_NET_DSA_TAG_RTL83XX) += tag_rtl83xx.o
 \ No newline at end of file
-diff -urpN linux-5.4.139.old/net/dsa/tag_rtl83xx.c linux-5.4.139/net/dsa/tag_rtl83xx.c
-diff -urpN linux-5.4.139.old/net/dsa/tag_trailer.c linux-5.4.139/net/dsa/tag_trailer.c
+diff -urpN linux-5.10.64.old/net/dsa/Makefile.orig linux-5.10.64/net/dsa/Makefile.orig
+\ No newline at end of file
