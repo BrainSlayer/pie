@@ -86,6 +86,7 @@
 
 #define RTL931X_VLAN_PROFILE_SET(idx)		(0x9800 + (((idx) * 28)))
 #define RTL931X_VLAN_CTRL			(0x94E4)
+#define RTL931X_VLAN_PORT_IGR_CTRL		(0x94E8)
 #define RTL931X_VLAN_PORT_IGR_FLTR		(0x96B4)
 #define RTL931X_VLAN_PORT_EGR_FLTR		(0x96C4)
 #define RTL931X_VLAN_PORT_TAG_CTRL		(0x4860)
@@ -596,6 +597,17 @@ enum phy_type {
 	PHY_RTL839X_SDS = 5,
 };
 
+enum pbvlan_type {
+	PBVLAN_TYPE_INNER = 0,
+	PBVLAN_TYPE_OUTER,
+};
+
+enum pbvlan_mode {
+	PBVLAN_MODE_UNTAG_AND_PRITAG=0,
+	PBVLAN_MODE_UNTAG_ONLY,
+	PBVLAN_MODE_ALL_PKT,
+};
+
 struct rtl838x_port {
 	bool enable;
 	u64 pm;
@@ -962,7 +974,9 @@ struct rtl838x_reg {
 	void (*enable_mcast_flood)(int port, bool enable);
 	void (*enable_bcast_flood)(int port, bool enable);
 	void (*set_distribution_algorithm)(int group, int algoidx, u32 algomask);
-	void (*set_receive_management_action)(int port, rma_ctrl_t type, action_type_t action);
+	void (*set_receive_management_action)(int port, rma_ctrl_t type, action_type_t action);	
+	void (*vlan_port_pvidmode_set)(int port, enum pbvlan_type type, enum pbvlan_mode mode);
+	void (*vlan_port_pvid_set)(int port, enum pbvlan_type type, int pvid);
 	u32 stat_port_rst;
 	u32 stat_rst;
 	u32 stat_port_std_mib;
@@ -984,7 +998,6 @@ struct rtl838x_reg {
 	u32 mac_tx_pause_sts;
 	u32 vlan_port_egr_filter;
 	u32 vlan_port_igr_filter;
-	u32 vlan_port_pb;
 	u32 vlan_port_tag_sts_ctrl;
 	u32 rma_bpdu_fld_pmask;
 	u32 rma_bpdu_ctrl;

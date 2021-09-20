@@ -2416,6 +2416,22 @@ void rtl930x_set_receive_management_action(int port, rma_ctrl_t type, action_typ
 	}
 }
 
+void rtl930x_vlan_port_pvidmode_set(int port, enum pbvlan_type type, enum pbvlan_mode mode) {
+	if (type == PBVLAN_TYPE_INNER)
+		sw_w32_mask(0x3, mode ,RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+	else
+		sw_w32_mask(0x3 << 14, mode << 14 ,RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+
+}
+
+void rtl930x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
+	if (type == PBVLAN_TYPE_INNER)
+		sw_w32_mask(0xfff << 2, pvid << 2 ,RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+	else
+		sw_w32_mask(0xfff << 16, pvid << 16 ,RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+
+}
+
 const struct rtl838x_reg rtl930x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -2468,7 +2484,8 @@ const struct rtl838x_reg rtl930x_reg = {
 	.write_cam = rtl930x_write_cam,
 	.vlan_port_egr_filter = RTL930X_VLAN_PORT_EGR_FLTR,
 	.vlan_port_igr_filter = RTL930X_VLAN_PORT_IGR_FLTR,
-	.vlan_port_pb = RTL930X_VLAN_PORT_PB_VLAN,
+	.vlan_port_pvidmode_set = rtl930x_vlan_port_pvidmode_set,
+	.vlan_port_pvid_set = rtl930x_vlan_port_pvid_set,
 	.vlan_port_tag_sts_ctrl = RTL930X_VLAN_PORT_TAG_STS_CTRL,
 	.trk_mbr_ctr = rtl930x_trk_mbr_ctr,
 	.rma_bpdu_fld_pmask = RTL930X_RMA_BPDU_FLD_PMSK,
