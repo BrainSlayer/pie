@@ -16,7 +16,12 @@
 		cpu@0 {
 			// try: 
 			compatible = "mti,interaptive";
-			//compatible = "mips,mips34Kc";
+			reg = <0>;
+		};
+
+		cpu@1 {
+			// try: 
+			compatible = "mti,interaptive";
 			reg = <0>;
 		};
 	};
@@ -37,6 +42,14 @@
 		interrupt-controller;
 	};
 
+
+	osc: oscillator {
+		compatible = "fixed-clock";
+		#clock-cells = <1>;
+		clock-frequency  = <200000000>;
+		clock-output-names = "osc";
+	};
+
 	gic: interrupt-controller@1ddc0000 {
 		compatible = "mti,gic";
 		reg = <0x1ddc0000 0x20000>;
@@ -51,13 +64,12 @@
 		 * controller & should be probed first.
 		 */
 		interrupt-parent = <&cpuintc>;
-	};
 
-	osc: oscillator {
-		compatible = "fixed-clock";
-		#clock-cells = <1>;
-		clock-frequency  = <200000000>;
-		clock-output-names = "osc";
+		timer {
+			compatible = "mti,gic-timer";
+			interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;
+			clocks = <&osc 0>;
+		};
 	};
 	
 	soc: soc {
@@ -66,14 +78,6 @@
 		#size-cells = <1>;
 		ranges = <0x0 0x18000000 0x10000>;
 
-		timer: timer@3200 {
-			compatible = "realtek,rtl9300-timer";
-			reg = <0x3200 0x60>;
-			interrupt-parent = <&gic>;
-			interrupts = <GIC_SHARED 1 IRQ_TYPE_LEVEL_HIGH>;
-			interrupt-names = "ostimer";
-			clocks = <&osc 0>;
-		};
 
 		spi0: spi@1200 {
 			status = "okay";
@@ -128,10 +132,10 @@
 	};
 
 
-	ethernet0: ethernet@bb00a300 {
+	ethernet0: ethernet@1b00a300 {
 		status = "okay";
 		compatible = "realtek,rtl838x-eth";
-		reg = <0xbb00a300 0x100>;
+		reg = <0x1b00a300 0x100>;
 		interrupt-parent = <&gic>;
 		interrupts = <GIC_SHARED 16 IRQ_TYPE_LEVEL_HIGH>;
 		#interrupt-cells = <1>;
