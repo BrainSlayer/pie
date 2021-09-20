@@ -140,6 +140,7 @@ static void __init rtl931x_setup(void)
 void __init plat_mem_setup(void)
 {
 	void *dtb;
+	pr_info("plat_mem_setup\n");
 
 	set_io_port_base(KSEG1);
 	_machine_restart = rtl838x_restart;

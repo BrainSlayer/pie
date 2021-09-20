@@ -2,14 +2,11 @@
 
 #include <linux/of_mdio.h>
 #include <linux/of_platform.h>
-<<<<<<< HEAD
-=======
 #include <net/arp.h>
 #include <net/nexthop.h>
 #include <net/neighbour.h>
 #include <net/netevent.h>
 #include <linux/inetdevice.h>
->>>>>>> c21f1f8bf7 (5.10 port)
 
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
 #include "rtl83xx.h"
@@ -186,44 +183,27 @@ u64 rtl838x_get_port_reg(int reg)
 /* Port register accessor functions for the RTL839x and RTL931X SoCs */
 void rtl839x_mask_port_reg_be(u64 clear, u64 set, int reg)
 {
-<<<<<<< HEAD
-	sw_w32_mask((u32)(clear >> 32), (u32)(set >> 32), reg);
-	sw_w32_mask((u32)(clear & 0xffffffff), (u32)(set & 0xffffffff), reg + 4);
-=======
 	u32 *setmask = (u32*)&set;
 	u32 *clearmask = (u32*)&clear;
 	
 	sw_w32_mask(clearmask[0], setmask[0], reg);
 	sw_w32_mask(clearmask[1], setmask[1], reg + 4);
->>>>>>> c21f1f8bf7 (5.10 port)
 }
 
 u64 rtl839x_get_port_reg_be(int reg)
 {
-<<<<<<< HEAD
-	u64 v = sw_r32(reg);
-
-	v <<= 32;
-	v |= sw_r32(reg + 4);
-=======
 	u64 v;
 	u32 *get = (u32*)&v;
 	get[0]=sw_r32(reg);
 	get[1]=sw_r32(reg + 4);
->>>>>>> c21f1f8bf7 (5.10 port)
 	return v;
 }
 
 void rtl839x_set_port_reg_be(u64 set, int reg)
 {
-<<<<<<< HEAD
-	sw_w32(set >> 32, reg);
-	sw_w32(set & 0xffffffff, reg + 4);
-=======
 	u32 *setmask = (u32*)&set;
 	sw_w32(setmask[0], reg);
 	sw_w32(setmask[1], reg + 4);
->>>>>>> c21f1f8bf7 (5.10 port)
 }
 
 void rtl839x_mask_port_reg_le(u64 clear, u64 set, int reg)
@@ -406,13 +386,6 @@ static int __init rtl83xx_get_l2aging(struct rtl838x_switch_priv *priv)
 }
 
 /* Caller must hold priv->reg_mutex */
-<<<<<<< HEAD
-int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port)
-{
-	struct rtl838x_switch_priv *priv = ds->priv;
-	int i;
-
-=======
 int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port,struct netdev_lag_upper_info *info)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
@@ -422,7 +395,6 @@ int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port,struct netdev_lag
 	if (info->tx_type != NETDEV_LAG_TX_TYPE_HASH) {
 		return -EINVAL;
 	}
->>>>>>> c21f1f8bf7 (5.10 port)
 	pr_info("%s: Adding port %d to LA-group %d\n", __func__, port, group);
 	if (group >= priv->n_lags) {
 		pr_err("Link Agrregation group too large.\n");
@@ -435,24 +407,13 @@ int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port,struct netdev_lag
 	}
 
 	for (i = 0; i < priv->n_lags; i++) {
-<<<<<<< HEAD
-		if (priv->lags_port_members[i] & BIT_ULL(i))
-=======
 		if (priv->lags_port_members[i] & BIT_ULL(port))
->>>>>>> c21f1f8bf7 (5.10 port)
 			break;
 	}
 	if (i != priv->n_lags) {
 		pr_err("%s: Port already member of LAG: %d\n", __func__, i);
 		return -ENOSPC;
 	}
-<<<<<<< HEAD
-
-	priv->r->mask_port_reg_be(0, BIT_ULL(port), priv->r->trk_mbr_ctr(group));
-	priv->lags_port_members[group] |= BIT_ULL(port);
-
-	pr_info("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
-=======
 	switch(info->hash_type) {
 	case NETDEV_LAG_HASH_L2:
 		algomsk |= TRUNK_DISTRIBUTION_ALGO_DMAC_BIT; //DMAC
@@ -480,7 +441,6 @@ int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port,struct netdev_lag
 	priv->lags_port_members[group] |= BIT_ULL(port);
 
 	pr_debug("lags_port_members %d now %016llx\n", group, priv->lags_port_members[group]);
->>>>>>> c21f1f8bf7 (5.10 port)
 	return 0;
 }
 
@@ -490,11 +450,7 @@ int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port)
 	struct rtl838x_switch_priv *priv = ds->priv;
 
 	pr_info("%s: Removing port %d from LA-group %d\n", __func__, port, group);
-<<<<<<< HEAD
-
-=======
 	
->>>>>>> c21f1f8bf7 (5.10 port)
 	if (group >= priv->n_lags) {
 		pr_err("Link Agrregation group too large.\n");
 		return -EINVAL;
@@ -507,18 +463,10 @@ int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port)
 
 
 	if (!(priv->lags_port_members[group] & BIT_ULL(port))) {
-<<<<<<< HEAD
-		pr_err("%s: Port not member of LAG: %d\n", __func__, group
-		);
-		return -ENOSPC;
-	}
-
-=======
 		pr_err("%s: Port not member of LAG: %d\n", __func__, group);
 		return -ENOSPC;
 	}
 	// 0x7f algo mask all
->>>>>>> c21f1f8bf7 (5.10 port)
 	priv->r->mask_port_reg_be(BIT_ULL(port), 0, priv->r->trk_mbr_ctr(group));
 	priv->lags_port_members[group] &= ~BIT_ULL(port);
 
@@ -526,8 +474,6 @@ int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port)
 	return 0;
 }
 
-<<<<<<< HEAD
-=======
 /*
  * Allocate a 64 bit octet counter located in the LOG HW table
  */
@@ -685,7 +631,6 @@ int rtl83xx_l2_nexthop_rm(struct rtl838x_switch_priv *priv, struct rtl83xx_nexth
 	return 0;
 }
 #if 0
->>>>>>> c21f1f8bf7 (5.10 port)
 static int rtl83xx_handle_changeupper(struct rtl838x_switch_priv *priv,
 				      struct net_device *ndev,
 				      struct netdev_notifier_changeupper_info *info)
@@ -735,10 +680,7 @@ out:
 	mutex_unlock(&priv->reg_mutex);
 	return 0;
 }
-<<<<<<< HEAD
-=======
 #endif
->>>>>>> c21f1f8bf7 (5.10 port)
 
 static int rtl83xx_netdevice_event(struct notifier_block *this,
 				   unsigned long event, void *ptr)
@@ -755,11 +697,7 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	priv = container_of(this, struct rtl838x_switch_priv, nb);
 	switch (event) {
 	case NETDEV_CHANGEUPPER:
-<<<<<<< HEAD
-		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
-=======
 //		err = rtl83xx_handle_changeupper(priv, ndev, ptr);
->>>>>>> c21f1f8bf7 (5.10 port)
 		break;
 	}
 
@@ -769,8 +707,6 @@ static int rtl83xx_netdevice_event(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
-<<<<<<< HEAD
-=======
 const static struct rhashtable_params route_ht_params = {
 	.key_len     = sizeof(u32),
 	.key_offset  = offsetof(struct rtl83xx_route, gw_ip),
@@ -1473,7 +1409,6 @@ static int rtl83xx_fib_event(struct notifier_block *this, unsigned long event, v
 	return NOTIFY_DONE;
 }
 
->>>>>>> c21f1f8bf7 (5.10 port)
 static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 {
 	int err = 0, i;
@@ -1495,27 +1430,15 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	priv->ds = devm_kzalloc(dev, sizeof(*priv->ds), GFP_KERNEL);
-<<<<<<< HEAD
-
-	if (!priv->ds)
-		return -ENOMEM;
-=======
 	if (!priv->ds)
 		return -ENOMEM;
 
 	priv->ds->num_ports = DSA_MAX_PORTS;
->>>>>>> c21f1f8bf7 (5.10 port)
 	priv->ds->dev = dev;
 	priv->ds->priv = priv;
 	priv->ds->ops = &rtl83xx_switch_ops;
 	priv->dev = dev;
 
-<<<<<<< HEAD
-	priv->family_id = soc_info.family;
-	priv->id = soc_info.id;
-	switch(soc_info.family) {
-	case RTL8380_FAMILY_ID:
-=======
 	mutex_init(&priv->reg_mutex);
 
 	priv->family_id = soc_info.family;
@@ -1524,7 +1447,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	switch(soc_info.family) {
 	case RTL8380_FAMILY_ID:
 		rtl8380_get_version(priv);  // TODO: Make this a function pointer call
->>>>>>> c21f1f8bf7 (5.10 port)
 		priv->ds->ops = &rtl83xx_switch_ops;
 		priv->cpu_port = RTL838X_CPU_PORT;
 		priv->port_mask = 0x1f;
@@ -1533,13 +1455,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->r = &rtl838x_reg;
 		priv->ds->num_ports = 29;
 		priv->fib_entries = 8192;
-<<<<<<< HEAD
-		rtl8380_get_version(priv);
-		priv->n_lags = 8;
-		priv->l2_bucket_size = 4;
-		break;
-	case RTL8390_FAMILY_ID:
-=======
 		priv->n_lags = 8;
 		priv->l2_bucket_size = 4;
 		priv->n_pie_blocks = 12;
@@ -1548,7 +1463,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		break;
 	case RTL8390_FAMILY_ID:
 		rtl8390_get_version(priv);
->>>>>>> c21f1f8bf7 (5.10 port)
 		priv->ds->ops = &rtl83xx_switch_ops;
 		priv->cpu_port = RTL839X_CPU_PORT;
 		priv->port_mask = 0x3f;
@@ -1557,13 +1471,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->r = &rtl839x_reg;
 		priv->ds->num_ports = 53;
 		priv->fib_entries = 16384;
-<<<<<<< HEAD
-		rtl8390_get_version(priv);
-		priv->n_lags = 16;
-		priv->l2_bucket_size = 4;
-		break;
-	case RTL9300_FAMILY_ID:
-=======
 		priv->n_lags = 16;
 		priv->l2_bucket_size = 4;
 		priv->n_pie_blocks = 18;
@@ -1572,7 +1479,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		break;
 	case RTL9300_FAMILY_ID:
 		priv->version = RTL8390_VERSION_A; // TODO: Understand RTL9300 versions
->>>>>>> c21f1f8bf7 (5.10 port)
 		priv->ds->ops = &rtl930x_switch_ops;
 		priv->cpu_port = RTL930X_CPU_PORT;
 		priv->port_mask = 0x1f;
@@ -1581,14 +1487,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->r = &rtl930x_reg;
 		priv->ds->num_ports = 29;
 		priv->fib_entries = 16384;
-<<<<<<< HEAD
-		priv->version = RTL8390_VERSION_A;
-		priv->n_lags = 16;
-		sw_w32(1, RTL930X_ST_CTRL);
-		priv->l2_bucket_size = 8;
-		break;
-	case RTL9310_FAMILY_ID:
-=======
 		priv->n_lags = 16;
 		sw_w32(1, RTL930X_ST_CTRL);
 		priv->l2_bucket_size = 8;
@@ -1598,7 +1496,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		break;
 	case RTL9310_FAMILY_ID:
 		priv->version = RTL8390_VERSION_A; // TODO: Fix me
->>>>>>> c21f1f8bf7 (5.10 port)
 		priv->ds->ops = &rtl930x_switch_ops;
 		priv->cpu_port = RTL931X_CPU_PORT;
 		priv->port_mask = 0x3f;
@@ -1607,13 +1504,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->r = &rtl931x_reg;
 		priv->ds->num_ports = 57;
 		priv->fib_entries = 16384;
-<<<<<<< HEAD
-		priv->version = RTL8390_VERSION_A;
-		priv->n_lags = 16;
-		priv->l2_bucket_size = 8;
-		break;
-	}
-=======
 		priv->n_lags = 16;
 		priv->l2_bucket_size = 8;
 		priv->n_pie_blocks = 32;
@@ -1627,17 +1517,12 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 
 	priv->ds->num_lag_ids = priv->n_lags;
 
->>>>>>> c21f1f8bf7 (5.10 port)
 	pr_debug("Chip version %c\n", priv->version);
 
 	err = rtl83xx_mdio_probe(priv);
 	if (err) {
 		/* Probing fails the 1st time because of missing ethernet driver
-<<<<<<< HEAD
-		 * initialization. Use this to disable traffic in case the bootloader left if on
-=======
 		 * initialization. Use this to disable traffic in case the bootloader left it on
->>>>>>> c21f1f8bf7 (5.10 port)
 		 */
 		return err;
 	}
@@ -1647,14 +1532,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		return err;
 	}
 
-<<<<<<< HEAD
-	/*
-	 * dsa_to_port returns dsa_port from the port list in
-	 * dsa_switch_tree, the tree is built when the switch
-	 * is registered by dsa_register_switch
-	 */
-=======
->>>>>>> c21f1f8bf7 (5.10 port)
 	for (i = 0; i <= priv->cpu_port; i++)
 		priv->ports[i].dp = dsa_to_port(priv->ds, i);
 
@@ -1696,28 +1573,13 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	rtl83xx_get_l2aging(priv);
 
 	rtl83xx_setup_qos(priv);
-<<<<<<< HEAD
-
-<<<<<<< HEAD
-=======
-=======
 	
->>>>>>> 14116ac1b5 (rtl9313 support)
 	priv->r->l3_setup(priv);
 
->>>>>>> c21f1f8bf7 (5.10 port)
 	/* Clear all destination ports for mirror groups */
 	for (i = 0; i < 4; i++)
 		priv->mirror_group_ports[i] = -1;
 
-<<<<<<< HEAD
-	priv->nb.notifier_call = rtl83xx_netdevice_event;
-		if (register_netdevice_notifier(&priv->nb)) {
-			priv->nb.notifier_call = NULL;
-			dev_err(dev, "Failed to register LAG netdev notifier\n");
-	}
-
-=======
 	/*
 	 * Register netdevice event callback to catch changes in link aggregation groups
 	 */
@@ -1756,7 +1618,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		goto err_register_fib_nb;
 
 	// TODO: put this into l2_setup()
->>>>>>> c21f1f8bf7 (5.10 port)
 	// Flood BPDUs to all ports including cpu-port
 	if (soc_info.family != RTL9300_FAMILY_ID) { // TODO: Port this functionality
 		bpdu_mask = soc_info.family == RTL8380_FAMILY_ID ? 0x1FFFFFFF : 0x1FFFFFFFFFFFFF;
@@ -1766,10 +1627,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		sw_w32(7, priv->r->spcl_trap_eapol_ctrl);
 
 		rtl838x_dbgfs_init(priv);
-<<<<<<< HEAD
-	}
-
-=======
 	} else {
 		rtl930x_dbgfs_init(priv);
 	}
@@ -1781,7 +1638,6 @@ err_register_fib_nb:
 err_register_ne_nb:
 	unregister_netdevice_notifier(&priv->nb);
 err_register_nb:
->>>>>>> c21f1f8bf7 (5.10 port)
 	return err;
 }
 

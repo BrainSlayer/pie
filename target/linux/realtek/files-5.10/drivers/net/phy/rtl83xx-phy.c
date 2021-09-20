@@ -307,9 +307,53 @@ int rtl930x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v)
 
 	sw_w32(v, RTL930X_SDS_INDACS_DATA);
 	cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 0x3;
+	sw_w32(cmd, RTL930X_SDS_INDACS_CMD);
 
 	for (i = 0; i < 100; i++) {
 		if (!(sw_r32(RTL930X_SDS_INDACS_CMD) & 0x1))
+			break;
+		mdelay(1);
+	}
+
+	if (i >= 100)
+		return -EIO;
+
+	return 0;
+}
+
+
+int rtl931x_read_sds_phy(int phy_addr, int page, int phy_reg)
+{
+	int i;
+	u32 cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 1;
+
+	pr_info("%s: phy_addr(SDS-ID) %d, phy_reg: %d\n", __func__, phy_addr, phy_reg);
+	sw_w32(cmd, RTL931X_SERDES_INDRT_ACCESS_CTRL);
+
+	for (i = 0; i < 100; i++) {
+		if (!(sw_r32(RTL931X_SERDES_INDRT_ACCESS_CTRL) & 0x1))
+			break;
+		mdelay(1);
+	}
+
+	if (i >= 100)
+		return -EIO;
+
+	pr_info("%s: returning %04x\n", __func__, sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL) & 0xffff);
+	return sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL) & 0xffff;
+}
+
+int rtl931x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v)
+{
+	int i;
+	u32 cmd;
+
+	sw_w32(v, RTL931X_SERDES_INDRT_DATA_CTRL);
+	cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 0x3;
+	sw_w32(cmd, RTL931X_SERDES_INDRT_ACCESS_CTRL);
+
+	for (i = 0; i < 100; i++) {
+		if (!(sw_r32(RTL931X_SERDES_INDRT_ACCESS_CTRL) & 0x1))
 			break;
 		mdelay(1);
 	}
@@ -2098,12 +2142,13 @@ int rtl9300_configure_serdes(struct phy_device *phydev)
 	pr_info("%s, RTL930X_MAC_FORCE_MODE_CTRL : %08x\n", __func__, v);
 	mode |= BIT(0);		// MAC enabled
 	mode &= ~(7 << 3);
-	mode |= 2 << 3;  	// Speed = 1G
+	mode |= 4 << 3;  	// Speed = 10G, 1G is 2
 	mode &= ~BIT(1);	// Link is down
 	sw_w32(mode, RTL930X_MAC_FORCE_MODE_CTRL + 4 * phy_addr);
 	mdelay(20);
 
-	rtl9300_sds_rst(sds_num, 0x04);
+	// Enable SerDes Mode 10GKR
+	rtl9300_sds_rst(sds_num, 0x1a);
 
 	// Enable 1GBit PHY
 	v = rtl930x_read_sds_phy(sds_num, PHY_PAGE_2, PHY_CTRL_REG);
@@ -2146,6 +2191,15 @@ int rtl9300_configure_serdes(struct phy_device *phydev)
 
 	// TODO: Apply patch set for fibre type
 
+	return 0;
+}
+
+int rtl9310_configure_serdes(struct phy_device *phydev)
+{
+	struct device *dev = &phydev->mdio.dev;
+	int phy_addr = phydev->mdio.addr;
+
+	pr_info("%s: PHY: %d\n", __func__, phy_addr);
 	return 0;
 }
 
@@ -2344,11 +2398,28 @@ static int rtl8390_serdes_probe(struct phy_device *phydev)
 	return rtl8390_configure_generic(phydev);
 }
 
+static int rtl9310_serdes_probe(struct phy_device *phydev)
+{
+	struct device *dev = &phydev->mdio.dev;
+	struct rtl838x_phy_priv *priv;
+	int addr = phydev->mdio.addr;
+
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->name = "RTL9310 Serdes";
+	return rtl9300_configure_serdes(phydev);
+}
+
 static int rtl9300_serdes_probe(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
 	struct rtl838x_phy_priv *priv;
 	int addr = phydev->mdio.addr;
+
+	if (soc_info.family == RTL9300_FAMILY_ID)
+		return rtl9310_serdes_probe(phydev);
 
 	if (soc_info.family != RTL9300_FAMILY_ID)
 		return -ENODEV;

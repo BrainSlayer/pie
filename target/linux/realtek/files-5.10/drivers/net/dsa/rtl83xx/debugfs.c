@@ -40,14 +40,10 @@
 #define RTL839X_MIR_RSPAN_TX_CTRL		(0x69b0)
 #define RTL839X_MIR_RSPAN_TX_TAG_RM_CTRL	(0x2550)
 #define RTL839X_MIR_RSPAN_TX_TAG_EN_CTRL	(0x2554)
-<<<<<<< HEAD
-#define RTL839X_MIR_SAMPLE_RATE_CTRL                (0x2558)
-=======
 
 #define RTL838X_STAT_PRVTE_DROP_COUNTERS	(0x6A00)
 #define RTL839X_STAT_PRVTE_DROP_COUNTERS	(0x3E00)
 #define RTL930X_STAT_PRVTE_DROP_COUNTERS	(0xB5B8)
->>>>>>> c21f1f8bf7 (5.10 port)
 
 int rtl83xx_port_get_stp_state(struct rtl838x_switch_priv *priv, int port);
 void rtl83xx_port_stp_state_set(struct dsa_switch *ds, int port, u8 state);
@@ -57,8 +53,6 @@ u32 rtl839x_get_egress_rate(struct rtl838x_switch_priv *priv, int port);
 int rtl838x_set_egress_rate(struct rtl838x_switch_priv *priv, int port, u32 rate);
 int rtl839x_set_egress_rate(struct rtl838x_switch_priv *priv, int port, u32 rate);
 
-<<<<<<< HEAD
-=======
 
 const char *rtl838x_drop_cntr[] = {
     "ALE_TX_GOOD_PKTS", "MAC_RX_DROP", "ACL_FWD_DROP", "HW_ATTACK_PREVENTION_DROP",
@@ -111,7 +105,6 @@ const char *rtl930x_drop_cntr[] = {
 	"STACK_NONUC_BLOCKING_PMSK", "STACK_PORT_NOT_FOUND", "ACL_LOOPBACK_DROP", "IP6_ROUTING_EXT_HEADER"
 };
 
->>>>>>> c21f1f8bf7 (5.10 port)
 static ssize_t rtl838x_common_read(char __user *buffer, size_t count,
 					loff_t *ppos, unsigned int value)
 {
@@ -196,8 +189,6 @@ static const struct file_operations stp_state_fops = {
 	.write = stp_state_write,
 };
 
-<<<<<<< HEAD
-=======
 static ssize_t drop_counter_read(struct file *filp, char __user *buffer, size_t count,
 			     loff_t *ppos)
 {
@@ -253,7 +244,6 @@ static const struct file_operations drop_counter_fops = {
 	.read = drop_counter_read,
 };
 
->>>>>>> c21f1f8bf7 (5.10 port)
 static ssize_t age_out_read(struct file *filp, char __user *buffer, size_t count,
 			     loff_t *ppos)
 {
@@ -333,8 +323,6 @@ static const struct file_operations port_egress_fops = {
 	.write = port_egress_rate_write,
 };
 
-<<<<<<< HEAD
-=======
 static ssize_t port_838x_bpdu_action_read(struct file *filp, char __user *buffer, size_t count,
 				loff_t *ppos)
 {
@@ -479,19 +467,15 @@ static const struct file_operations port_838x_action_eapol_fops = {
 
 
 
->>>>>>> c21f1f8bf7 (5.10 port)
 
 static const struct debugfs_reg32 port_ctrl_regs[] = {
 	{ .name = "port_isolation", .offset = RTL838X_PORT_ISO_CTRL(0), },
 	{ .name = "mac_force_mode", .offset = RTL838X_MAC_FORCE_MODE_CTRL, },
 };
-<<<<<<< HEAD
-=======
 static const struct debugfs_reg32 port_ctrl_regs_839x[] = {
 	{ .name = "port_isolation", .offset = RTL839X_PORT_ISO_CTRL(0), },
 	{ .name = "mac_force_mode", .offset = RTL839X_MAC_FORCE_MODE_CTRL, },
 };
->>>>>>> c21f1f8bf7 (5.10 port)
 
 void rtl838x_dbgfs_cleanup(struct rtl838x_switch_priv *priv)
 {
@@ -508,35 +492,6 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 
 	port_dir = debugfs_create_dir(priv->ports[port].dp->name, parent);
 
-<<<<<<< HEAD
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-		debugfs_create_x32("storm_rate_uc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_STORM_CTRL_PORT_UC(port)));
-
-		debugfs_create_x32("storm_rate_mc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_STORM_CTRL_PORT_MC(port)));
-
-		debugfs_create_x32("storm_rate_bc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_STORM_CTRL_PORT_BC(port)));
-
-		debugfs_create_x32("vlan_port_tag_sts_ctrl", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_VLAN_PORT_TAG_STS_CTRL 
-				+ (port << 2)));
-	} else {
-		debugfs_create_x32("storm_rate_uc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_STORM_CTRL_PORT_UC_0(port)));
-
-		debugfs_create_x32("storm_rate_mc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_STORM_CTRL_PORT_MC_0(port)));
-
-		debugfs_create_x32("storm_rate_bc", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_STORM_CTRL_PORT_BC_0(port)));
-
-		debugfs_create_x32("vlan_port_tag_sts_ctrl", 0644, port_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_VLAN_PORT_TAG_STS_CTRL
-				+ (port << 2)));
-	}
-=======
 	debugfs_create_x32("sflow_port_rate", 0644, port_dir,
 			(u32 *)(RTL838X_SW_BASE + priv->r->sflow_port_rate_ctrl + (port << 2)));
 	debugfs_create_x32("storm_rate_uc", 0644, port_dir,
@@ -557,7 +512,6 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 	debugfs_create_file("action_lltp", 0600, port_dir, &priv->ports[port],&port_838x_action_lltp_fops);
 	if (priv->r->rma_lltp_ctrl)
 		debugfs_create_file("action_eapol", 0600, port_dir, &priv->ports[port],&port_838x_action_eapol_fops);
->>>>>>> c21f1f8bf7 (5.10 port)
 
 	debugfs_create_u32("id", 0444, port_dir, (u32 *)&priv->ports[port].dp->index);
 
@@ -565,15 +519,11 @@ static int rtl838x_dbgfs_port_init(struct dentry *parent, struct rtl838x_switch_
 	if (!port_ctrl_regset)
 		return -ENOMEM;
 
-<<<<<<< HEAD
-	port_ctrl_regset->regs = port_ctrl_regs;
-=======
 	if (priv->family_id == RTL8380_FAMILY_ID)
 		port_ctrl_regset->regs = port_ctrl_regs;
 	else
 		port_ctrl_regset->regs = port_ctrl_regs_839x;
 
->>>>>>> c21f1f8bf7 (5.10 port)
 	port_ctrl_regset->nregs = ARRAY_SIZE(port_ctrl_regs);
 	port_ctrl_regset->base = (void *)(RTL838X_SW_BASE + (port << 2));
 	debugfs_create_regset32("port_ctrl", 0400, port_dir, port_ctrl_regset);
@@ -667,11 +617,7 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 	struct dentry *mirror_dir;
 	struct debugfs_regset32 *port_ctrl_regset;
 	int ret, i;
-<<<<<<< HEAD
-	char lag_name[10];
-=======
 	char lag_name[32];
->>>>>>> c21f1f8bf7 (5.10 port)
 	char mirror_name[10];
 
 	pr_info("%s called\n", __func__);
@@ -701,15 +647,11 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 		goto err;
 	}
 
-<<<<<<< HEAD
-	port_ctrl_regset->regs = port_ctrl_regs;
-=======
 	if (priv->family_id == RTL8380_FAMILY_ID)
 		port_ctrl_regset->regs = port_ctrl_regs;
 	else
 		port_ctrl_regset->regs = port_ctrl_regs_839x;
 
->>>>>>> c21f1f8bf7 (5.10 port)
 	port_ctrl_regset->nregs = ARRAY_SIZE(port_ctrl_regs);
 	port_ctrl_regset->base = (void *)(RTL838X_SW_BASE + (priv->cpu_port << 2));
 	debugfs_create_regset32("port_ctrl", 0400, port_dir, port_ctrl_regset);
@@ -718,16 +660,6 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 	/* Create entries for LAGs */
 	for (i = 0; i < priv->n_lags; i++) {
 		snprintf(lag_name, sizeof(lag_name), "lag.%02d", i);
-<<<<<<< HEAD
-		if (priv->family_id == RTL8380_FAMILY_ID)
-			debugfs_create_x32(lag_name, 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + priv->r->trk_mbr_ctr(i)));
-		else
-			debugfs_create_x64(lag_name, 0644, rtl838x_dir,
-				(u64 *)(RTL838X_SW_BASE + priv->r->trk_mbr_ctr(i)));
-	}
-
-=======
 		debugfs_create_x64(lag_name, 0644, rtl838x_dir, (u64 *)(RTL838X_SW_BASE + priv->r->trk_mbr_ctr(i)));
 	}
 	if (priv->r->trk_hash_ctrl) {
@@ -744,7 +676,6 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 		}
 	}
 	}
->>>>>>> c21f1f8bf7 (5.10 port)
 	/* Create directories for mirror groups */
 	for (i = 0; i < 4; i++) {
 		snprintf(mirror_name, sizeof(mirror_name), "mirror.%1d", i);
@@ -788,21 +719,6 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 		}
 	}
 
-<<<<<<< HEAD
-	if (priv->family_id == RTL8380_FAMILY_ID)
-		debugfs_create_x32("bpdu_flood_mask", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + priv->r->rma_bpdu_fld_pmask));
-	else
-		debugfs_create_x64("bpdu_flood_mask", 0644, rtl838x_dir,
-				(u64 *)(RTL838X_SW_BASE + priv->r->rma_bpdu_fld_pmask));
-
-	if (priv->family_id == RTL8380_FAMILY_ID)
-		debugfs_create_x32("vlan_ctrl", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL838X_VLAN_CTRL));
-	else
-		debugfs_create_x32("vlan_ctrl", 0644, rtl838x_dir,
-				(u32 *)(RTL838X_SW_BASE + RTL839X_VLAN_CTRL));
-=======
 	debugfs_create_x32("bpdu_flood_mask", 0644, rtl838x_dir,
 			(u32 *)(RTL838X_SW_BASE + priv->r->rma_bpdu_fld_pmask));
 	debugfs_create_x32("vlan_ctrl", 0644, rtl838x_dir,
@@ -833,23 +749,17 @@ void rtl838x_dbgfs_init(struct rtl838x_switch_priv *priv)
 	if (priv->r->spcl_trap_ctrl)
 		debugfs_create_x32("trap", 0644, rtl838x_dir,
 				(u32 *)(RTL838X_SW_BASE + priv->r->spcl_trap_ctrl));
->>>>>>> c21f1f8bf7 (5.10 port)
 
 	ret = rtl838x_dbgfs_leds(rtl838x_dir, priv);
 	if (ret)
 		goto err;
 
-<<<<<<< HEAD
-=======
 	debugfs_create_file("drop_counters", 0400, rtl838x_dir, priv, &drop_counter_fops);
 
->>>>>>> c21f1f8bf7 (5.10 port)
 	return;
 err:
 	rtl838x_dbgfs_cleanup(priv);
 }
-<<<<<<< HEAD
-=======
 
 void rtl930x_dbgfs_init(struct rtl838x_switch_priv *priv)
 {
@@ -864,4 +774,3 @@ void rtl930x_dbgfs_init(struct rtl838x_switch_priv *priv)
 
 	debugfs_create_file("drop_counters", 0400, dbg_dir, priv, &drop_counter_fops);
 }
->>>>>>> c21f1f8bf7 (5.10 port)

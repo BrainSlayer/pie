@@ -34,19 +34,11 @@ extern struct rtl83xx_soc_info soc_info;
  * the memory used for the ring buffer.
  */
 #define MAX_RXRINGS	32
-<<<<<<< HEAD
-#define MAX_RXLEN	100
-#define MAX_ENTRIES	(200 * 8)
-#define TXRINGS		2
-// BUG: TXRINGLEN can be 160
-#define TXRINGLEN	16
-=======
 #define MAX_RXLEN	300
 #define MAX_ENTRIES	(300 * 8)
 #define TXRINGS		2
 // BUG: TXRINGLEN can be 160
 #define TXRINGLEN	160
->>>>>>> c21f1f8bf7 (5.10 port)
 #define NOTIFY_EVENTS	10
 #define NOTIFY_BLOCKS	10
 #define TX_EN		0x8
@@ -63,13 +55,10 @@ extern struct rtl83xx_soc_info soc_info;
 #define RTL838X_STORM_CTRL_PORT_BC_EXCEED	(0x470C)
 #define RTL838X_STORM_CTRL_PORT_MC_EXCEED	(0x4710)
 #define RTL838X_STORM_CTRL_PORT_UC_EXCEED	(0x4714)
-<<<<<<< HEAD
-=======
 
 #define RTL839X_STORM_CTRL_PORT_BC_EXCEED	(0x180C)
 #define RTL839X_STORM_CTRL_PORT_MC_EXCEED	(0x1814)
 #define RTL839X_STORM_CTRL_PORT_UC_EXCEED	(0x181C)
->>>>>>> c21f1f8bf7 (5.10 port)
 #define RTL838X_ATK_PRVNT_STS			(0x5B1C)
 
 struct p_hdr {
@@ -447,23 +436,6 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 	bool triggered = false;
 	u32 atk = sw_r32(RTL838X_ATK_PRVNT_STS);
 	int i;
-<<<<<<< HEAD
-	u32 storm_uc = sw_r32(RTL838X_STORM_CTRL_PORT_UC_EXCEED);
-	u32 storm_mc = sw_r32(RTL838X_STORM_CTRL_PORT_MC_EXCEED);
-	u32 storm_bc = sw_r32(RTL838X_STORM_CTRL_PORT_BC_EXCEED);
-
-	pr_debug("IRQ: %08x\n", status);
-	if (storm_uc || storm_mc || storm_bc) {
-		pr_warn("Storm control UC: %08x, MC: %08x, BC: %08x\n",
-			storm_uc, storm_mc, storm_bc);
-
-		sw_w32(storm_uc, RTL838X_STORM_CTRL_PORT_UC_EXCEED);
-		sw_w32(storm_mc, RTL838X_STORM_CTRL_PORT_MC_EXCEED);
-		sw_w32(storm_bc, RTL838X_STORM_CTRL_PORT_BC_EXCEED);
-
-		triggered = true;
-	}
-=======
 #if 0
 	/*
 	 * this code is wrong in many points. first. the register has a per port offset. so this code here checks only the content of port 0
@@ -506,7 +478,6 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 	}
 #endif
 
->>>>>>> c21f1f8bf7 (5.10 port)
 
 	if (atk) {
 		pr_debug("Attack prevention triggered: %08x\n", atk);
@@ -535,11 +506,7 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 
 	/* RX buffer overrun */
 	if (status & 0x000ff) {
-<<<<<<< HEAD
-		pr_info("RX buffer overrun: status %x, mask: %x\n",
-=======
 		pr_debug("RX buffer overrun: status %x, mask: %x\n",
->>>>>>> c21f1f8bf7 (5.10 port)
 			 status, sw_r32(priv->r->dma_if_intr_msk));
 		sw_w32(status, priv->r->dma_if_intr_sts);
 		rtl838x_rb_cleanup(priv, status & 0xff);
@@ -1829,15 +1796,6 @@ static int rtl839x_mdio_reset(struct mii_bus *bus)
 	return 0;
 }
 
-static int rtl931x_mdio_reset(struct mii_bus *bus)
-{
-	sw_w32(0x00000000, RTL931X_SMI_PORT_POLLING_CTRL);
-	sw_w32(0x00000000, RTL931X_SMI_PORT_POLLING_CTRL + 4);
-
-	pr_debug("%s called\n", __func__);
-
-	return 0;
-}
 
 static int rtl930x_mdio_reset(struct mii_bus *bus)
 {
@@ -1885,6 +1843,52 @@ static int rtl930x_mdio_reset(struct mii_bus *bus)
 	// TODO: Set up RTL9300_SMI_10GPHY_POLLING_SEL_0_ADDR for Aquantia PHYs on 1250
 
 	return 0;
+}
+
+static int rtl931x_mdio_reset(struct mii_bus *bus)
+{
+       int i;
+       int pos;
+       struct rtl838x_eth_priv *priv = bus->priv;
+       u32 c45_mask = 0;
+       u32 poll_sel[4];
+       u32 poll_ctrl = 0;
+
+       pr_info("%s called\n", __func__);
+       // Mapping of port to phy-addresses on an SMI bus
+       poll_sel[0] = poll_sel[1] = 0;
+       for (i = 0; i < 56; i++) {
+               pos = (i % 6) * 5;
+               sw_w32_mask(0x1f << pos, priv->smi_addr[i] << pos,
+                           RTL931X_SMI_PORT_ADDR + (i / 6) * 4);
+
+               pr_info("%d pos %d, bus %d, phy-id %d\n", i, pos, priv->smi_bus[i], priv->smi_addr[i]);
+               pos = (i * 2) % 32;
+               poll_sel[i / 16] |= priv->smi_bus[i] << pos;
+               poll_ctrl |= BIT(20 + priv->smi_bus[i]);
+       }
+
+       // Configure which SMI bus is behind which port number
+       for (i = 0; i < 4; i++) {
+               pr_info("poll sel %d, %08x\n", i, poll_sel[i]);
+               sw_w32(poll_sel[i], RTL931X_SMI_PORT_POLLING_SEL + (i * 4));
+       }
+
+       // Enable polling on the respective SMI busses
+       //sw_w32_mask(0, poll_ctrl, RTL930X_SMI_GLB_CTRL);
+
+       // Poll the respective port:
+       // Set bit p of RTL9310_SMI_PORT_POLLING_CTRL
+
+       // Configure which SMI busses are polled in c45 based on a c45 PHY being on that bus
+       for (i = 0; i < 4; i++)
+               if (priv->smi_bus_isc45[i])
+                       c45_mask |= 0x2 << (i * 2);  // Std. C45, non-standard is 0x3
+
+       pr_info("c45_mask: %08x\n", c45_mask);
+       sw_w32_mask(0, c45_mask, RTL931X_SMI_GLB_CTRL1);
+
+       return 0;
 }
 
 static int rtl838x_mdio_init(struct rtl838x_eth_priv *priv)
@@ -2139,11 +2143,7 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 		err = -ENXIO;
 		goto err_free;
 	}
-<<<<<<< HEAD
-
-=======
 	pr_info("Allocate %ld bytes for DMA\n", rxrings * rxringlen * RING_BUFFER + sizeof(struct ring_b) + sizeof(struct notify_b));
->>>>>>> c21f1f8bf7 (5.10 port)
 	/* Allocate buffer memory */
 	priv->membase = dmam_alloc_coherent(&pdev->dev, rxrings * rxringlen * RING_BUFFER
 				+ sizeof(struct ring_b) + sizeof(struct notify_b),
