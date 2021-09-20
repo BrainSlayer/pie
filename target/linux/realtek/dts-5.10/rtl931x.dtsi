@@ -46,7 +46,7 @@
 	osc: oscillator {
 		compatible = "fixed-clock";
 		#clock-cells = <1>;
-		clock-frequency  = <200000000>;
+		clock-frequency  = <2000000000>;
 		clock-output-names = "osc";
 	};
 
