@@ -39,7 +39,7 @@ diff -urpN linux-5.10.64.old/arch/mips/Kconfig linux-5.10.64/arch/mips/Kconfig
  config SGI_IP22
  	bool "SGI IP22 (Indy/Indigo2)"
  	select ARC_MEMORY
-@@ -1034,6 +1053,26 @@ config NLM_XLP_BOARD
+@@ -1034,6 +1053,24 @@ config NLM_XLP_BOARD
  
  endchoice
  
@@ -59,8 +59,6 @@ diff -urpN linux-5.10.64.old/arch/mips/Kconfig linux-5.10.64/arch/mips/Kconfig
 +	depends on RTL930X
 +	select MIPS_GIC
 +	select SYS_SUPPORTS_VPE_LOADER
-+	select SYS_SUPPORTS_MIPS_CPS
-+	select SYS_SUPPORTS_SMP
 +
 +
  source "arch/mips/alchemy/Kconfig"
