@@ -232,19 +232,16 @@ void __init prom_init(void)
 
 #ifdef  CONFIG_MIPS_CPS
 	if (!register_cps_smp_ops()) {
-		printk(KERN_INFO "cps success\n");
 		return;
 	}
 #endif
 #ifdef  CONFIG_MIPS_CMP
 	if (!register_cmp_smp_ops()) {
-		printk(KERN_INFO "cmp success\n");
 		return;
 	}
 #endif
 #ifdef CONFIG_MIPS_MT_SMP
 	if (!register_vsmp_smp_ops()) {
-		printk(KERN_INFO "vcmp success\n");
 		return;
 	}
 #endif
