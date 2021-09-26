@@ -1796,15 +1796,6 @@ static int rtl839x_mdio_reset(struct mii_bus *bus)
 	return 0;
 }
 
-static int rtl931x_mdio_reset(struct mii_bus *bus)
-{
-	sw_w32(0x00000000, RTL931X_SMI_PORT_POLLING_CTRL);
-	sw_w32(0x00000000, RTL931X_SMI_PORT_POLLING_CTRL + 4);
-
-	pr_debug("%s called\n", __func__);
-
-	return 0;
-}
 
 static int rtl930x_mdio_reset(struct mii_bus *bus)
 {
@@ -1852,6 +1843,52 @@ static int rtl930x_mdio_reset(struct mii_bus *bus)
 	// TODO: Set up RTL9300_SMI_10GPHY_POLLING_SEL_0_ADDR for Aquantia PHYs on 1250
 
 	return 0;
+}
+
+static int rtl931x_mdio_reset(struct mii_bus *bus)
+{
+       int i;
+       int pos;
+       struct rtl838x_eth_priv *priv = bus->priv;
+       u32 c45_mask = 0;
+       u32 poll_sel[4];
+       u32 poll_ctrl = 0;
+
+       pr_info("%s called\n", __func__);
+       // Mapping of port to phy-addresses on an SMI bus
+       poll_sel[0] = poll_sel[1] = 0;
+       for (i = 0; i < 56; i++) {
+               pos = (i % 6) * 5;
+               sw_w32_mask(0x1f << pos, priv->smi_addr[i] << pos,
+                           RTL931X_SMI_PORT_ADDR + (i / 6) * 4);
+
+               pr_info("%d pos %d, bus %d, phy-id %d\n", i, pos, priv->smi_bus[i], priv->smi_addr[i]);
+               pos = (i * 2) % 32;
+               poll_sel[i / 16] |= priv->smi_bus[i] << pos;
+               poll_ctrl |= BIT(20 + priv->smi_bus[i]);
+       }
+
+       // Configure which SMI bus is behind which port number
+       for (i = 0; i < 4; i++) {
+               pr_info("poll sel %d, %08x\n", i, poll_sel[i]);
+               sw_w32(poll_sel[i], RTL931X_SMI_PORT_POLLING_SEL + (i * 4));
+       }
+
+       // Enable polling on the respective SMI busses
+       //sw_w32_mask(0, poll_ctrl, RTL930X_SMI_GLB_CTRL);
+
+       // Poll the respective port:
+       // Set bit p of RTL9310_SMI_PORT_POLLING_CTRL
+
+       // Configure which SMI busses are polled in c45 based on a c45 PHY being on that bus
+       for (i = 0; i < 4; i++)
+               if (priv->smi_bus_isc45[i])
+                       c45_mask |= 0x2 << (i * 2);  // Std. C45, non-standard is 0x3
+
+       pr_info("c45_mask: %08x\n", c45_mask);
+       sw_w32_mask(0, c45_mask, RTL931X_SMI_GLB_CTRL1);
+
+       return 0;
 }
 
 static int rtl838x_mdio_init(struct rtl838x_eth_priv *priv)

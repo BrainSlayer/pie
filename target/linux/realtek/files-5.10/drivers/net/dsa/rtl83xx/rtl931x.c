@@ -675,9 +675,9 @@ int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)
 
 void rtl931x_vlan_port_pvidmode_set(int port, enum pbvlan_type type, enum pbvlan_mode mode) {
 	if (type == PBVLAN_TYPE_INNER)
-		sw_w32_mask(0x3 << 12, mode << 12 ,RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
+		sw_w32_mask(0x3 << 12, mode << 12, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
 	else
-		sw_w32_mask(0x3 << 26, mode << 26 ,RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
+		sw_w32_mask(0x3 << 26, mode << 26, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
 
 }
 
