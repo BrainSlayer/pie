@@ -197,16 +197,16 @@ int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 	/* Clear both port registers */
 	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2);
 	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2 + 4);
-	sw_w32_mask(0, BIT(port), RTL931X_SMI_INDRT_ACCESS_CTRL_2+ (port % 32) * 4);
+	sw_w32_mask(0, BIT(port % 32), RTL931X_SMI_INDRT_ACCESS_CTRL_2 + (port / 32) * 4);
 
-	sw_w32_mask(0xffff0000, val << 16, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+	sw_w32_mask(0xffff, val, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
 
 	v = reg << 6 | page << 11 ;
 	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 
 	sw_w32(0x1ff, RTL931X_SMI_INDRT_ACCESS_CTRL_1);
 
-	v |= 1 << 3 | 1; /* Write operation and execute */
+	v |= BIT(4) | 1; /* Write operation and execute */
 	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 
 	do {
@@ -228,21 +228,20 @@ int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 
 	mutex_lock(&smi_lock);
 
-	sw_w32_mask(0xffff, port, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
-	v = reg << 6 | page << 11; // TODO: ACCESS Offset? Park page
-	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+	sw_w32(port << 5, RTL931X_SMI_INDRT_ACCESS_BC_PHYID_CTRL);
 
-	sw_w32(0x1ff, RTL931X_SMI_INDRT_ACCESS_CTRL_1);
-
-	v |= 1;
+	v = reg << 6 | page << 11 | 1;
 	sw_w32(v, RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 
 	do {
 	} while (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0) & 0x1);
 
-	*val = (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) & 0xffff0000) >> 16;
+	v = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0);
+	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+	*val = (*val & 0xffff0000) >> 16;
 
-	pr_info("%s: port %d, page: %d, reg: %x, val: %x\n", __func__, port, page, reg, *val);
+	pr_debug("%s: port %d, page: %d, reg: %x, val: %x, v: %08x\n",
+		__func__, port, page, reg, *val, v);
 
 	mutex_unlock(&smi_lock);
 	return 0;
@@ -255,7 +254,7 @@ int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 {
 	int err = 0;
 	u32 v;
-	int type = 1; // TODO: For C45 PHYs need to set to 2
+	int type = 2; // TODO:2, for C45 PHYs need to set to 1 sometimes
 
 	mutex_lock(&smi_lock);
 
@@ -272,9 +271,11 @@ int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 		v = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 	} while (v & BIT(0));
 
-	// There is no error-checking via BIT 1 of v, as it does not seem to be set correctly
+	// Check for error condition
+	if (v & BIT(1))
+		err = -EIO;
 
-	*val = (sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) & 0xffff);
+	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) >> 16;
 
 	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
 
@@ -298,7 +299,7 @@ int rtl931x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
 	sw_w32(port << 5, RTL931X_SMI_INDRT_ACCESS_BC_PHYID_CTRL);
 
 	// Set data to write
-	sw_w32_mask(0xffff << 16, val << 16, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
+	sw_w32_mask(0xffff, val, RTL931X_SMI_INDRT_ACCESS_CTRL_3);
 
 	// Set MMD device number and register to write to
 	sw_w32(devnum << 16 | (regnum & 0xffff), RTL931X_SMI_INDRT_ACCESS_MMD_CTRL);
@@ -672,23 +673,6 @@ int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)
 {
 	return 0;
 }
-
-void rtl931x_vlan_port_pvidmode_set(int port, enum pbvlan_type type, enum pbvlan_mode mode) {
-	if (type == PBVLAN_TYPE_INNER)
-		sw_w32_mask(0x3 << 12, mode << 12, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
-	else
-		sw_w32_mask(0x3 << 26, mode << 26, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
-
-}
-
-void rtl931x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
-	if (type == PBVLAN_TYPE_INNER)
-		sw_w32_mask(0xfff, pvid, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
-	else
-		sw_w32_mask(0xfff << 14, pvid << 14, RTL931X_VLAN_PORT_IGR_CTRL + (port << 2));
-
-}
-
 const struct rtl838x_reg rtl931x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -745,8 +729,7 @@ const struct rtl838x_reg rtl931x_reg = {
 	.write_mcast_pmask = rtl931x_write_mcast_pmask,
 	.vlan_port_egr_filter = RTL931X_VLAN_PORT_EGR_FLTR,
 	.vlan_port_igr_filter = RTL931X_VLAN_PORT_IGR_FLTR,
-	.vlan_port_pvidmode_set = rtl931x_vlan_port_pvidmode_set,
-	.vlan_port_pvid_set = rtl931x_vlan_port_pvid_set,
+//	.vlan_port_pb = does not exist
 	.vlan_port_tag_sts_ctrl = RTL931X_VLAN_PORT_TAG_CTRL,
 	.trk_mbr_ctr = rtl931x_trk_mbr_ctr,
 	.rma_bpdu_ctrl = RTL931X_RMA_BPDU_CTRL,
