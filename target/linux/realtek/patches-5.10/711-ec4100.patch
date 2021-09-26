@@ -41,47 +41,6 @@ Index: linux-5.4.111/drivers/net/phy/rtl83xx-phy.c
  
 Index: linux-5.4.111/arch/mips/rtl838x/setup.c
 ===================================================================
---- linux-5.4.111.orig/arch/mips/rtl838x/setup.c
-+++ linux-5.4.111/arch/mips/rtl838x/setup.c
-@@ -46,21 +46,6 @@ static void rtl838x_restart(char *comman
- 	sw_w32(1, RTL838X_RST_GLB_CTRL_1);
- }
- 
--static void rtl839x_restart(char *command)
--{
--	/* SoC reset vector (in flash memory): on RTL839x platform preferred way to reset */
--	void (*f)(void) = (void *) 0xbfc00000;
--
--	pr_info("System restart.\n");
--	/* Reset SoC */
--	sw_w32(0xFFFFFFFF, RTL839X_RST_GLB_CTRL);
--	/* and call reset vector */
--	f();
--	/* If this fails, halt the CPU */
--	while
--		(1);
--}
--
- static void rtl930x_restart(char *command)
- {
- 	pr_info("System restart.\n");
-@@ -109,8 +94,6 @@ static void __init rtl838x_setup(void)
- static void __init rtl839x_setup(void)
- {
- 	pr_info("Registering _machine_restart\n");
--	_machine_restart = rtl839x_restart;
--	_machine_halt = rtl838x_halt;
- 
- 	/* Setup System LED. Bit 14 of RTL839X_LED_GLB_CTRL then allows to toggle it */
- 	sw_w32_mask(0, 3 << 15, RTL839X_LED_GLB_CTRL);
-@@ -141,7 +124,6 @@ void __init plat_mem_setup(void)
- 	void *dtb;
- 
- 	set_io_port_base(KSEG1);
--	_machine_restart = rtl838x_restart;
- 
- 	if (fw_passed_dtb) /* UHI interface */
- 		dtb = (void *)fw_passed_dtb;
 Index: linux-5.4.111/drivers/gpio/edgecore_reboot.c
 ===================================================================
 --- /dev/null
