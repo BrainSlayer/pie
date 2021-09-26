@@ -322,6 +322,7 @@ static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
 				     unsigned long *supported,
 				     struct phylink_link_state *state)
 {
+	struct rtl838x_switch_priv *priv = ds->priv;
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
 	pr_info("In %s port %d, state is %d (%s)", __func__, port, state->interface,
@@ -337,6 +338,7 @@ static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
 	    state->interface != PHY_INTERFACE_MODE_XGMII &&
 	    state->interface != PHY_INTERFACE_MODE_HSGMII &&
 	    state->interface != PHY_INTERFACE_MODE_10GKR &&
+	    state->interface != PHY_INTERFACE_MODE_USXGMII &&
 	    state->interface != PHY_INTERFACE_MODE_INTERNAL &&
 	    state->interface != PHY_INTERFACE_MODE_SGMII) {
 		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
@@ -352,6 +354,9 @@ static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
 	phylink_set(mask, Pause);
 	phylink_set(mask, Asym_Pause);
 
+	if (state->interface == PHY_INTERFACE_MODE_USXGMII)
+		 phylink_set(mask, 10000baseT_Full);
+
 	/* With the exclusion of MII and Reverse MII, we support Gigabit,
 	 * including Half duplex
 	 */
@@ -362,8 +367,10 @@ static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
 	}
 
 	/* On the RTL9300 family of SoCs, ports 26 to 27 may be SFP ports TODO: take out of .dts */
-	if (port >= 26 && port <= 27)
+	if (priv->family_id == RTL9300_FAMILY_ID && port >= 26 && port <= 27) {
 		phylink_set(mask, 1000baseX_Full);
+		phylink_set(mask, 10000baseKR_Full);
+	}
 
 	phylink_set(mask, 10baseT_Half);
 	phylink_set(mask, 10baseT_Full);
@@ -700,13 +707,9 @@ static void rtl93xx_phylink_mac_config(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	int sds_num, sds_mode;
 	u32 reg, v;
-	u32 *p1 = 0xb8003308, *p2 = 0xb800330c;
 
 	pr_info("%s port %d, mode %x, phy-mode: %s, speed %d, link %d\n", __func__,
 		port, mode, phy_modes(state->interface), state->speed, state->link);
-	pr_info("%s: %08x %08x\n", __func__, *p1, *p2);
-	*p1 |= BIT(15);
-	*p2 &= ~BIT(15);
 
 	// BUG: Make this work on RTL93XX
 	if (priv->family_id >= RTL9310_FAMILY_ID)
@@ -730,7 +733,7 @@ static void rtl93xx_phylink_mac_config(struct dsa_switch *ds, int port,
 			sds_mode = 0x10;
 			break;
 		case PHY_INTERFACE_MODE_10GKR:
-			sds_mode = 0x1b;
+			sds_mode = 0x1b; // 10G 1000X Auto
 			break;
 		case PHY_INTERFACE_MODE_USXGMII:
 			sds_mode = 0x0d;
@@ -757,12 +760,6 @@ static void rtl93xx_phylink_mac_config(struct dsa_switch *ds, int port,
 		break;
 	case SPEED_1000:
 		pr_info("Setting PHY speed to 1000M\n");
-		// BUG: SDS-num is hard-coded!
-		v = rtl930x_read_sds_phy(8, 2, 0);
-		v &= ~(BIT(6) | BIT(13));
-		v |= BIT(6);
-		rtl930x_write_sds_phy(8, 2, 0, v);
-
 		reg |= 2 << 3;
 		break;
 	default:
