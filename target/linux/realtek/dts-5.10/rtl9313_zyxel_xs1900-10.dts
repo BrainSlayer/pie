@@ -92,48 +92,65 @@
 		/* External phy ARQ813 */
 		phy0: ethernet-phy@0 {
 			reg = <0>;
-			compatible = "ethernet-phy-ieee802.3-c22";
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 8>;
+			sds = < 2 >;
 		};
-		phy10: ethernet-phy@1 {
-			reg = <10>;
-			compatible = "ethernet-phy-ieee802.3-c22";
+		phy1: ethernet-phy@1 {
+			reg = <8>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 9>;
+			sds = < 3 >;
 		};
-		phy18: ethernet-phy@2 {
-			reg = <18>;
-			compatible = "ethernet-phy-ieee802.3-c22";
+		phy2: ethernet-phy@2 {
+			reg = <16>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 10>;
+			sds = < 4 >;
 		};
-		phy26: ethernet-phy@3 {
-			reg = <26>;
-			compatible = "ethernet-phy-ieee802.3-c22";
+		phy3: ethernet-phy@3 {
+			reg = <24>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 11>;
+			sds = < 5 >;
 		};
-		phy34: ethernet-phy@4 {
-			reg = <34>;
-			compatible = "ethernet-phy-ieee802.3-c22";
+		phy4: ethernet-phy@4 {
+			reg = <32>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 12>;
+			sds = < 6 >;
 		};
-		phy45: ethernet-phy@5 {
-			reg = <45>;
-			compatible = "ethernet-phy-ieee802.3-c22";
+		phy5: ethernet-phy@5 {
+			reg = <40>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 13>;
+			sds = < 7 >;
 		};
 		phy6: ethernet-phy@6 {
-			reg = <6>;
-			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <48>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 14>;
+			sds = < 8 >;
 		};
 		phy7: ethernet-phy@7 {
-			reg = <7>;
-			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <50>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 15>;
 		};
 
-		/* RTL9313 Internal Serdes */
-		phy48: ethernet-phy@48 {
+		/* RTL9313 Internal Serdes
+		phy52: ethernet-phy@48 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			phy-is-integrated;
-			reg = <48>;
+			reg = <52>;
+			rtl9300,smi-address = <2 0>;
 		};
-		phy49: ethernet-phy@49 {
+		phy53: ethernet-phy@49 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			phy-is-integrated;
-			reg = <49>;
-		};
+			reg = <53>;
+			rtl9300,smi-address = <3 0>;
+		}; */
 
 	};
 };
@@ -147,69 +164,69 @@
 			reg = <0>;
 			label = "lan1";
 			phy-handle = <&phy0>;
-			phy-mode = "qsgmii";
+			phy-mode = "usxgmii";
 		};
-		port@10 {
-			reg = <10>;
+		port@8 {
+			reg = <8>;
 			label = "lan2";
-			phy-handle = <&phy10>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy1>;
+			phy-mode = "usxgmii";
 		};
-		port@18 {
-			reg = <18>;
+		port@16 {
+			reg = <16>;
 			label = "lan3";
-			phy-handle = <&phy18>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy2>;
+			phy-mode = "usxgmii";
 		};
-		port@26 {
-			reg = <26>;
+		port@24 {
+			reg = <24>;
 			label = "lan4";
-			phy-handle = <&phy26>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy3>;
+			phy-mode = "usxgmii";
 		};
-		port@34 {
-			reg = <34>;
+		port@32 {
+			reg = <32>;
 			label = "lan5";
-			phy-handle = <&phy34>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy4>;
+			phy-mode = "usxgmii";
 		};
-		port@45 {
-			reg = <45>;
+		port@40 {
+			reg = <40>;
 			label = "lan6";
-			phy-handle = <&phy45>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy5>;
+			phy-mode = "usxgmii";
 		};
-		port@6 {
-			reg = <6>;
-			label = "lan7";
-			phy-handle = <&phy6>;
-			phy-mode = "qsgmii";
-		};
-		port@7 {
-			reg = <7>;
-			label = "lan8";
-			phy-handle = <&phy7>;
-			phy-mode = "qsgmii";
-		};
-
-		/* RTL9313 Internal SerDes */
 		port@48 {
 			reg = <48>;
-			label = "lan49";
-			phy-mode = "internal";
-			phy-handle = <&phy48>;
+			label = "lan7";
+			phy-handle = <&phy6>;
+			phy-mode = "usxgmii";
 		};
-		port@49 {
-			reg = <49>;
-			label = "lan50";
-			phy-mode = "internal";
-			phy-handle = <&phy49>;
+		port@50 {
+			reg = <50>;
+			label = "lan8";
+			phy-handle = <&phy7>;
+			phy-mode = "usxgmii";
 		};
 
-		/* CPU-Port */
+		/* RTL9313 Internal SerDes
 		port@52 {
-			ethernet = <&ethernet0>;
 			reg = <52>;
+			label = "lan9";
+			phy-mode = "internal";
+			phy-handle = <&phy52>;
+		};
+		port@53 {
+			reg = <53>;
+			label = "lan10";
+			phy-mode = "internal";
+			phy-handle = <&phy53>;
+		}; */
+
+		/* CPU-Port */
+		port@56 {
+			ethernet = <&ethernet0>;
+			reg = <56>;
 			phy-mode = "qsgmii";
 			fixed-link {
 				speed = <1000>;
