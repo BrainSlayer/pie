@@ -198,6 +198,19 @@
 /* Registers of the internal Serdes of the 8380 */
 #define RTL838X_SDS4_FIB_REG0			(0xF800)
 
+/* Chip configuration registers of the RTL9310 */
+#define RTL931X_MEM_ENCAP_INIT			(0x4854)
+#define RTL931X_MEM_MIB_INIT			(0x7E18)
+#define RTL931X_MEM_ACL_INIT			(0x40BC)
+#define RTL931X_MEM_ALE_INIT_0			(0x83F0)
+#define RTL931X_MEM_ALE_INIT_1			(0x83F4)
+#define RTL931X_MEM_ALE_INIT_2			(0x82E4)
+#define RTL931X_MDX_CTRL_RSVD			(0x1250)
+#define RTL931X_PS_SOC_CTRL			(0x13f8)
+#define RTL931X_SMI_10GPHY_POLLING_SEL2		(0xCF8)
+#define RTL931X_SMI_10GPHY_POLLING_SEL3		(0xCFC)
+#define RTL931X_SMI_10GPHY_POLLING_SEL4		(0xD00)
+
 inline int rtl838x_mac_port_ctrl(int p)
 {
 	return RTL838X_MAC_PORT_CTRL + (p << 7);
