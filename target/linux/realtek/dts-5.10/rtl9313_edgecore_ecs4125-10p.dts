@@ -161,7 +161,7 @@
 			phy-is-integrated;
 			reg = <53>;
 			rtl9300,smi-address = <3 0>;
-		};
+		}; */
 
 	};
 };
