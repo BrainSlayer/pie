@@ -634,7 +634,7 @@ static void rtl931x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
  */
 static u64 rtl931x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
 {
-        return 0;
+	return 0;
 }
 
 static u64 rtl931x_read_cam(int idx, struct rtl838x_l2_entry *e)
@@ -673,9 +673,6 @@ int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)
 {
 	return 0;
 }
-<<<<<<< HEAD
-=======
-
 
 void rtl931x_vlan_port_pvidmode_set(int port, enum pbvlan_type type, enum pbvlan_mode mode) {
 	if (type == PBVLAN_TYPE_INNER)
@@ -693,7 +690,6 @@ void rtl931x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
 
 }
 
->>>>>>> bb59695e29dde4599125e94bd5a21aba8899875e
 const struct rtl838x_reg rtl931x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -750,12 +746,8 @@ const struct rtl838x_reg rtl931x_reg = {
 	.write_mcast_pmask = rtl931x_write_mcast_pmask,
 	.vlan_port_egr_filter = RTL931X_VLAN_PORT_EGR_FLTR,
 	.vlan_port_igr_filter = RTL931X_VLAN_PORT_IGR_FLTR,
-<<<<<<< HEAD
-//	.vlan_port_pb = does not exist
-=======
 	.vlan_port_pvidmode_set = rtl931x_vlan_port_pvidmode_set,
 	.vlan_port_pvid_set = rtl931x_vlan_port_pvid_set,
->>>>>>> bb59695e29dde4599125e94bd5a21aba8899875e
 	.vlan_port_tag_sts_ctrl = RTL931X_VLAN_PORT_TAG_CTRL,
 	.trk_mbr_ctr = rtl931x_trk_mbr_ctr,
 	.rma_bpdu_ctrl = RTL931X_RMA_BPDU_CTRL,

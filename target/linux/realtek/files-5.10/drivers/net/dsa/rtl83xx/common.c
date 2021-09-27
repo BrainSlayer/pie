@@ -1416,7 +1416,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	u64 bpdu_mask;
 
-	pr_debug("Probing RTL838X switch device\n");
+	pr_info("Probing RTL838X switch device\n");
 	if (!pdev->dev.of_node) {
 		dev_err(dev, "No DT found\n");
 		return -EINVAL;
@@ -1509,7 +1509,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->n_pie_blocks = 32;
 		priv->port_ignore = 0x3f;
 		priv->n_counters = 0; // TODO: Figure out logs on RTL9310
-		return -EINVAL;
 		break;
 	}
 	memset(priv->mc_group_saves, -1, sizeof(priv->mc_group_saves));
@@ -1517,13 +1516,16 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 
 	priv->ds->num_lag_ids = priv->n_lags;
 
-	pr_debug("Chip version %c\n", priv->version);
+	pr_info("Chip version %c\n", priv->version);
 
+	pr_info("%s calling rtl83xx_mdio_probe\n", __func__);
 	err = rtl83xx_mdio_probe(priv);
+	pr_info("%s returned %d\n", __func__, err);
 	if (err) {
 		/* Probing fails the 1st time because of missing ethernet driver
 		 * initialization. Use this to disable traffic in case the bootloader left it on
 		 */
+		pr_info("%s Delaying probe for now\n", __func__);
 		return err;
 	}
 	err = dsa_register_switch(priv->ds);
