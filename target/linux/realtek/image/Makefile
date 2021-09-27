@@ -23,7 +23,7 @@ define Device/Default
 ifdef CONFIG_LINUX_5_10
   DEVICE_DTS_DIR := ../dts-5.10
 else
-  DEVICE_DTS_DIR := ../dts
+  DEVICE_DTS_DIR := ../dts-5.4
 endif
   DEVICE_DTS = $$(SOC)_$(1)
   IMAGES := sysupgrade.bin

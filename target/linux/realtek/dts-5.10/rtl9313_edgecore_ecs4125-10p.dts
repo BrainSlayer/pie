@@ -103,55 +103,64 @@
 		/* External phy ARQ813 */
 		phy0: ethernet-phy@0 {
 			reg = <0>;
-			compatible = "ethernet-phy-ieee802.3-c22";
-			rtl9300,smi-address= <0 0>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 8>;
+			sds = < 2 >;
 		};
-		phy8: ethernet-phy@8 {
+		phy1: ethernet-phy@1 {
 			reg = <8>;
-			compatible = "ethernet-phy-ieee802.3-c22";
-			rtl9300,smi-address= <0 1>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 9>;
+			sds = < 3 >;
 		};
-		phy16: ethernet-phy@16 {
+		phy2: ethernet-phy@2 {
 			reg = <16>;
-			compatible = "ethernet-phy-ieee802.3-c22";
-			rtl9300,smi-address= <0 2>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 10>;
+			sds = < 4 >;
 		};
-		phy24: ethernet-phy@24 {
+		phy3: ethernet-phy@3 {
 			reg = <24>;
-			compatible = "ethernet-phy-ieee802.3-c22";
-			rtl9300,smi-address= <0 3>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 11>;
+			sds = < 5 >;
 		};
-		phy32: ethernet-phy@32 {
+		phy4: ethernet-phy@4 {
 			reg = <32>;
-			compatible = "ethernet-phy-ieee802.3-c22";
-			rtl9300,smi-address= <0 4>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 12>;
+			sds = < 6 >;
 		};
-		phy40: ethernet-phy@40 {
+		phy5: ethernet-phy@5 {
 			reg = <40>;
-			compatible = "ethernet-phy-ieee802.3-c22";
-			rtl9300,smi-address= <0 5>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 13>;
+			sds = < 7 >;
 		};
-		phy48: ethernet-phy@48 {
+		phy6: ethernet-phy@6 {
 			reg = <48>;
-			compatible = "ethernet-phy-ieee802.3-c22";
-			rtl9300,smi-address= <0 6>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 14>;
+			sds = < 8 >;
 		};
-		phy50: ethernet-phy@50 {
+		phy7: ethernet-phy@7 {
 			reg = <50>;
-			compatible = "ethernet-phy-ieee802.3-c22";
-			rtl9300,smi-address= <0 7>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			rtl9300,smi-address = <0 15>;
 		};
 
-		/* RTL9313 Internal Serdes */
-		phy54: ethernet-phy@54 {
+		/* RTL9313 Internal Serdes
+		phy52: ethernet-phy@48 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			phy-is-integrated;
-			reg = <54>;
+			reg = <52>;
+			rtl9300,smi-address = <2 0>;
 		};
-		phy55: ethernet-phy@55 {
+		phy53: ethernet-phy@49 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			phy-is-integrated;
-			reg = <55>;
+			reg = <53>;
+			rtl9300,smi-address = <3 0>;
 		};
 
 	};
@@ -166,64 +175,64 @@
 			reg = <0>;
 			label = "lan1";
 			phy-handle = <&phy0>;
-			phy-mode = "qsgmii";
+			phy-mode = "usxgmii";
 		};
 		port@8 {
 			reg = <8>;
 			label = "lan2";
-			phy-handle = <&phy8>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy1>;
+			phy-mode = "usxgmii";
 		};
 		port@16 {
 			reg = <16>;
 			label = "lan3";
-			phy-handle = <&phy16>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy2>;
+			phy-mode = "usxgmii";
 		};
 		port@24 {
 			reg = <24>;
 			label = "lan4";
-			phy-handle = <&phy24>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy3>;
+			phy-mode = "usxgmii";
 		};
 		port@32 {
 			reg = <32>;
 			label = "lan5";
-			phy-handle = <&phy32>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy4>;
+			phy-mode = "usxgmii";
 		};
 		port@40 {
 			reg = <40>;
 			label = "lan6";
-			phy-handle = <&phy40>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy5>;
+			phy-mode = "usxgmii";
 		};
 		port@48 {
 			reg = <48>;
 			label = "lan7";
-			phy-handle = <&phy48>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy6>;
+			phy-mode = "usxgmii";
 		};
 		port@50 {
 			reg = <50>;
 			label = "lan8";
-			phy-handle = <&phy50>;
-			phy-mode = "qsgmii";
+			phy-handle = <&phy7>;
+			phy-mode = "usxgmii";
 		};
 
-		/* RTL9313 Internal SerDes */
-		port@54 {
-			reg = <54>;
-			label = "lan54";
+		/* RTL9313 Internal SerDes
+		port@52 {
+			reg = <52>;
+			label = "lan9";
 			phy-mode = "internal";
-			phy-handle = <&phy54>;
+			phy-handle = <&phy52>;
 		};
-		port@55 {
-			reg = <55>;
-			label = "lan55";
+		port@53 {
+			reg = <53>;
+			label = "lan10";
 			phy-mode = "internal";
-			phy-handle = <&phy55>;
-		};
+			phy-handle = <&phy53>;
+		}; */
 
 		/* CPU-Port */
 		port@56 {
