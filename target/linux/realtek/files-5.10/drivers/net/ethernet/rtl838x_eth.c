@@ -1897,6 +1897,9 @@ static int rtl931x_mdio_reset(struct mii_bus *bus)
 		poll_sel[i / 16] |= priv->smi_bus[i] << pos;
 		poll_ctrl |= BIT(20 + priv->smi_bus[i]);
 		mdc_on[priv->smi_bus[i]] = true;
+	
+		// Enable Polling of the respective port
+		sw_w32_mask(0, 1 << (i % 32), RTL931X_SMI_PORT_POLLING_CTRL + (i >> 5) * 4);
 	}
 
 	for (i = 0; i < 12; i++)
