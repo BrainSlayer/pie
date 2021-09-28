@@ -1881,13 +1881,16 @@ static int rtl931x_mdio_reset(struct mii_bus *bus)
 	bool mdc_on[4];
 
 	pr_info("%s called\n", __func__);
+
 	mdc_on[0] = mdc_on[1] = mdc_on[2] = mdc_on[3] = false;
 	// Mapping of port to phy-addresses on an SMI bus
 	poll_sel[0] = poll_sel[1] = poll_sel[2] = poll_sel[3] = 0;
+	for (i = 0; i < 12; i++)
+		pr_info("WAS i: %d, %08x\n", i, sw_r32(RTL931X_SMI_PORT_ADDR + i * 4));
 	for (i = 0; i < 56; i++) {
 		pos = (i % 6) * 5;
-		sw_w32_mask(0x1f << pos, priv->smi_addr[i] << pos,
-			    RTL931X_SMI_PORT_ADDR + (i / 6) * 4);
+		pr_info("WAS i: port %d, %08x\n", i, (sw_r32(RTL931X_SMI_PORT_ADDR + (i / 6) * 4) >> pos) & 0x1f);
+		sw_w32_mask(0x1f << pos, priv->smi_addr[i] << pos, RTL931X_SMI_PORT_ADDR + (i / 6) * 4);
 
 		pr_info("port %d mapped to pos %d, bus %d, phy-id %d\n", i, pos, priv->smi_bus[i], priv->smi_addr[i]);
 		pos = (i * 2) % 32;
@@ -1901,6 +1904,9 @@ static int rtl931x_mdio_reset(struct mii_bus *bus)
 	
 	// Configure which SMI bus is behind which port number
 	for (i = 0; i < 4; i++) {
+		pr_info("poll sel WAS %d, %08x\n", i, sw_r32(RTL931X_SMI_PORT_POLLING_SEL + (i * 4)));
+	}
+	for (i = 0; i < 4; i++) {
 		pr_info("poll sel %d, %08x\n", i, poll_sel[i]);
 		sw_w32(poll_sel[i], RTL931X_SMI_PORT_POLLING_SEL + (i * 4));
 	}
@@ -1912,23 +1918,32 @@ static int rtl931x_mdio_reset(struct mii_bus *bus)
 	// Set bit p of RTL9310_SMI_PORT_POLLING_CTRL for p < 56, after SerDes patching!
 
 	// Configure which SMI busses
+	pr_info("%s: WAS RTL931X_MAC_L2_GLOBAL_CTRL2 %08x\n", __func__, sw_r32(RTL931X_MAC_L2_GLOBAL_CTRL2));
 	for (i = 0; i < 4; i++) {
 		// bus is polled in c45
 		if (priv->smi_bus_isc45[i])
 			c45_mask |= 0x3 << (i * 2);  // Std. C45, non-standard is 0x3 BUG: Use 2 again
 		// Enable bus access via MDC
-		if (mdc_on[i])
+		if (mdc_on[i]) {
 			sw_w32_mask(0, BIT(9 + i), RTL931X_MAC_L2_GLOBAL_CTRL2);
+		}
 	}
 
 	pr_info("%s: RTL931X_MAC_L2_GLOBAL_CTRL2 %08x\n", __func__, sw_r32(RTL931X_MAC_L2_GLOBAL_CTRL2));
 
+	pr_info("%s: WAS RTL931X_SMI_10GPHY_POLLING_SEL2 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL2));
+	pr_info("%s: WAS RTL931X_SMI_10GPHY_POLLING_SEL3 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL3));
+	pr_info("%s: WAS RTL931X_SMI_10GPHY_POLLING_SEL4 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL4));
 	// We have a 10G PHY enable polling
 	sw_w32(0x01010000, RTL931X_SMI_10GPHY_POLLING_SEL2);
 	sw_w32(0x01E7C400, RTL931X_SMI_10GPHY_POLLING_SEL3);
 	sw_w32(0x01E7E820, RTL931X_SMI_10GPHY_POLLING_SEL4);
 
-	pr_info("c45_mask: %08x\n", c45_mask);
+	pr_info("%s: RTL931X_SMI_10GPHY_POLLING_SEL2 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL2));
+	pr_info("%s: RTL931X_SMI_10GPHY_POLLING_SEL3 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL3));
+	pr_info("%s: RTL931X_SMI_10GPHY_POLLING_SEL4 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL4));
+
+	pr_info("c45_mask: %08x, was %X", c45_mask, sw_r32(RTL931X_SMI_GLB_CTRL1));
 	sw_w32_mask(0xff, c45_mask, RTL931X_SMI_GLB_CTRL1);
 
 	return 0;

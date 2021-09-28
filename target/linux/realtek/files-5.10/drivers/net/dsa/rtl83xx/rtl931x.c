@@ -84,7 +84,7 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	w = sw_r32(rtl_table_data(r, 1));
 	x = sw_r32(rtl_table_data(r, 2));
 	y = sw_r32(rtl_table_data(r, 3));
-	pr_debug("VLAN_READ %d: %08x %08x\n", vlan, v, w);
+	pr_info("VLAN_READ %d: %08x %08x\n", vlan, v, w);
 	rtl_table_release(r);
 
 	info->tagged_ports = ((u64) v) << 25 | (w >> 7);
@@ -240,7 +240,7 @@ int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3);
 	*val = (*val & 0xffff0000) >> 16;
 
-	pr_debug("%s: port %d, page: %d, reg: %x, val: %x, v: %08x\n",
+	pr_info("%s: port %d, page: %d, reg: %x, val: %x, v: %08x\n",
 		__func__, port, page, reg, *val, v);
 
 	mutex_unlock(&smi_lock);
@@ -277,7 +277,7 @@ int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 
 	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) >> 16;
 
-	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
+	pr_info("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
 
 	mutex_unlock(&smi_lock);
 
@@ -311,7 +311,7 @@ int rtl931x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
 		v = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 	} while (v & BIT(0));
 
-	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, val, err);
+	pr_info("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, val, err);
 	mutex_unlock(&smi_lock);
 	return err;
 }
@@ -524,12 +524,12 @@ static u32 rtl931x_l2_hash_key(struct rtl838x_switch_priv *priv, u64 seed)
  */
 static void rtl931x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 {
-	pr_debug("In %s valid?\n", __func__);
+	pr_info("In %s valid?\n", __func__);
 	e->valid = !!(r[2] & BIT(31));
 	if (!e->valid)
 		return;
 
-	pr_debug("In %s is valid\n", __func__);
+	pr_info("In %s is valid\n", __func__);
 	e->is_ip_mc = false;
 	e->is_ipv6_mc = false;
 

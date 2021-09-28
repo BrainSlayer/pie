@@ -265,10 +265,10 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 	int ret;
 	u32 pn;
 
-	pr_debug("In %s\n", __func__);
+	pr_info("In %s\n", __func__);
 	mii_np = of_find_compatible_node(NULL, NULL, "realtek,rtl838x-mdio");
 	if (mii_np) {
-		pr_debug("Found compatible MDIO node!\n");
+		pr_info("Found compatible MDIO node!\n");
 	} else {
 		dev_err(priv->dev, "no %s child node found", "mdio-bus");
 		return -ENODEV;
@@ -276,7 +276,7 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 
 	priv->mii_bus = of_mdio_find_bus(mii_np);
 	if (!priv->mii_bus) {
-		pr_debug("Deferring probe of mdio bus\n");
+		pr_info("Deferring probe of mdio bus\n");
 		return -EPROBE_DEFER;
 	}
 	if (!of_device_is_available(mii_np))
@@ -314,7 +314,7 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 		// Check for the integrated SerDes of the RTL8380M first
 		if (of_property_read_bool(dn, "phy-is-integrated")
 			&& priv->id == 0x8380 && pn >= 24) {
-			pr_debug("----> FÓUND A SERDES\n");
+			pr_info("----> FÓUND A SERDES\n");
 			priv->ports[pn].phy = PHY_RTL838X_SDS;
 			continue;
 		}
@@ -360,12 +360,12 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 	 * TODO: Put this in rtl83xx_phylink_mac_config ? see rtl93xx_phylink_mac_config
 	 */
 	if (priv->ports[24].phy == PHY_RTL838X_SDS) {
-		pr_debug("Powering on fibre ports & reset\n");
+		pr_info("Powering on fibre ports & reset\n");
 		rtl8380_sds_power(24, 1);
 		rtl8380_sds_power(26, 1);
 	}
 
-	pr_debug("%s done\n", __func__);
+	pr_info("%s done\n", __func__);
 	return 0;
 }
 
