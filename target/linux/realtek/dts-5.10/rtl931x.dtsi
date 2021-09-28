@@ -95,6 +95,7 @@
 			gpio-controller;
 			#gpio-cells = <2>;
 			interrupt-parent = <&gic>;
+			#interrupt-cells = <3>;
 			interrupts = <GIC_SHARED 20 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
@@ -105,6 +106,7 @@
 			clock-frequency = <200000000>;
 
 			interrupt-parent = <&gic>;
+			#interrupt-cells = <3>;
 			interrupts = <GIC_SHARED 22 IRQ_TYPE_LEVEL_HIGH>;
 
 			reg-io-width = <1>;
@@ -120,6 +122,7 @@
 			clock-frequency = <200000000>;
 
 			interrupt-parent = <&gic>;
+			#interrupt-cells = <3>;
 			interrupts = <GIC_SHARED 23 IRQ_TYPE_LEVEL_HIGH>;
 
 			reg-io-width = <1>;
@@ -137,8 +140,8 @@
 		compatible = "realtek,rtl838x-eth";
 		reg = <0x1b00a300 0x100>;
 		interrupt-parent = <&gic>;
+		#interrupt-cells = <3>;
 		interrupts = <GIC_SHARED 16 IRQ_TYPE_LEVEL_HIGH>;
-		#interrupt-cells = <1>;
 		phy-mode = "internal";
 		fixed-link {
 			speed = <1000>;
@@ -150,6 +153,7 @@
 		compatible = "realtek,rtl83xx-switch";
 
 		interrupt-parent = <&gic>;
-		interrupts = <15>;
+		#interrupt-cells = <3>;
+		interrupts = <GIC_SHARED 15 IRQ_TYPE_LEVEL_HIGH>;
 	};
 };
