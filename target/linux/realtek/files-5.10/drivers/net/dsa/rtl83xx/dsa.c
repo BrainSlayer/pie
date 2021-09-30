@@ -5,6 +5,8 @@
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
 #include "rtl83xx.h"
 
+
+
 extern int rtl930x_read_sds_phy(int phy_addr, int page, int phy_reg);
 extern int rtl930x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v);
 extern struct rtl83xx_soc_info soc_info;
@@ -162,7 +164,8 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 	pr_debug("%s called\n", __func__);
 
 	/* Disable MAC polling the PHY so that we can start configuration */
-	priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
+	if (priv->r->smi_poll_ctrl)
+		priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
 
 	for (i = 0; i < ds->num_ports; i++)
 		priv->ports[i].enable = false;
@@ -220,6 +223,7 @@ static int rtl930x_setup(struct dsa_switch *ds)
 	/* Disable MAC polling the PHY so that we can start configuration */
 	if (priv->family_id == RTL9300_FAMILY_ID)
 		sw_w32(0, RTL930X_SMI_POLL_CTRL);
+
 	if (priv->family_id == RTL9310_FAMILY_ID) {
 		sw_w32(0, RTL931X_SMI_PORT_POLLING_CTRL);
 		sw_w32(0, RTL931X_SMI_PORT_POLLING_CTRL + 4);
@@ -893,7 +897,7 @@ static int rtl83xx_port_enable(struct dsa_switch *ds, int port,
 
 	/* enable inner tagging on egress, do not keep any tags */
 	if (priv->family_id == RTL9310_FAMILY_ID)
-		sw_w32(BIT(4), priv->r->vlan_port_tag_sts_ctrl + (port << 2));
+		sw_w32(BIT(6), priv->r->vlan_port_tag_sts_ctrl + (port << 2));
 	else
 		sw_w32(1, priv->r->vlan_port_tag_sts_ctrl + (port << 2));
 

@@ -345,7 +345,8 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 	}
 
 	/* Disable MAC polling the PHY so that we can start configuration */
-	priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
+	if (priv->r->smi_poll_ctrl)
+		priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
 
 	/* Enable PHY control via SoC */
 	if (priv->family_id == RTL8380_FAMILY_ID) {

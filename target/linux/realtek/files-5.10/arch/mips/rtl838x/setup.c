@@ -82,6 +82,7 @@ static void rtl931x_restart(char *command)
 	sw_w32(v, RTL931X_RST_GLB_CTRL);
 	msleep(15);
 	sw_w32(0x101, RTL931X_RST_GLB_CTRL);
+
 }
 
 static void rtl838x_halt(void)

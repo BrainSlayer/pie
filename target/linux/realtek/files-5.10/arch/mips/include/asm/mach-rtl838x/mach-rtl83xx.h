@@ -7,6 +7,7 @@
 #define _MACH_RTL838X_H_
 
 #include <asm/types.h>
+#include <asm/io.h>
 /*
  * Register access macros
  */
@@ -20,18 +21,39 @@
 #define rtl83xx_r8(reg)		readb(reg)
 #define rtl83xx_w8(val, reg)	writeb(val, reg)
 
-#define sw_r32(reg)		readl(RTL838X_SW_BASE + reg)
-#define sw_w32(val, reg)	writel(val, RTL838X_SW_BASE + reg)
-#define sw_w32_mask(clear, set, reg)	\
-				sw_w32((sw_r32(reg) & ~(clear)) | (set), reg)
+#define sw_r32(reg)		readl((volatile void *)(RTL838X_SW_BASE + reg))
+static void __maybe_unused _sw_w32(u32 val, u32 reg, const char *func, const int line) 
+{ 
+	if (!reg) {
+		pr_info("fuckup on %s:%d\n", func, line);
+		return;
+	}
+	writel(val, (RTL838X_SW_BASE + reg));
+}
+#define sw_w32(val, reg) _sw_w32(val, (reg) ,__func__,__LINE__)
+
+
+static void __maybe_unused _sw_w32_mask(u32 clear, u32 set, u32 reg, const char *func, const int line) {
+	_sw_w32((sw_r32(reg) & ~(clear)) | (set), reg, func, line);
+}
+
+#define sw_w32_mask(clear, val, reg) _sw_w32_mask (clear, val, (reg) ,__func__,__LINE__)
+
+#define sw_w64(val, reg) _sw_w64(val, (reg) ,__func__,__LINE__)
+
 #define sw_r64(reg)		((((u64)readl(RTL838X_SW_BASE + reg)) << 32) | \
 				readl(RTL838X_SW_BASE + reg + 4))
 
-#define sw_w64(val, reg)	do { \
-					writel((u32)((val) >> 32), RTL838X_SW_BASE + reg); \
-					writel((u32)((val) & 0xffffffff), \
-							RTL838X_SW_BASE + reg + 4); \
-				} while (0)
+static void __maybe_unused _sw_w64(u64 val, u32 reg, const char *func, const int line)
+{
+	if (!reg) {
+		pr_info("fuckup on %s:%d\n", func, line);
+	} 
+	writel((u32)((val) >> 32), (RTL838X_SW_BASE + reg)); 
+	writel((u32)((val) & 0xffffffff), (RTL838X_SW_BASE + reg + 4)); 
+}
+
+#define sw_w64(val, reg) _sw_w64(val, (reg) ,__func__,__LINE__)
 
 /*
  * SPRAM

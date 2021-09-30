@@ -147,7 +147,7 @@ static inline int rtl931x_mac_link_spd_sts(int p)
 
 static inline int rtl931x_mac_port_ctrl(int p)
 {
-	return RTL931X_MAC_PORT_CTRL(p);
+	return RTL930X_MAC_L2_PORT_CTRL(p);
 }
 
 static inline int rtl931x_l2_port_new_salrn(int p)
@@ -184,13 +184,7 @@ irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 
 	/* Clear status */
 	rtl839x_set_port_reg_le(ports, RTL931X_ISR_PORT_LINK_STS_CHG);
-	pr_info("RTL9310 Link change: status: %x, ports %llx, cpu %d\n", status, ports, smp_processor_id());
-
-	if (!ports)
-		rtl839x_set_port_reg_le(0xFFFFFFFFFFFFFFULL, RTL931X_ISR_PORT_LINK_STS_CHG);
-	
-	pr_debug("In %s, status_tx: %08x, status_rx: %08x, status_rx_r: %08x, notify: %08x\n",
-		__func__, status_tx, status_rx, status_rx_r, sw_r32(RTL931X_L2_NTFY_IF_INTR_STS));
+	pr_info("RTL9310 Link change: status: %x, ports %llx\n", status, ports);
 
 	for (i = 0; i < 56; i++) {
 		if (ports & BIT_ULL(i)) {
