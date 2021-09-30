@@ -5,6 +5,8 @@
 #include <asm/mach-rtl838x/mach-rtl83xx.h>
 #include "rtl83xx.h"
 
+
+
 extern int rtl930x_read_sds_phy(int phy_addr, int page, int phy_reg);
 extern int rtl930x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v);
 extern struct rtl83xx_soc_info soc_info;
@@ -39,7 +41,8 @@ static void rtl83xx_enable_phy_polling(struct rtl838x_switch_priv *priv)
 	}
 
 	pr_debug("%s: %16llx\n", __func__, v);
-	priv->r->set_port_reg_le(v, priv->r->smi_poll_ctrl);
+	if (priv->r->smi_poll_ctrl)
+		priv->r->set_port_reg_le(v, priv->r->smi_poll_ctrl);
 
 	/* PHY update complete, there is no global PHY polling enable bit on the 9300 */
 	if (priv->family_id == RTL8390_FAMILY_ID)
@@ -162,7 +165,8 @@ static int rtl83xx_setup(struct dsa_switch *ds)
 	pr_debug("%s called\n", __func__);
 
 	/* Disable MAC polling the PHY so that we can start configuration */
-	priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
+	if (priv->r->smi_poll_ctrl)
+		priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
 
 	for (i = 0; i < ds->num_ports; i++)
 		priv->ports[i].enable = false;
@@ -220,7 +224,13 @@ static int rtl930x_setup(struct dsa_switch *ds)
 
 	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 	/* Disable MAC polling the PHY so that we can start configuration */
-	sw_w32(0, RTL930X_SMI_POLL_CTRL);
+	if (priv->family_id == RTL9300_FAMILY_ID)
+		sw_w32(0, RTL930X_SMI_POLL_CTRL);
+	else {
+		sw_w32(0, RTL931X_SMI_PORT_POLLING_CTRL);
+		sw_w32(0, RTL931X_SMI_PORT_POLLING_CTRL + 4);
+
+	}
 	printk(KERN_INFO "%s:%d\n",__func__,__LINE__);
 
 	// Disable all ports except CPU port

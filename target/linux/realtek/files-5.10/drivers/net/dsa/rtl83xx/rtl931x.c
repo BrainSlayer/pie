@@ -147,7 +147,7 @@ static inline int rtl931x_mac_link_spd_sts(int p)
 
 static inline int rtl931x_mac_port_ctrl(int p)
 {
-	return RTL931X_MAC_PORT_CTRL(p);
+	return RTL930X_MAC_L2_PORT_CTRL(p);
 }
 
 static inline int rtl931x_l2_port_new_salrn(int p)
@@ -170,7 +170,7 @@ irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 
 	/* Clear status */
 	rtl839x_set_port_reg_le(ports, RTL931X_ISR_PORT_LINK_STS_CHG);
-	pr_info("RTL9310 Link change: status: %x, ports %llx\n", status, ports);
+//	pr_info("RTL9310 Link change: status: %x, ports %llx\n", status, ports);
 
 	for (i = 0; i < 56; i++) {
 		if (ports & BIT_ULL(i)) {
@@ -277,7 +277,7 @@ int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 
 	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) >> 16;
 
-	pr_info("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
+	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
 
 	mutex_unlock(&smi_lock);
 

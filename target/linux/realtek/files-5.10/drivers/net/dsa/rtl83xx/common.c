@@ -345,7 +345,8 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 	}
 
 	/* Disable MAC polling the PHY so that we can start configuration */
-	priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
+	if (priv->r->smi_poll_ctrl)
+		priv->r->set_port_reg_le(0ULL, priv->r->smi_poll_ctrl);
 
 	/* Enable PHY control via SoC */
 	if (priv->family_id == RTL8380_FAMILY_ID) {
@@ -1621,7 +1622,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 
 	// TODO: put this into l2_setup()
 	// Flood BPDUs to all ports including cpu-port
-	if (soc_info.family != RTL9300_FAMILY_ID) { // TODO: Port this functionality
+	if (soc_info.family != RTL9300_FAMILY_ID && soc_info.family != RTL9310_FAMILY_ID) { // TODO: Port this functionality
 		bpdu_mask = soc_info.family == RTL8380_FAMILY_ID ? 0x1FFFFFFF : 0x1FFFFFFFFFFFFF;
 		priv->r->set_port_reg_be(bpdu_mask, priv->r->rma_bpdu_fld_pmask);
 
