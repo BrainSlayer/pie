@@ -977,6 +977,7 @@ struct rtl838x_reg {
 	void (*set_receive_management_action)(int port, rma_ctrl_t type, action_type_t action);	
 	void (*vlan_port_pvidmode_set)(int port, enum pbvlan_type type, enum pbvlan_mode mode);
 	void (*vlan_port_pvid_set)(int port, enum pbvlan_type type, int pvid);
+	int (*set_ageing_time)(unsigned long msec);
 	u32 stat_port_rst;
 	u32 stat_rst;
 	u32 stat_port_std_mib;

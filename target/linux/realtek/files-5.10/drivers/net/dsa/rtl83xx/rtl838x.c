@@ -1666,6 +1666,22 @@ void rtl838x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
 
 }
 
+static int rtl838x_set_ageing_time(unsigned long msec)
+{
+	int t = sw_r32(RTL838X_L2_CTRL_1);
+
+	t &= 0x7FFFFF;
+	t = t * 128 / 625; /* Aging time in seconds. 0: L2 aging disabled */
+	pr_debug("L2 AGING time: %d sec\n", t);
+
+	t = (msec * 625 + 127000) / 128000;
+	t = t > 0x7FFFFF ? 0x7FFFFF : t;
+	sw_w32_mask(0x7FFFFF, t, RTL838X_L2_CTRL_1);
+	pr_debug("Dynamic aging for ports: %x\n", sw_r32(RTL838X_L2_PORT_AGING_OUT));
+
+	return 0;
+}
+
 const struct rtl838x_reg rtl838x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -1682,8 +1698,8 @@ const struct rtl838x_reg rtl838x_reg = {
 	.traffic_get = rtl838x_traffic_get,
 	.traffic_set = rtl838x_traffic_set,
 	.l2_ctrl_0 = RTL838X_L2_CTRL_0,
+	.set_ageing_time = rtl838x_set_ageing_time,
 	.l2_ctrl_1 = RTL838X_L2_CTRL_1,
-	.l2_port_aging_out = RTL838X_L2_PORT_AGING_OUT,
 	.smi_poll_ctrl = RTL838X_SMI_POLL_CTRL,
 	.l2_tbl_flush_ctrl = RTL838X_L2_TBL_FLUSH_CTRL,
 	.exec_tbl0_cmd = rtl838x_exec_tbl0_cmd,

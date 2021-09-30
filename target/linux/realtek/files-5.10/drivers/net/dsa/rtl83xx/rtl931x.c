@@ -84,7 +84,7 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	w = sw_r32(rtl_table_data(r, 1));
 	x = sw_r32(rtl_table_data(r, 2));
 	y = sw_r32(rtl_table_data(r, 3));
-	pr_info("VLAN_READ %d: %08x %08x\n", vlan, v, w);
+	pr_debug("VLAN_READ %d: %08x %08x\n", vlan, v, w);
 	rtl_table_release(r);
 
 	info->tagged_ports = ((u64) v) << 25 | (w >> 7);
@@ -160,6 +160,16 @@ static inline int rtl931x_l2_port_new_sa_fwd(int p)
 	return RTL931X_L2_PORT_NEW_SA_FWD(p);
 }
 
+#define RTL931X_DMA_IF_CTRL                     (0x0928)
+#define RTL931X_DMA_IF_INTR_RX_RUNOUT_STS       (0x091c)
+#define RTL931X_DMA_IF_INTR_RX_DONE_STS         (0x0920)
+#define RTL931X_DMA_IF_INTR_TX_DONE_STS         (0x0924)
+#define RTL931X_DMA_IF_INTR_RX_RUNOUT_MSK       (0x0910)
+#define RTL931X_DMA_IF_INTR_RX_DONE_MSK         (0x0914)
+#define RTL931X_DMA_IF_INTR_TX_DONE_MSK         (0x0918)
+#define RTL931X_L2_NTFY_IF_INTR_MSK             (0x09E4)
+#define RTL931X_L2_NTFY_IF_INTR_STS             (0x09E8)
+
 irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 {
 	struct dsa_switch *ds = dev_id;
@@ -168,9 +178,19 @@ irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 	u64 link;
 	int i;
 
+	u32 status_rx_r = sw_r32(RTL931X_DMA_IF_INTR_RX_RUNOUT_STS);
+	u32 status_rx = sw_r32(RTL931X_DMA_IF_INTR_RX_DONE_STS);
+	u32 status_tx = sw_r32(RTL931X_DMA_IF_INTR_TX_DONE_STS);
+
 	/* Clear status */
 	rtl839x_set_port_reg_le(ports, RTL931X_ISR_PORT_LINK_STS_CHG);
-	pr_info("RTL9310 Link change: status: %x, ports %llx\n", status, ports);
+	pr_info("RTL9310 Link change: status: %x, ports %llx, cpu %d\n", status, ports, smp_processor_id());
+
+	if (!ports)
+		rtl839x_set_port_reg_le(0xFFFFFFFFFFFFFFULL, RTL931X_ISR_PORT_LINK_STS_CHG);
+	
+	pr_debug("In %s, status_tx: %08x, status_rx: %08x, status_rx_r: %08x, notify: %08x\n",
+		__func__, status_tx, status_rx, status_rx_r, sw_r32(RTL931X_L2_NTFY_IF_INTR_STS));
 
 	for (i = 0; i < 56; i++) {
 		if (ports & BIT_ULL(i)) {
@@ -240,7 +260,7 @@ int rtl931x_read_phy(u32 port, u32 page, u32 reg, u32 *val)
 	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3);
 	*val = (*val & 0xffff0000) >> 16;
 
-	pr_info("%s: port %d, page: %d, reg: %x, val: %x, v: %08x\n",
+	pr_debug("%s: port %d, page: %d, reg: %x, val: %x, v: %08x\n",
 		__func__, port, page, reg, *val, v);
 
 	mutex_unlock(&smi_lock);
@@ -277,7 +297,7 @@ int rtl931x_read_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 *val)
 
 	*val = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_3) >> 16;
 
-	pr_info("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
+	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, *val, err);
 
 	mutex_unlock(&smi_lock);
 
@@ -311,7 +331,7 @@ int rtl931x_write_mmd_phy(u32 port, u32 devnum, u32 regnum, u32 val)
 		v = sw_r32(RTL931X_SMI_INDRT_ACCESS_CTRL_0);
 	} while (v & BIT(0));
 
-	pr_info("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, val, err);
+	pr_debug("%s: port %d, regnum: %x, val: %x (err %d)\n", __func__, port, regnum, val, err);
 	mutex_unlock(&smi_lock);
 	return err;
 }
@@ -524,12 +544,12 @@ static u32 rtl931x_l2_hash_key(struct rtl838x_switch_priv *priv, u64 seed)
  */
 static void rtl931x_fill_l2_entry(u32 r[], struct rtl838x_l2_entry *e)
 {
-	pr_info("In %s valid?\n", __func__);
+	pr_debug("In %s valid?\n", __func__);
 	e->valid = !!(r[2] & BIT(31));
 	if (!e->valid)
 		return;
 
-	pr_info("In %s is valid\n", __func__);
+	pr_debug("In %s is valid\n", __func__);
 	e->is_ip_mc = false;
 	e->is_ipv6_mc = false;
 
@@ -690,6 +710,21 @@ void rtl931x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
 
 }
 
+static int rtl931x_set_ageing_time(unsigned long msec)
+{
+	int t = sw_r32(RTL931X_L2_AGE_CTRL);
+
+	t &= 0x1FFFFF;
+	t = (t * 8) / 10;
+	pr_debug("L2 AGING time: %d sec\n", t);
+
+	t = (msec / 100 + 7) / 8;
+	t = t > 0x1FFFFF ? 0x1FFFFF : t;
+	sw_w32_mask(0x1FFFFF, t, RTL931X_L2_AGE_CTRL);
+	pr_debug("Dynamic aging for ports: %x\n", sw_r32(RTL931X_L2_PORT_AGE_CTRL));
+	return 0;
+}
+
 const struct rtl838x_reg rtl931x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -705,9 +740,8 @@ const struct rtl838x_reg rtl931x_reg = {
 	.traffic_get = rtl931x_traffic_get,
 	.traffic_set = rtl931x_traffic_set,
 	.l2_ctrl_0 = RTL931X_L2_CTRL,
-	.l2_ctrl_1 = RTL931X_L2_AGE_CTRL,
-	.l2_port_aging_out = RTL931X_L2_PORT_AGE_CTRL,
-	// .smi_poll_ctrl does not exist
+	.set_ageing_time = rtl931x_set_ageing_time,
+	.smi_poll_ctrl = RTL931X_SMI_PORT_POLLING_CTRL,
 	.l2_tbl_flush_ctrl = RTL931X_L2_TBL_FLUSH_CTRL,
 	.exec_tbl0_cmd = rtl931x_exec_tbl0_cmd,
 	.exec_tbl1_cmd = rtl931x_exec_tbl1_cmd,

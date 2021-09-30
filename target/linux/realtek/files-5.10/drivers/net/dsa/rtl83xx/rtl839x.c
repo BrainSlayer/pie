@@ -1769,6 +1769,22 @@ void rtl839x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid) {
 
 }
 
+static int rtl839x_set_ageing_time(unsigned long msec)
+{
+	int t = sw_r32(RTL839X_L2_CTRL_1);
+
+	t &= 0x1FFFFF;
+	t = t * 3 / 5; /* Aging time in seconds. 0: L2 aging disabled */
+	pr_debug("L2 AGING time: %d sec\n", t);
+
+	t = (msec * 5 + 2000) / 3000;
+	t = t > 0x1FFFFF ? 0x1FFFFF : t;
+	sw_w32_mask(0x1FFFFF, t, RTL839X_L2_CTRL_1);
+	pr_debug("Dynamic aging for ports: %x\n", sw_r32(RTL839X_L2_PORT_AGING_OUT));
+
+	return 0;
+}
+
 const struct rtl838x_reg rtl839x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -1785,8 +1801,7 @@ const struct rtl838x_reg rtl839x_reg = {
 	.traffic_set = rtl839x_traffic_set,
 	.port_iso_ctrl = rtl839x_port_iso_ctrl,
 	.l2_ctrl_0 = RTL839X_L2_CTRL_0,
-	.l2_ctrl_1 = RTL839X_L2_CTRL_1,
-	.l2_port_aging_out = RTL839X_L2_PORT_AGING_OUT,
+	.set_ageing_time = rtl839x_set_ageing_time,
 	.smi_poll_ctrl = RTL839X_SMI_PORT_POLLING_CTRL,
 	.l2_tbl_flush_ctrl = RTL839X_L2_TBL_FLUSH_CTRL,
 	.exec_tbl0_cmd = rtl839x_exec_tbl0_cmd,

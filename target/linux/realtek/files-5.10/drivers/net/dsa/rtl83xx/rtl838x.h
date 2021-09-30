@@ -440,8 +440,7 @@ struct rtl838x_reg {
 	void (*traffic_set)(int source, u64 dest_matrix);
 	u64 (*traffic_get)(int source);
 	int l2_ctrl_0;
-	int l2_ctrl_1;
-	int l2_port_aging_out;
+	int (*set_ageing_time)(unsigned long msec);
 	int smi_poll_ctrl;
 	int l2_tbl_flush_ctrl;
 	void (*exec_tbl0_cmd)(u32 cmd);

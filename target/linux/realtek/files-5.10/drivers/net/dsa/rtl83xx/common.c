@@ -369,22 +369,6 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 	return 0;
 }
 
-static int __init rtl83xx_get_l2aging(struct rtl838x_switch_priv *priv)
-{
-	int t = sw_r32(priv->r->l2_ctrl_1);
-
-	t &= priv->family_id == RTL8380_FAMILY_ID ? 0x7fffff : 0x1FFFFF;
-
-	if (priv->family_id == RTL8380_FAMILY_ID)
-		t = t * 128 / 625; /* Aging time in seconds. 0: L2 aging disabled */
-	else
-		t = (t * 3) / 5;
-
-	pr_debug("L2 AGING time: %d sec\n", t);
-	pr_debug("Dynamic aging for ports: %x\n", sw_r32(priv->r->l2_port_aging_out));
-	return t;
-}
-
 /* Caller must hold priv->reg_mutex */
 int rtl83xx_lag_add(struct dsa_switch *ds, int group, int port,struct netdev_lag_upper_info *info)
 {
@@ -1488,7 +1472,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->ds->num_ports = 29;
 		priv->fib_entries = 16384;
 		priv->n_lags = 16;
-		sw_w32(1, RTL930X_ST_CTRL);
+		sw_w32(1, RTL930X_ST_CTRL); // Enable MSTI mode for Spanning tree
 		priv->l2_bucket_size = 8;
 		priv->n_pie_blocks = 16;
 		priv->port_ignore = 0x3f;
@@ -1500,7 +1484,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->cpu_port = RTL931X_CPU_PORT;
 		priv->port_mask = 0x3f;
 		priv->port_width = 2;
-		priv->irq_mask = 0xFFFFFFFFFFFFFULL;
+		priv->irq_mask = 0xFFFFFFFFFFFFFFULL;
 		priv->r = &rtl931x_reg;
 		priv->ds->num_ports = 57;
 		priv->fib_entries = 16384;
@@ -1509,6 +1493,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->n_pie_blocks = 32;
 		priv->port_ignore = 0x3f;
 		priv->n_counters = 0; // TODO: Figure out logs on RTL9310
+		// sw_w32(1, RTL931X_ST_CTRL); // Enable MSTI mode for Spanning tree??
 		break;
 	}
 	memset(priv->mc_group_saves, -1, sizeof(priv->mc_group_saves));
@@ -1572,8 +1557,6 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	if (soc_info.family != RTL9310_FAMILY_ID)
 		sw_w32(0x1, priv->r->imr_glb);
 
-	rtl83xx_get_l2aging(priv);
-
 	rtl83xx_setup_qos(priv);
 	
 	priv->r->l3_setup(priv);
@@ -1619,9 +1602,9 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	if (err)
 		goto err_register_fib_nb;
 
-	// TODO: put this into l2_setup()
+	// TODO: put this into l2_setup() and port this functionality
 	// Flood BPDUs to all ports including cpu-port
-	if (soc_info.family != RTL9300_FAMILY_ID) { // TODO: Port this functionality
+	if (soc_info.family != RTL9300_FAMILY_ID && soc_info.family != RTL9310_FAMILY_ID) {
 		bpdu_mask = soc_info.family == RTL8380_FAMILY_ID ? 0x1FFFFFFF : 0x1FFFFFFFFFFFFF;
 		priv->r->set_port_reg_be(bpdu_mask, priv->r->rma_bpdu_fld_pmask);
 
