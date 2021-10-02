@@ -283,12 +283,9 @@
 #define RTL931X_SFLOW_CTRL			(0x8400)
 #define RTL931X_SFLOW_PORT_RATE_CTRL		(0x8404)
 
-#define RTL931X_MIR_RSPAN_VLAN_CTRL			(0x69A0)
-#define RTL931X_MIR_RSPAN_TX_CTRL			(0x69B0)
-#define RTL931X_MIR_RSPAN_RX_TAG_RM_CTRL		(0xAF5C)
-#define RTL931X_MIR_RSPAN_RX_TAG_EN_CTRL		(0x2554)
-
-
+#define RTL931X_MIR_RSPAN_VLAN_CTRL		(0x1410)
+#define RTL931X_MIR_RSPAN_TX_CTRL		(0x1420)
+#define RTL931X_MIR_RSPAN_RX_TAG_RM_CTRL	(0xAF5C)
 
 /* Storm/rate control and scheduling */
 #define RTL838X_STORM_CTRL			(0x4700)
@@ -344,7 +341,7 @@
 #define RTL931X_STORM_CTRL_PORT_MC_0(p)		(0xB1EC + (((p) << 3)))
 #define RTL931X_STORM_CTRL_PORT_MC_1(p)		(0xB1F0 + (((p) << 3)))
 #define RTL931X_STORM_CTRL_PORT_BC_0(p)		(0xB3C4 + (((p) << 3)))
-#define RTL931X_STORM_CTRL_PORT_BC_1(p)		(0xB3C4 + (((p) << 3)))
+#define RTL931X_STORM_CTRL_PORT_BC_1(p)		(0xB3C8 + (((p) << 3)))
 
 #define RTL839X_TBL_ACCESS_CTRL_2		(0x611C)
 #define RTL839X_TBL_ACCESS_DATA_2(i)		(0x6120 + (((i) << 2)))
