@@ -439,56 +439,10 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 	struct rtl838x_eth_priv *priv = netdev_priv(dev);
 	u32 status = sw_r32(priv->r->dma_if_intr_sts);
 //	bool triggered = false;
-	u32 atk = sw_r32(RTL838X_ATK_PRVNT_STS);
 	int i;
-#if 0
-	/*
-	 * this code is wrong in many points. first. the register has a per port offset. so this code here checks only the content of port 0
-	 * second, the registers are different for each chipset. remove this code for now since it does not make any sense at all 
-	 */
-	u32 storm_uc = 0;
-	u32 storm_mc = 0;
-	u32 storm_bc = 0;
-	if (priv->family_id == RTL8390_FAMILY_ID) {
-		storm_uc = sw_r32(RTL839X_STORM_CTRL_PORT_UC_EXCEED);
-		storm_mc = sw_r32(RTL839X_STORM_CTRL_PORT_MC_EXCEED);
-		storm_bc = sw_r32(RTL839X_STORM_CTRL_PORT_BC_EXCEED);
-		pr_debug("IRQ: %08x\n", status);
-		if (storm_uc || storm_mc || storm_bc) {
-			pr_warn("Storm control UC: %08x, MC: %08x, BC: %08x\n",
-				storm_uc, storm_mc, storm_bc);
-	
-			sw_w32(storm_uc, RTL839X_STORM_CTRL_PORT_UC_EXCEED);
-			sw_w32(storm_mc, RTL839X_STORM_CTRL_PORT_MC_EXCEED);
-			sw_w32(storm_bc, RTL839X_STORM_CTRL_PORT_BC_EXCEED);
-	
-			triggered = true;
-		}
-	}
-	if (priv->family_id == RTL8380_FAMILY_ID) {
-		storm_uc = sw_r32(RTL838X_STORM_CTRL_PORT_UC_EXCEED);
-		storm_mc = sw_r32(RTL838X_STORM_CTRL_PORT_MC_EXCEED);
-		storm_bc = sw_r32(RTL838X_STORM_CTRL_PORT_BC_EXCEED);
-		pr_debug("IRQ: %08x\n", status);
-		if (storm_uc || storm_mc || storm_bc) {
-			pr_warn("Storm control UC: %08x, MC: %08x, BC: %08x\n",
-				storm_uc, storm_mc, storm_bc);
-	
-			sw_w32(storm_uc, RTL838X_STORM_CTRL_PORT_UC_EXCEED);
-			sw_w32(storm_mc, RTL838X_STORM_CTRL_PORT_MC_EXCEED);
-			sw_w32(storm_bc, RTL838X_STORM_CTRL_PORT_BC_EXCEED);
-	
-			triggered = true;
-		}
-	}
-#endif
 
-
-	if (atk) {
-		pr_debug("Attack prevention triggered: %08x\n", atk);
-		sw_w32(atk, RTL838X_ATK_PRVNT_STS);
-	}
-
+	pr_info("%s: called\n", __func__);
+	
 	spin_lock(&priv->lock);
 	/*  Ignore TX interrupt */
 	if ((status & 0xf0000)) {
@@ -545,8 +499,8 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 	u32 status_tx = sw_r32(priv->r->dma_if_intr_tx_done_sts);
 	int i;
 
-	pr_debug("In %s, status_tx: %08x, status_rx: %08x, status_rx_r: %08x\n",
-		__func__, status_tx, status_rx, status_rx_r);
+	pr_info("In %s, status_tx: %08x, status_rx: %08x, status_rx_r: %08x, notify: %08x\n",
+		__func__, status_tx, status_rx, status_rx_r, sw_r32(priv->r->l2_ntfy_if_intr_sts));
 	spin_lock(&priv->lock);
 
 	/*  Ignore TX interrupt */
