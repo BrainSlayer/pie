@@ -21,6 +21,8 @@ extern const struct rtl838x_reg rtl931x_reg;
 extern const struct dsa_switch_ops rtl83xx_switch_ops;
 extern const struct dsa_switch_ops rtl930x_switch_ops;
 
+extern void enable_switch_irq(void);
+
 DEFINE_MUTEX(smi_lock);
 
 int rtl83xx_port_get_stp_state(struct rtl838x_switch_priv *priv, int port)
@@ -1402,6 +1404,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	u64 bpdu_mask;
 
 	pr_info("Probing RTL838X switch device\n");
+
 	if (!pdev->dev.of_node) {
 		dev_err(dev, "No DT found\n");
 		return -EINVAL;
@@ -1523,11 +1526,13 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	for (i = 0; i <= priv->cpu_port; i++)
 		priv->ports[i].dp = dsa_to_port(priv->ds, i);
 
-	/* Enable link and media change interrupts. Are the SERDES masks needed? */
-	sw_w32_mask(0, 3, priv->r->isr_glb_src);
 
 	priv->r->set_port_reg_le(priv->irq_mask, priv->r->isr_port_link_sts_chg);
 	priv->r->set_port_reg_le(priv->irq_mask, priv->r->imr_port_link_sts_chg);
+
+	/* Enable link and media change interrupts. Are the SERDES masks needed? */
+	sw_w32_mask(0, 1, priv->r->isr_glb_src);
+	pr_info("RTL9310 Link status raw 1 %08x %08x\n", sw_r32(0x12b8), sw_r32(0x12bc));
 
 	priv->link_state_irq = platform_get_irq(pdev, 0);
 	pr_info("LINK state irq: %d\n", priv->link_state_irq);

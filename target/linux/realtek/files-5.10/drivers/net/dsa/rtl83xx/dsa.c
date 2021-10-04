@@ -41,7 +41,12 @@ static void rtl83xx_enable_phy_polling(struct rtl838x_switch_priv *priv)
 	}
 
 	pr_info("%s: %16llx\n", __func__, v);
-	priv->r->set_port_reg_le(v, priv->r->smi_poll_ctrl);
+	if (priv->family_id != RTL9310_FAMILY_ID) {
+		priv->r->set_port_reg_le(v, priv->r->smi_poll_ctrl);
+	} else {
+		sw_w32(0xffffffff, RTL931X_SMI_PORT_POLLING_CTRL);
+		sw_w32(0x7fffff, RTL931X_SMI_PORT_POLLING_CTRL + 4);
+	}
 
 	/* PHY update complete, there is no global PHY polling enable bit on the 9300 */
 	if (priv->family_id == RTL8390_FAMILY_ID)
@@ -718,7 +723,7 @@ static void rtl93xx_phylink_mac_config(struct dsa_switch *ds, int port,
 		return;
 
 	// On the RTL930X, ports 24 to 27 are using an internal SerDes
-	if (port >=24 && port <= 27) {
+	if (port >=24 && port <= 27 && priv->family_id == RTL9300_FAMILY_ID) {
 		sds_num = port - 18; // Port 24 mapped to SerDes 6, 25 to 7 ...
 		switch (state->interface) {
 		case PHY_INTERFACE_MODE_HSGMII:
@@ -815,6 +820,7 @@ static void rtl93xx_phylink_mac_link_up(struct dsa_switch *ds, int port,
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
 
+	pr_info("%s called\n", __func__);
 	/* Restart TX/RX to port */
 	sw_w32_mask(0, 0x3, priv->r->mac_port_ctrl(port));
 }
@@ -891,7 +897,6 @@ static int rtl83xx_port_enable(struct dsa_switch *ds, int port,
 	u64 v;
 
 	pr_debug("%s: %x %d", __func__, (u32) priv, port);
-
 
 	priv->ports[port].enable = true;
 
@@ -1119,7 +1124,6 @@ void rtl83xx_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
 
 	priv->r->stp_get(priv, msti, port_state);
 
-	pr_info("Current state, port %d: %d\n", port, (port_state[index] >> bit) & 3);
 	port_state[index] &= ~(3 << bit);
 
 	switch (state) {
@@ -1206,7 +1210,7 @@ static int rtl83xx_vlan_filtering(struct dsa_switch *ds, int port,
 				  bool vlan_filtering, struct switchdev_trans *trans)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	pr_debug("%s: port %d state %d\n", __func__, port, vlan_filtering);
+	pr_info("%s: port %d state %d\n", __func__, port, vlan_filtering);
 	mutex_lock(&priv->reg_mutex);
 
 	if (vlan_filtering) {
@@ -1243,6 +1247,7 @@ static int rtl83xx_vlan_prepare(struct dsa_switch *ds, int port,
 	struct rtl838x_vlan_info info;
 	struct rtl838x_switch_priv *priv = ds->priv;
 
+	pr_info("%s called\n");
 	mutex_lock(&priv->reg_mutex);
 	priv->r->vlan_tables_read(0, &info);
 

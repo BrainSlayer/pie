@@ -178,16 +178,14 @@ irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 	u64 link;
 	int i;
 
-	u32 status_rx_r = sw_r32(RTL931X_DMA_IF_INTR_RX_RUNOUT_STS);
-	u32 status_rx = sw_r32(RTL931X_DMA_IF_INTR_RX_DONE_STS);
-	u32 status_tx = sw_r32(RTL931X_DMA_IF_INTR_TX_DONE_STS);
-
 	/* Clear status */
 	rtl839x_set_port_reg_le(ports, RTL931X_ISR_PORT_LINK_STS_CHG);
 	pr_info("RTL9310 Link change: status: %x, ports %llx\n", status, ports);
 
 	for (i = 0; i < 56; i++) {
 		if (ports & BIT_ULL(i)) {
+			link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
+			// Must re-read this to get correct status
 			link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
 			if (link & BIT_ULL(i))
 				dsa_port_phylink_mac_change(ds, i, true);
@@ -208,6 +206,7 @@ int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 		return -ENOTSUPP;
 
 	mutex_lock(&smi_lock);
+	pr_info("%s: writing to phy %d %d %d %d\n", __func__, port, page, reg, val);
 	/* Clear both port registers */
 	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2);
 	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2 + 4);

@@ -8,14 +8,14 @@
 / {
 	compatible = "edgecore,ecs4125-10p", "realtek,rtl838x-soc";
 	model = "Edgecore ECS4125-12P Switch";
-
+/*
 	aliases {
 		led-boot = &led_sys;
 		led-failsafe = &led_sys;
 		led-running = &led_sys;
 		led-upgrade = &led_sys;
 	};	
-
+*/
 
 	memory@0 {
 		device_type = "memory";
@@ -30,7 +30,7 @@
 	chosen {
 		bootargs = "console=ttyS0,115200";
 	};
-
+/*
 	leds {
 		compatible = "gpio-leds";
 
@@ -38,13 +38,13 @@
 			label = "ecs4125_15:green:sys";
 			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
 		};
-	};
+	}; */
 };
-
+/*
 &gpio0 {
 	indirect-access-bus-id = <0>;
 };
-
+*/
 &spi0 {
 	status = "okay";
 	flash@0 {

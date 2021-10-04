@@ -685,13 +685,13 @@ static void rtl838x_hw_reset(struct rtl838x_eth_priv *priv)
 
 	/* Reset NIC  */
 	if (priv->family_id == RTL9300_FAMILY_ID || priv->family_id == RTL9310_FAMILY_ID)
-		sw_w32(0x4, priv->r->rst_glb_ctrl);
+		sw_w32(0x86, priv->r->rst_glb_ctrl);
 	else
 		sw_w32(0x8, priv->r->rst_glb_ctrl);
 
 	do { /* Wait for reset of NIC and Queues done */
 		udelay(20);
-	} while (sw_r32(priv->r->rst_glb_ctrl) & 0xc);
+	} while (sw_r32(priv->r->rst_glb_ctrl) & 0xff);
 	mdelay(100);
 
 	/* Setup Head of Line */
@@ -936,17 +936,17 @@ static int rtl838x_eth_open(struct net_device *ndev)
 
 	case RTL9310_FAMILY_ID:
 		rtl93xx_hw_en_rxtx(priv);
-
+/*
 		// Enable CPU access to switch, set EXT_CPU_EN
 		sw_w32_mask(0, BIT(2), RTL931X_MAC_L2_GLOBAL_CTRL2);
 
 		// Set PCIE_PWR_DOWN
 		sw_w32_mask(0, BIT(1), RTL931X_PS_SOC_CTRL);
-		break;
+		break; */
 	}
 
 	netif_tx_start_all_queues(ndev);
-
+	pr_info("%s: sleeping 2\n", __func__); msleep(10000); pr_info("%s: sleeping done 2\n", __func__);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return 0;
@@ -1585,6 +1585,9 @@ static int rtl8380_init_mac(struct rtl838x_eth_priv *priv)
 	if (priv->family_id == 0x8390)
 		return rtl8390_init_mac(priv);
 
+	if (priv->family_id != 0x8380)
+		return 0;
+
 	pr_info("%s\n", __func__);
 	/* fix timer for EEE */
 	sw_w32(0x5001411, RTL838X_EEE_TX_TIMER_GIGA_CTRL);
@@ -1607,7 +1610,7 @@ static int rtl838x_get_link_ksettings(struct net_device *ndev,
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(ndev);
 
-	pr_debug("%s called\n", __func__);
+	pr_info("%s called\n", __func__);
 	return phylink_ethtool_ksettings_get(priv->phylink, cmd);
 }
 
@@ -1616,7 +1619,7 @@ static int rtl838x_set_link_ksettings(struct net_device *ndev,
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(ndev);
 
-	pr_debug("%s called\n", __func__);
+	pr_info("%s called\n", __func__);
 	return phylink_ethtool_ksettings_set(priv->phylink, cmd);
 }
 
@@ -1753,7 +1756,7 @@ static int rtl931x_mdio_write(struct mii_bus *bus, int mii_id,
 
 static int rtl838x_mdio_reset(struct mii_bus *bus)
 {
-	pr_debug("%s called\n", __func__);
+	pr_info("%s called\n", __func__);
 	/* Disable MAC polling the PHY so that we can start configuration */
 	sw_w32(0x00000000, RTL838X_SMI_POLL_CTRL);
 
@@ -1839,47 +1842,32 @@ static int rtl931x_mdio_reset(struct mii_bus *bus)
 	bool mdc_on[4];
 
 	pr_info("%s called\n", __func__);
+	// Disable port polling for configuration purposes
+	sw_w32(0, RTL931X_SMI_PORT_POLLING_CTRL);
+	sw_w32(0, RTL931X_SMI_PORT_POLLING_CTRL + 4);
+	msleep(100);
 
 	mdc_on[0] = mdc_on[1] = mdc_on[2] = mdc_on[3] = false;
 	// Mapping of port to phy-addresses on an SMI bus
 	poll_sel[0] = poll_sel[1] = poll_sel[2] = poll_sel[3] = 0;
-	for (i = 0; i < 12; i++)
-		pr_info("WAS i: %d, %08x\n", i, sw_r32(RTL931X_SMI_PORT_ADDR + i * 4));
 	for (i = 0; i < 56; i++) {
 		pos = (i % 6) * 5;
-		pr_info("WAS i: port %d, %08x\n", i, (sw_r32(RTL931X_SMI_PORT_ADDR + (i / 6) * 4) >> pos) & 0x1f);
 		sw_w32_mask(0x1f << pos, priv->smi_addr[i] << pos, RTL931X_SMI_PORT_ADDR + (i / 6) * 4);
-
-		pr_info("port %d mapped to pos %d, bus %d, phy-id %d\n", i, pos, priv->smi_bus[i], priv->smi_addr[i]);
 		pos = (i * 2) % 32;
 		poll_sel[i / 16] |= priv->smi_bus[i] << pos;
 		poll_ctrl |= BIT(20 + priv->smi_bus[i]);
 		mdc_on[priv->smi_bus[i]] = true;
-	
-		// Enable Polling of the respective port
-		sw_w32_mask(0, 1 << (i % 32), RTL931X_SMI_PORT_POLLING_CTRL + (i >> 5) * 4);
 	}
 
-	for (i = 0; i < 12; i++)
-		pr_info("i: %d, %08x\n", i, sw_r32(RTL931X_SMI_PORT_ADDR + i * 4));
-	
 	// Configure which SMI bus is behind which port number
-	for (i = 0; i < 4; i++) {
-		pr_info("poll sel WAS %d, %08x\n", i, sw_r32(RTL931X_SMI_PORT_POLLING_SEL + (i * 4)));
-	}
 	for (i = 0; i < 4; i++) {
 		pr_info("poll sel %d, %08x\n", i, poll_sel[i]);
 		sw_w32(poll_sel[i], RTL931X_SMI_PORT_POLLING_SEL + (i * 4));
 	}
 
-	// Enable polling on the respective SMI busses
-	//sw_w32_mask(0, poll_ctrl, RTL930X_SMI_GLB_CTRL);
-
-	// Poll the respective port:
-	// Set bit p of RTL9310_SMI_PORT_POLLING_CTRL for p < 56, after SerDes patching!
-
 	// Configure which SMI busses
 	pr_info("%s: WAS RTL931X_MAC_L2_GLOBAL_CTRL2 %08x\n", __func__, sw_r32(RTL931X_MAC_L2_GLOBAL_CTRL2));
+	pr_info("c45_mask: %08x, RTL931X_SMI_GLB_CTRL0 was %X", c45_mask, sw_r32(RTL931X_SMI_GLB_CTRL0));
 	for (i = 0; i < 4; i++) {
 		// bus is polled in c45
 		if (priv->smi_bus_isc45[i])
@@ -1887,24 +1875,21 @@ static int rtl931x_mdio_reset(struct mii_bus *bus)
 		// Enable bus access via MDC
 		if (mdc_on[i]) {
 			sw_w32_mask(0, BIT(9 + i), RTL931X_MAC_L2_GLOBAL_CTRL2);
+			// Private field
+			sw_w32_mask(0, BIT(20 + i), RTL931X_SMI_GLB_CTRL0);
+			// Park page
+			sw_w32_mask(0, BIT(16 + i), RTL931X_SMI_GLB_CTRL0);
 		}
 	}
 
 	pr_info("%s: RTL931X_MAC_L2_GLOBAL_CTRL2 %08x\n", __func__, sw_r32(RTL931X_MAC_L2_GLOBAL_CTRL2));
+	pr_info("c45_mask: %08x, RTL931X_SMI_GLB_CTRL0 was %X", c45_mask, sw_r32(RTL931X_SMI_GLB_CTRL0));
 
-	pr_info("%s: WAS RTL931X_SMI_10GPHY_POLLING_SEL2 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL2));
-	pr_info("%s: WAS RTL931X_SMI_10GPHY_POLLING_SEL3 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL3));
-	pr_info("%s: WAS RTL931X_SMI_10GPHY_POLLING_SEL4 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL4));
-	// We have a 10G PHY enable polling
+	/* We have a 10G PHY enable polling
 	sw_w32(0x01010000, RTL931X_SMI_10GPHY_POLLING_SEL2);
 	sw_w32(0x01E7C400, RTL931X_SMI_10GPHY_POLLING_SEL3);
 	sw_w32(0x01E7E820, RTL931X_SMI_10GPHY_POLLING_SEL4);
-
-	pr_info("%s: RTL931X_SMI_10GPHY_POLLING_SEL2 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL2));
-	pr_info("%s: RTL931X_SMI_10GPHY_POLLING_SEL3 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL3));
-	pr_info("%s: RTL931X_SMI_10GPHY_POLLING_SEL4 %X\n",__func__, sw_r32(RTL931X_SMI_10GPHY_POLLING_SEL4));
-
-	pr_info("c45_mask: %08x, was %X", c45_mask, sw_r32(RTL931X_SMI_GLB_CTRL1));
+*/
 	sw_w32_mask(0xff, c45_mask, RTL931X_SMI_GLB_CTRL1);
 
 	return 0;
@@ -2041,7 +2026,6 @@ err_put_node:
 
 static int rtl838x_mdio_remove(struct rtl838x_eth_priv *priv)
 {
-	pr_debug("%s called\n", __func__);
 	if (!priv->mii_bus)
 		return 0;
 
@@ -2075,6 +2059,8 @@ static int rtl93xx_set_features(struct net_device *dev, netdev_features_t featur
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(dev);
 
+	pr_info("%s called\n", __func__);
+	return 0;
 	if ((features ^ dev->features) & NETIF_F_RXCSUM) {
 		if (!(features & NETIF_F_RXCSUM))
 			sw_w32_mask(BIT(4), 0, priv->r->mac_port_ctrl(priv->cpu_port));

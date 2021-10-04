@@ -8,18 +8,18 @@
 / {
 	compatible = "zyxel,xs1900-10", "realtek,rtl838x-soc";
 	model = "Zyxel XS1900-10";
-
+/*
 	aliases {
 		led-boot = &led_sys;
 		led-failsafe = &led_sys;
 		led-running = &led_sys;
 		led-upgrade = &led_sys;
 	};	
-
+*/
 	chosen {
 		bootargs = "console=ttyS0,115200";
 	};
-
+/*
 	leds {
 		compatible = "gpio-leds";
 
@@ -27,13 +27,13 @@
 			label = "gs1900_46:green:sys";
 			gpios = <&gpio0 46 GPIO_ACTIVE_HIGH>;
 		};
-	};
+	}; */
 };
-
+/*
 &gpio0 {
 	indirect-access-bus-id = <0>;
 };
-
+*/
 &spi0 {
 	status = "okay";
 	flash@0 {
