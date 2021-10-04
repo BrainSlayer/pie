@@ -42,7 +42,6 @@
 		interrupt-controller;
 	};
 
-
 	osc: oscillator {
 		compatible = "fixed-clock";
 		#clock-cells = <1>;
