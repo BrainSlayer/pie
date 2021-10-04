@@ -42,6 +42,13 @@
 		interrupt-controller;
 	};
 
+	osc: oscillator {
+		compatible = "fixed-clock";
+		#clock-cells = <1>;
+		clock-frequency  = <200000000>;
+		clock-output-names = "osc";
+	};
+
 	gic: interrupt-controller@1ddc0000 {
 		compatible = "mti,gic";
 		reg = <0x1ddc0000 0x20000>;
@@ -60,6 +67,7 @@
 		timer {
 			compatible = "mti,gic-timer";
 			interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;
+			clocks = <&osc 0>;
 		};
 	};
 	
