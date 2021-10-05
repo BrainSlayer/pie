@@ -239,7 +239,7 @@ static ssize_t drop_counter_read(struct file *filp, char __user *buffer, size_t 
 	case RTL9310_FAMILY_ID:
 		d = rtl931x_drop_cntr;
 		offset = RTL931X_STAT_PRVTE_DROP_COUNTERS;
-		num = 80;
+		num = 81;
 		break;
 	}
 
