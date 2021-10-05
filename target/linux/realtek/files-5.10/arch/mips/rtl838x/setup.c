@@ -175,13 +175,38 @@ void __init plat_mem_setup(void)
 	}
 }
 
+#ifdef CONFIG_CLKSRC_MIPS_GIC
+static u32 gic_frequency_dt;
+
+static struct property gic_frequency_prop = {
+	.name = "clock-frequency",
+	.length = sizeof(u32),
+	.value = &gic_frequency_dt,
+};
+
+static void update_gic_frequency_dt(unsigned int gic_frequency)
+{
+	struct device_node *node;
+
+	gic_frequency_dt = cpu_to_be32(gic_frequency);
+
+	node = of_find_compatible_node(NULL, NULL, "mti,gic-timer");
+	if (!node) {
+		pr_err("mti,gic-timer device node not found\n");
+		return;
+	}
+
+	if (of_update_property(node, &gic_frequency_prop) < 0)
+		pr_err("error updating gic frequency property\n");
+}
+#endif
+
 void __init plat_time_init(void)
 {
 	struct device_node *np;
 	u32 freq = 500000000;
 
 	of_clk_init(NULL);
-	timer_probe();
 
 	np = of_find_node_by_name(NULL, "cpus");
 	if (!np) {
@@ -195,6 +220,11 @@ void __init plat_time_init(void)
 	}
 
 	mips_hpt_frequency = freq / 2;
+#ifdef CONFIG_CLKSRC_MIPS_GIC
+	printk("GIC frequency %d.%02d MHz\n", freq/1000000, (freq%1000000)*100/1000000);
+	update_gic_frequency_dt(mips_hpt_frequency);
+#endif
+	timer_probe();
 }
 
 void __init arch_init_irq(void)
