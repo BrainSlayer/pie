@@ -274,7 +274,7 @@ static int rtl8231_gpio_probe(struct platform_device *pdev)
 	struct rtl8231_gpios *gpios;
 	int err;
 	u32 indirect_bus_id;
-
+	return 0;
 	pr_info("Probing RTL8231 GPIOs\n");
 
 	if (!np) {

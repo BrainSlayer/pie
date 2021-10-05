@@ -346,7 +346,7 @@ static int rtl838x_gpio_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 	struct rtl838x_gpios *gpios;
 	int err;
-
+	return 0;
 	pr_info("Probing RTL838X GPIOs for %08x\n", soc_info.id);
 
 	if (!np) {
