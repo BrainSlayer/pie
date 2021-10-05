@@ -936,17 +936,16 @@ static int rtl838x_eth_open(struct net_device *ndev)
 
 	case RTL9310_FAMILY_ID:
 		rtl93xx_hw_en_rxtx(priv);
-/*
-		// Enable CPU access to switch, set EXT_CPU_EN
-		sw_w32_mask(0, BIT(2), RTL931X_MAC_L2_GLOBAL_CTRL2);
+
+		// Disable External CPU access to switch, clear EXT_CPU_EN
+		sw_w32_mask(BIT(2), 0, RTL931X_MAC_L2_GLOBAL_CTRL2);
 
 		// Set PCIE_PWR_DOWN
 		sw_w32_mask(0, BIT(1), RTL931X_PS_SOC_CTRL);
-		break; */
+		break;
 	}
 
 	netif_tx_start_all_queues(ndev);
-	pr_info("%s: sleeping 2\n", __func__); msleep(10000); pr_info("%s: sleeping done 2\n", __func__);
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return 0;
