@@ -63,3 +63,5 @@ struct __attribute__ ((__packed__)) fw_header {
 /*Registers of the internal SerDes of the 9310 */
 #define RTL931X_SERDES_INDRT_ACCESS_CTRL	(0x5638)
 #define RTL931X_SERDES_INDRT_DATA_CTRL		(0x563C)
+#define RTL931X_SERDES_MODE_CTRL		(0x13cc)
+#define RTL931X_PS_SERDES_OFF_MODE_CTRL		(0x13f4)

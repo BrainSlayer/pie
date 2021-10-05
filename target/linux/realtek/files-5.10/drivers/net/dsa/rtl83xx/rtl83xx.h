@@ -132,6 +132,7 @@ int rtl83xx_lag_del(struct dsa_switch *ds, int group, int port);
 
 /* RTL931x-specific */
 irqreturn_t rtl931x_switch_irq(int irq, void *dev_id);
+void rtl9310_sds_rst(int sds_num, u32 mode);
 
 #endif /* _NET_DSA_RTL83XX_H */
 

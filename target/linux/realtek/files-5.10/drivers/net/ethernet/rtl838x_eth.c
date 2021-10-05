@@ -1870,7 +1870,7 @@ static int rtl931x_mdio_reset(struct mii_bus *bus)
 	for (i = 0; i < 4; i++) {
 		// bus is polled in c45
 		if (priv->smi_bus_isc45[i])
-			c45_mask |= 0x3 << (i * 2);  // Std. C45, non-standard is 0x3 BUG: Use 2 again
+			c45_mask |= 0x2 << (i * 2);  // Std. C45, non-standard is 0x3
 		// Enable bus access via MDC
 		if (mdc_on[i]) {
 			sw_w32_mask(0, BIT(9 + i), RTL931X_MAC_L2_GLOBAL_CTRL2);

@@ -241,6 +241,32 @@ void rtl9300_sds_rst(int sds_num, u32 mode)
 		sw_r32(0x194), sw_r32(0x198), sw_r32(0x2a0), sw_r32(0x2a4));
 }
 
+/* Reset the SerDes by powering it off, setting its mode to off (0x9f), setting the new mode
+ * and turning it on again. Modes are:
+ * 0x06: QSGMII		0x10: XSGMII		0x0d: USXGMII
+ * 0x12: HISGMII	0x09: XSMII		0x02: SGMII
+ * 0x1f: OFF
+ */
+void rtl9310_sds_rst(int sds_num, u32 mode)
+{
+	u32 sds_ps;
+	int pos = sds_num % 4;
+
+	// Switch Serdes Off
+	sds_ps = sw_r32(RTL931X_PS_SERDES_OFF_MODE_CTRL);
+	sw_w32(sds_ps | BIT(sds_num), RTL931X_PS_SERDES_OFF_MODE_CTRL);
+
+	// Change SerDes mode to off and then set new mode
+	sw_w32_mask(0xff << pos, 0x9f << pos, RTL931X_SERDES_MODE_CTRL + ((sds_num >> 2) << 2));
+	msleep(10);
+	// New mode, need to set BIT(7)
+	mode |= BIT(7);
+	sw_w32_mask(0xff << pos, mode << pos, RTL931X_SERDES_MODE_CTRL + ((sds_num >> 2) << 2));
+
+	// Return to inital power state
+	sw_w32(sds_ps, RTL931X_PS_SERDES_OFF_MODE_CTRL);
+}
+
 /*
  * On the RTL839x family of SoCs with inbuilt SerDes, these SerDes are accessed through
  * a 2048 bit register that holds the contents of the PHY being simulated by the SoC.
