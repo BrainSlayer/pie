@@ -253,9 +253,15 @@ int rtl8231_init(struct rtl8231_gpios *gpios)
 		sw_w32_mask(3, 1, RTL838X_DMY_REG5);
 	}
 
-	/*Select GPIO functionality for pins 0-15, 16-31 and 32-37 */
+	/* Select GPIO functionality and force input direction for pins 0-36 */
 	rtl8231_write(gpios, RTL8231_GPIO_PIN_SEL(0), 0xffff);
+	rtl8231_write(gpios, RTL8231_GPIO_DIR(0), 0xffff);
 	rtl8231_write(gpios, RTL8231_GPIO_PIN_SEL(16), 0xffff);
+	rtl8231_write(gpios, RTL8231_GPIO_DIR(16), 0xffff);
+	rtl8231_write(gpios, RTL8231_GPIO_PIN_SEL(32), 0x03ff);
+
+	/* Set LED_Start to enable drivers for output mode */
+	rtl8231_write(gpios, RTL8231_LED_FUNC0, 1 << 1);
 
 	return 0;
 }
