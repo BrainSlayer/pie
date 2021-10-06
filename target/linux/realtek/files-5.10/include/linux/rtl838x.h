@@ -171,8 +171,8 @@
 #define RTL930X_RX_PAUSE_EN				(1 << 8)
 #define RTL930X_MAC_FORCE_FC_EN				(1 << 9)
 
-#define RTL931X_FORCE_EN				(1 << 0)
-#define RTL931X_FORCE_LINK_EN				(1 << 1)
+#define RTL931X_FORCE_EN				(1 << 9)
+#define RTL931X_FORCE_LINK_EN				(1 << 0)
 #define RTL931X_DUPLEX_MODE				(1 << 2)
 #define RTL931X_MAC_FORCE_FC_EN				(1 << 4)
 #define RTL931X_TX_PAUSE_EN				(1 << 16)

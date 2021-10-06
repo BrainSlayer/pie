@@ -499,7 +499,7 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 	u32 status_tx = sw_r32(priv->r->dma_if_intr_tx_done_sts);
 	int i;
 
-	pr_info("In %s, status_tx: %08x, status_rx: %08x, status_rx_r: %08x, notify: %08x\n",
+	pr_debug("In %s, status_tx: %08x, status_rx: %08x, status_rx_r: %08x, notify: %08x\n",
 		__func__, status_tx, status_rx, status_rx_r, sw_r32(priv->r->l2_ntfy_if_intr_sts));
 	spin_lock(&priv->lock);
 
@@ -816,7 +816,11 @@ static void rtl93xx_hw_en_rxtx(struct rtl838x_eth_priv *priv)
 		sw_w32_mask(0, BIT(priv->cpu_port), RTL930X_L2_UNKN_UC_FLD_PMSK);
 	else
 		sw_w32_mask(0, BIT(priv->cpu_port), RTL931X_L2_UNKN_UC_FLD_PMSK);
-	sw_w32(0x217, priv->r->mac_force_mode_ctrl + priv->cpu_port * 4);
+
+	if (priv->family_id == RTL9300_FAMILY_ID)
+		sw_w32(0x217, priv->r->mac_force_mode_ctrl + priv->cpu_port * 4);
+	else
+		sw_w32(0x2a1d, priv->r->mac_force_mode_ctrl + priv->cpu_port * 4);
 
 }
 
@@ -991,8 +995,10 @@ static void rtl838x_hw_stop(struct rtl838x_eth_priv *priv)
 	/* CPU-Port: Link down */
 	if (priv->family_id == RTL8380_FAMILY_ID || priv->family_id == RTL8390_FAMILY_ID)
 		sw_w32(force_mac, priv->r->mac_force_mode_ctrl + priv->cpu_port * 4);
-	else
+	else if (priv->family_id == RTL9300_FAMILY_ID)
 		sw_w32_mask(0x3, 0, priv->r->mac_force_mode_ctrl + priv->cpu_port *4);
+	else if (priv->family_id == RTL9310_FAMILY_ID)
+		sw_w32_mask(BIT(0) | BIT(9), 0, priv->r->mac_force_mode_ctrl + priv->cpu_port *4);
 	mdelay(100);
 
 	/* Disable all TX/RX interrupts */
