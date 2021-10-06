@@ -1682,6 +1682,16 @@ static int rtl838x_set_ageing_time(unsigned long msec)
 	return 0;
 }
 
+static void rtl838x_set_igr_filter(int port, int state)
+{
+	sw_w32_mask(0x3 << ((port & 0xf)<<1), state << ((port & 0xf)<<1), RTL838X_VLAN_PORT_IGR_FLTR + (((port >> 4) << 2)));
+}
+
+static void rtl838x_set_egr_filter(int port, int state)
+{
+	sw_w32_mask(0x1 << (port % 0x1d), state << (port % 0x1d), RTL838X_VLAN_PORT_EGR_FLTR + (((port / 29) << 2)));
+}
+
 const struct rtl838x_reg rtl838x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -1733,8 +1743,6 @@ const struct rtl838x_reg rtl838x_reg = {
 	.write_l2_entry_using_hash = rtl838x_write_l2_entry_using_hash,
 	.read_cam = rtl838x_read_cam,
 	.write_cam = rtl838x_write_cam,
-	.vlan_port_egr_filter = RTL838X_VLAN_PORT_EGR_FLTR,
-	.vlan_port_igr_filter = RTL838X_VLAN_PORT_IGR_FLTR,
 	.vlan_port_pvidmode_set = rtl838x_vlan_port_pvidmode_set,
 	.vlan_port_pvid_set = rtl838x_vlan_port_pvid_set,
 	.vlan_port_tag_sts_ctrl = RTL838X_VLAN_PORT_TAG_STS_CTRL,
@@ -1783,6 +1791,8 @@ const struct rtl838x_reg rtl838x_reg = {
 	.trk_hash_idx_ctrl = RTL838X_TRK_HASH_IDX_CTRL,
 	.set_distribution_algorithm = rtl838x_set_distribution_algorithm,
 	.set_receive_management_action = rtl838x_set_receive_management_action,
+	.set_vlan_igr_filter = rtl838x_set_igr_filter,
+	.set_vlan_egr_filter = rtl838x_set_egr_filter,
 };
 
 irqreturn_t rtl838x_switch_irq(int irq, void *dev_id)

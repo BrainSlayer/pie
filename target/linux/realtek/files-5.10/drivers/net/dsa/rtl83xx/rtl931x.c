@@ -718,6 +718,17 @@ static int rtl931x_set_ageing_time(unsigned long msec)
 	return 0;
 }
 
+static void rtl931x_set_igr_filter(int port, int state)
+{
+	sw_w32_mask(0x3 << ((port & 0xf)<<1), state << ((port & 0xf)<<1), RTL931X_VLAN_PORT_IGR_FLTR + (((port >> 4) << 2)));
+}
+
+static void rtl931x_set_egr_filter(int port, int state)
+{
+	sw_w32_mask(0x1 << (port % 0x20), state << (port % 0x20), RTL931X_VLAN_PORT_EGR_FLTR + (((port >> 5) << 2)));
+}
+
+
 const struct rtl838x_reg rtl931x_reg = {
 	.mask_port_reg_be = rtl839x_mask_port_reg_be,
 	.set_port_reg_be = rtl839x_set_port_reg_be,
@@ -771,8 +782,6 @@ const struct rtl838x_reg rtl931x_reg = {
 	.write_cam = rtl931x_write_cam,
 	.read_mcast_pmask = rtl931x_read_mcast_pmask,
 	.write_mcast_pmask = rtl931x_write_mcast_pmask,
-	.vlan_port_egr_filter = RTL931X_VLAN_PORT_EGR_FLTR,
-	.vlan_port_igr_filter = RTL931X_VLAN_PORT_IGR_FLTR,
 	.vlan_port_pvidmode_set = rtl931x_vlan_port_pvidmode_set,
 	.vlan_port_pvid_set = rtl931x_vlan_port_pvid_set,
 	.vlan_port_tag_sts_ctrl = RTL931X_VLAN_PORT_TAG_CTRL,
@@ -799,5 +808,7 @@ const struct rtl838x_reg rtl931x_reg = {
 	.set_distribution_algorithm = rtl931x_set_distribution_algorithm,
 	.set_receive_management_action = rtl931x_set_receive_management_action,
 	.pie_init = rtl931x_pie_init,
+	.set_vlan_igr_filter = rtl931x_set_igr_filter,
+	.set_vlan_egr_filter = rtl931x_set_egr_filter,
 };
 

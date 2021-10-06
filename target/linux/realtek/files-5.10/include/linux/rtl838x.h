@@ -974,6 +974,8 @@ struct rtl838x_reg {
 	void (*set_receive_management_action)(int port, rma_ctrl_t type, action_type_t action);	
 	void (*vlan_port_pvidmode_set)(int port, enum pbvlan_type type, enum pbvlan_mode mode);
 	void (*vlan_port_pvid_set)(int port, enum pbvlan_type type, int pvid);
+	void (*set_vlan_igr_filter)(int port, int state);
+	void (*set_vlan_egr_filter)(int port, int state);
 	int (*set_ageing_time)(unsigned long msec);
 	u32 stat_port_rst;
 	u32 stat_rst;
@@ -994,8 +996,6 @@ struct rtl838x_reg {
 	u32 mac_link_dup_sts;
 	u32 mac_rx_pause_sts;
 	u32 mac_tx_pause_sts;
-	u32 vlan_port_egr_filter;
-	u32 vlan_port_igr_filter;
 	u32 vlan_port_tag_sts_ctrl;
 	u32 rma_bpdu_fld_pmask;
 	u32 rma_bpdu_ctrl;
