@@ -143,6 +143,11 @@ static void rtl83xx_vlan_setup(struct rtl838x_switch_priv *priv)
 	info.hash_mc_fid = false;	// Do the same for Multicast packets
 	info.profile_id = 0;		// Use default Vlan Profile 0
 	info.tagged_ports = 0;		// Initially no port members
+	if (priv->family_id == RTL9310_FAMILY_ID) {
+		info.if_id = 0;
+		info.multicast_grp_mask = 0;
+		info.l2_tunnel_list_id = -1;
+	}
 
 	// Initialize all vlans 0-4095
 	for (i = 0; i < MAX_VLANS; i ++)
@@ -1896,7 +1901,6 @@ static int rtl83xx_port_mirror_add(struct dsa_switch *ds, int port,
 	/* We support 4 mirror groups, one destination port per group */
 	int group, err = 0;
 	struct rtl838x_switch_priv *priv = ds->priv;
-	struct rtl838x_vlan_info info;
 	int ctrl_reg, dpm_reg, spm_reg;
 
 	pr_debug("In %s\n", __func__);
@@ -2049,7 +2053,6 @@ static void add_portmatrix(struct dsa_switch *ds,int port)
 static int rtl83xx_port_lag_change(struct dsa_switch *ds, int port)
 {
 	struct rtl838x_switch_priv *priv = ds->priv;
-	u64 port_bitmap = BIT_ULL(priv->cpu_port);
 
 	pr_debug("%s: %d\n", __func__, port);
 	mutex_lock(&priv->reg_mutex);

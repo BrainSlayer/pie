@@ -622,7 +622,12 @@ struct rtl838x_vlan_info {
 	u8 profile_id;
 	bool hash_mc_fid;
 	bool hash_uc_fid;
-	u8 fid;
+	u8 fid;			// AKA MSTI
+
+	// The following fields are used only by the RTL931X
+	int if_id;	// Interface (index in L3_EGR_INTF_IDX)
+	u16 multicast_grp_mask;
+	int l2_tunnel_list_id;
 };
 
 enum l2_entry_type {

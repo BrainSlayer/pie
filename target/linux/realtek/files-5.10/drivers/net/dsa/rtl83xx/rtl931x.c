@@ -84,15 +84,24 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	w = sw_r32(rtl_table_data(r, 1));
 	x = sw_r32(rtl_table_data(r, 2));
 	y = sw_r32(rtl_table_data(r, 3));
-	pr_debug("VLAN_READ %d: %08x %08x\n", vlan, v, w);
 	rtl_table_release(r);
 
+	pr_info("VLAN_READ %d: %08x %08x %08x %08x\n", vlan, v, w, x, y);
 	info->tagged_ports = ((u64) v) << 25 | (w >> 7);
 	info->profile_id = (x >> 16) & 0xf;
-	info->hash_mc_fid = !!(x & BIT(30));
+	info->fid = w & 0x7f;				// AKA MSTI depending on context
 	info->hash_uc_fid = !!(x & BIT(31));
-	info->fid = w & 0x7f;
-	// TODO: use also info in 4th register
+	info->hash_mc_fid = !!(x & BIT(30));
+	info->if_id = (x >> 20) & 0x3ff;
+	info->profile_id = (x >> 16) & 0xf;
+	info->multicast_grp_mask = x & 0xffff;
+	if (x & BIT(31))
+		info->l2_tunnel_list_id = y >> 18;
+	else
+		info->l2_tunnel_list_id = -1;
+	pr_info("%s read tagged %016llx, profile-id %d, uc %d, mc %d, intf-id %d\n", __func__,
+		info->tagged_ports, info->profile_id, info->hash_uc_fid, info->hash_mc_fid,
+		info->if_id);
 
 	// Read UNTAG table via table register 3
 	r = rtl_table_get(RTL9310_TBL_3, 0);
@@ -106,21 +115,31 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 
 static void rtl931x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
 {
-	u32 v, w, x;
+	u32 v, w, x, y;
+	u16 mcast_tunnel_list = 0;
+	bool mcast_tunnel_list_valid = false;
 	// Access VLAN table (1) via register 0
 	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 3);
 
-	v = info->tagged_ports << 7;
-	w = (info->tagged_ports & 0x7f000000) << 25;
-	w |= (u32)info->fid;
-	x = info->profile_id << 16;
-	w |= info->hash_mc_fid ? BIT(30) : 0;
-	w |= info->hash_uc_fid ? BIT(31) : 0;
-	// TODO: use also info in 4th register
+	v = info->tagged_ports >> 25;
+	w = (info->tagged_ports & 0x1fffff) << 7;
+	w |= info->fid & 0x7f;
+	x = info->hash_uc_fid ? BIT(31) : 0;
+	x |= info->hash_mc_fid ? BIT(30) : 0;
+	x |= info->if_id & 0x3ff << 20;
+	x |= (info->profile_id & 0xf) << 16;
+	x |= info->multicast_grp_mask & 0xffff;
+	if (info->l2_tunnel_list_id >= 0) {
+		y = info->l2_tunnel_list_id << 18;
+		y |= BIT(31);
+	} else {
+		y = 0;
+	}
 
 	sw_w32(v, rtl_table_data(r, 0));
 	sw_w32(w, rtl_table_data(r, 1));
 	sw_w32(x, rtl_table_data(r, 2));
+	sw_w32(y, rtl_table_data(r, 3));
 
 	rtl_table_write(r, vlan);
 	rtl_table_release(r);
@@ -159,16 +178,6 @@ static inline int rtl931x_l2_port_new_sa_fwd(int p)
 {
 	return RTL931X_L2_PORT_NEW_SA_FWD(p);
 }
-
-#define RTL931X_DMA_IF_CTRL                     (0x0928)
-#define RTL931X_DMA_IF_INTR_RX_RUNOUT_STS       (0x091c)
-#define RTL931X_DMA_IF_INTR_RX_DONE_STS         (0x0920)
-#define RTL931X_DMA_IF_INTR_TX_DONE_STS         (0x0924)
-#define RTL931X_DMA_IF_INTR_RX_RUNOUT_MSK       (0x0910)
-#define RTL931X_DMA_IF_INTR_RX_DONE_MSK         (0x0914)
-#define RTL931X_DMA_IF_INTR_TX_DONE_MSK         (0x0918)
-#define RTL931X_L2_NTFY_IF_INTR_MSK             (0x09E4)
-#define RTL931X_L2_NTFY_IF_INTR_STS             (0x09E8)
 
 irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 {
@@ -668,6 +677,28 @@ static void rtl931x_vlan_fwd_on_inner(int port, bool is_set)
 
 static void rtl931x_vlan_profile_setup(int profile)
 {
+	u32 p[7];
+	int i;
+
+	pr_info("In %s\n", __func__);
+
+	if (profile > 15)
+		return;
+
+	p[0] = sw_r32(RTL931X_VLAN_PROFILE_SET(profile));
+
+	// Enable routing of Ipv4/6 Unicast and IPv4/6 Multicast traffic
+	//p[0] |= BIT(17) | BIT(16) | BIT(13) | BIT(12);
+	
+	p[1] = 0x1FFFFFF; // L2 unknwon MC flooding portmask all ports, including the CPU-port
+	p[2] = 0xFFFFFFFF;
+	p[3] = 0x1FFFFFF; // IPv4 unknwon MC flooding portmask
+	p[4] = 0xFFFFFFFF;
+	p[5] = 0x1FFFFFF; // IPv6 unknwon MC flooding portmask
+	p[6] = 0xFFFFFFFF;
+
+	for (i = 0; i < 7; i++)
+		sw_w32(p[i], RTL931X_VLAN_PROFILE_SET(profile) + i * 4);
 	pr_info("Leaving %s\n", __func__);
 }
 
