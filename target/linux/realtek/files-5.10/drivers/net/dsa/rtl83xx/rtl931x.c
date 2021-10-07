@@ -48,7 +48,7 @@ static void rtl931x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, u32 port
 	int i;
 	u32 cmd = 1 << 20 /* Execute cmd */
 		| 0 << 19 /* Read */
-		| 2 << 15 /* Table type 0b10 */
+		| 5 << 15 /* Table type 0b101 */
 		| (msti & 0x3fff);
 	priv->r->exec_tbl0_cmd(cmd);
 

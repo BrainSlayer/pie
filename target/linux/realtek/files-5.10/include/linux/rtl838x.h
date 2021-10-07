@@ -243,6 +243,8 @@
 
 #define RTL930X_ST_CTRL				(0x8798)
 
+#define RTL931X_ST_CTRL				(0x8000)
+
 #define RTL930X_L2_PORT_SABLK_CTRL		(0x905c)
 #define RTL930X_L2_PORT_DABLK_CTRL		(0x9060)
 
