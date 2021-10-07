@@ -86,7 +86,7 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 	y = sw_r32(rtl_table_data(r, 3));
 	rtl_table_release(r);
 
-	pr_info("VLAN_READ %d: %08x %08x %08x %08x\n", vlan, v, w, x, y);
+	pr_debug("VLAN_READ %d: %08x %08x %08x %08x\n", vlan, v, w, x, y);
 	info->tagged_ports = ((u64) v) << 25 | (w >> 7);
 	info->profile_id = (x >> 16) & 0xf;
 	info->fid = w & 0x7f;				// AKA MSTI depending on context
@@ -99,7 +99,7 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 		info->l2_tunnel_list_id = y >> 18;
 	else
 		info->l2_tunnel_list_id = -1;
-	pr_info("%s read tagged %016llx, profile-id %d, uc %d, mc %d, intf-id %d\n", __func__,
+	pr_debug("%s read tagged %016llx, profile-id %d, uc %d, mc %d, intf-id %d\n", __func__,
 		info->tagged_ports, info->profile_id, info->hash_uc_fid, info->hash_mc_fid,
 		info->if_id);
 

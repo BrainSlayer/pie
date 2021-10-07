@@ -322,7 +322,7 @@ bool rtl931x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
 	t->port = (h->cpu_tag[0] >> 8) & 0x3f;
 	t->crc_error = h->cpu_tag[1] & BIT(6);
 
-	pr_debug("Reason %d, port %d, queue %d\n", t->reason, t->port, t->queue);
+	pr_debug("%s: Reason %d, port %d, queue %d\n", __func__, t->reason, t->port, t->queue);
 	if (t->reason >= 19 && t->reason <= 27)
 		t->l2_offloaded = 0;
 	else
@@ -940,6 +940,9 @@ static int rtl838x_eth_open(struct net_device *ndev)
 
 	case RTL9310_FAMILY_ID:
 		rtl93xx_hw_en_rxtx(priv);
+
+		// Trap MLD and IGMP messages to CPU_PORT
+		sw_w32((0x2 << 3) | 0x2,  RTL931X_VLAN_APP_PKT_CTRL);
 
 		// Disable External CPU access to switch, clear EXT_CPU_EN
 		sw_w32_mask(BIT(2), 0, RTL931X_MAC_L2_GLOBAL_CTRL2);

@@ -246,7 +246,7 @@ static int rtl930x_setup(struct dsa_switch *ds)
 		sw_w32(0, RTL931X_SMI_PORT_POLLING_CTRL);
 		sw_w32(0, RTL931X_SMI_PORT_POLLING_CTRL + 4);
 		// Enable CIST STP mode
-		sw_w32(1, RTL931X_ST_CTRL);
+		//sw_w32(1, RTL931X_ST_CTRL);
 	}
 
 	// Disable all ports except CPU port

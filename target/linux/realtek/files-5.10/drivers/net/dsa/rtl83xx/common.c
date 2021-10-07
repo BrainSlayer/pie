@@ -1288,7 +1288,7 @@ static void rtl83xx_fib_event_work_do(struct work_struct *work)
 
 	/* Protect internal structures from changes */
 	rtnl_lock();
-	pr_debug("%s: doing work, event %ld\n", __func__, fib_work->event);
+	pr_info("%s: doing work, event %ld\n", __func__, fib_work->event);
 	switch (fib_work->event) {
 	case FIB_EVENT_ENTRY_ADD:
 	case FIB_EVENT_ENTRY_REPLACE:
