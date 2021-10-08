@@ -1680,19 +1680,19 @@ static int rtl83xx_port_fdb_dump(struct dsa_switch *ds, int port,
 			mac = ether_addr_to_u64(&e.mac[0]);
 			pkey = priv->r->l2_hash_key(priv, priv->r->l2_hash_seed(mac, fid));
 			fid = (pkey & 0x3ff) | (fid & ~0x3ff);
-			pr_debug("-> index %d, key %x, bucket %d, dmac %016llx, fid: %x rvid: %x\n",
+			pr_info("-> index %d, key %x, bucket %d, dmac %016llx, fid: %x rvid: %x\n",
 				i, i >> 2, i & 0x3, mac, fid, e.rvid);
 			dump_l2_entry(&e);
 			seed = priv->r->l2_hash_seed(mac, e.rvid);
 			key = priv->r->l2_hash_key(priv, seed);
-			pr_debug("seed: %016llx, key based on rvid: %08x\n", seed, key);
+			pr_info("seed: %016llx, key based on rvid: %08x\n", seed, key);
 			cb(e.mac, e.vid, e.is_static, data);
 		}
 		if (e.type == L2_MULTICAST) {
 			u64 portmask = priv->r->read_mcast_pmask(e.mc_portmask_index);
 			if (portmask & BIT_ULL(port)) {
 				dump_l2_entry(&e);
-				pr_debug("  PM: %016llx\n", portmask);
+				pr_info("  PM: %016llx\n", portmask);
 			}
 		}
 	}

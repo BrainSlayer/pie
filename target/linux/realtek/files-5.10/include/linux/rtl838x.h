@@ -664,6 +664,15 @@ struct rtl838x_l2_entry {
 	u16 mc_mac_index;
 	u16 nh_route_id;
 	bool nh_vlan_target;  // Only RTL83xx: VLAN used for next hop: 0: inner, 1: outer
+
+	// The following is only valid on RTL931x
+	bool is_open_flow;
+	bool is_pe_forward;
+	bool is_local_forward;
+	bool is_remote_forward;
+	bool is_l2_tunnel;
+	int l2_tunnel_id;
+	int l2_tunnel_list_id;
 };
 
 enum fwd_rule_action {

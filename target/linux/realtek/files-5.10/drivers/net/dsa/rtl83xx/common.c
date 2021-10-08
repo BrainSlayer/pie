@@ -1491,7 +1491,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 		priv->irq_mask = 0xFFFFFFFFFFFFFFULL;
 		priv->r = &rtl931x_reg;
 		priv->ds->num_ports = 57;
-		priv->fib_entries = 16384;
+		priv->fib_entries = 32768;
 		priv->n_lags = 16;
 		priv->l2_bucket_size = 8;
 		priv->n_pie_blocks = 32;
