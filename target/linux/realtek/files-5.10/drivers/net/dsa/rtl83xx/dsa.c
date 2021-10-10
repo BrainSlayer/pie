@@ -1331,13 +1331,13 @@ static int rtl83xx_vlan_filtering(struct dsa_switch *ds, int port,
 		 * The Egress filter used 1 bit per state (0: DISABLED, 1: ENABLED)
 		 */
 		if (port != priv->cpu_port)
-			priv->r->set_vlan_igr_filter(port, 0x1);
-		priv->r->set_vlan_egr_filter(port, 0x1);
+			priv->r->set_vlan_igr_filter(port, IGR_DROP);
+		priv->r->set_vlan_egr_filter(port, EGR_ENABLE);
 	} else {
 		/* Disable ingress and egress filtering */
 		if (port != priv->cpu_port)
-			priv->r->set_vlan_igr_filter(port, 0x0);
-		priv->r->set_vlan_egr_filter(port, 0x0);
+			priv->r->set_vlan_igr_filter(port, IGR_FORWARD);
+		priv->r->set_vlan_egr_filter(port, EGR_DISABLE);
 	}
 
 	/* Do we need to do something to the CPU-Port, too? */

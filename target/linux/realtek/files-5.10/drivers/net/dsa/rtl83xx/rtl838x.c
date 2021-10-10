@@ -1682,12 +1682,12 @@ static int rtl838x_set_ageing_time(unsigned long msec)
 	return 0;
 }
 
-static void rtl838x_set_igr_filter(int port, int state)
+static void rtl838x_set_igr_filter(int port, enum igr_filter state)
 {
 	sw_w32_mask(0x3 << ((port & 0xf)<<1), state << ((port & 0xf)<<1), RTL838X_VLAN_PORT_IGR_FLTR + (((port >> 4) << 2)));
 }
 
-static void rtl838x_set_egr_filter(int port, int state)
+static void rtl838x_set_egr_filter(int port, enum egr_filter state)
 {
 	sw_w32_mask(0x1 << (port % 0x1d), state << (port % 0x1d), RTL838X_VLAN_PORT_EGR_FLTR + (((port / 29) << 2)));
 }
