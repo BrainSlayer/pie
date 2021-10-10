@@ -7,13 +7,8 @@ define Device/zyxel_gs1900-48
   UIMAGE_MAGIC := 0x83800000
   ZYXEL_VERS := AAHO
   DEVICE_MODEL := GS1900-48
-# KERNEL := kernel-bin | append-dtb | gzip | zyxel-vers $$$$(ZYXEL_VERS) | \
-#	uImage gzip
   KERNEL_INITRAMFS := kernel-bin | append-dtb | gzip | zyxel-vers $$$$(ZYXEL_VERS) | \
 	uImage gzip
-#  IMAGES := sysupgrade.bin
-#  IMAGE/sysupgrade.bin := append-kernel | pad-to 64k | append-rootfs | pad-rootfs | \
-#	check-size | append-metadata
 endef
 TARGET_DEVICES += zyxel_gs1900-48
 
