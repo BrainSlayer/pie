@@ -54,7 +54,8 @@
 			partition@b260000 {
 				label = "firmware";
 				reg = <0x300000 0xd00000>;
-				compatible = "denx,uimage";
+				compatible = "openwrt,uimage", "denx,uimage";
+				openwrt,ih-magic = <0x93001250>;
 			};
 		};
 	};
@@ -191,20 +192,7 @@
 			phy-mode = "qsgmii";
 			phy-handle = <&phy25>;
 		};
-/*
-		port@26 {
-			reg = <26>;
-			label = "lan9";
-			phy-mode = "internal";
-			phy-handle = <&phy26>;
-		};
-		port@27 {
-			reg = <27>;
-			label = "lan10";
-			phy-mode = "internal";
-			phy-handle = <&phy27>;
-		};
-*/
+
 		port@28 {
 			ethernet = <&ethernet0>;
 			reg = <28>;
