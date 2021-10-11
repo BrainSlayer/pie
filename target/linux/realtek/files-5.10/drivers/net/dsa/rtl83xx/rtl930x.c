@@ -247,6 +247,7 @@ static void rtl930x_vlan_profile_setup(int profile)
 
 	// Enable routing of Ipv4/6 Unicast and IPv4/6 Multicast traffic
 	p[0] |= BIT(17) | BIT(16) | BIT(13) | BIT(12);
+	// p[0] |= 0x3 << 16; // TODO: Test this: Copy new SA Learn packet to CPU
 	p[2] = 0x1fffffff; // L2 unknwon MC flooding portmask all ports, including the CPU-port
 	p[3] = 0x1fffffff; // IPv4 unknwon MC flooding portmask
 	p[4] = 0x1fffffff; // IPv6 unknwon MC flooding portmask
