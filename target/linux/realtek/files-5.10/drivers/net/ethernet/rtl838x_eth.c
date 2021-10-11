@@ -34,11 +34,11 @@ extern struct rtl83xx_soc_info soc_info;
  * the memory used for the ring buffer.
  */
 #define MAX_RXRINGS	32
-#define MAX_RXLEN	100
-#define MAX_ENTRIES	(200 * 8)
+#define MAX_RXLEN	300
+#define MAX_ENTRIES	(300 * 8)
 #define TXRINGS		2
 // BUG: TXRINGLEN can be 160
-#define TXRINGLEN	16
+#define TXRINGLEN	160
 #define NOTIFY_EVENTS	10
 #define NOTIFY_BLOCKS	10
 #define TX_EN		0x8
