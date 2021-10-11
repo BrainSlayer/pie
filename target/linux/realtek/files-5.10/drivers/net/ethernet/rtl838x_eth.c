@@ -34,11 +34,11 @@ extern struct rtl83xx_soc_info soc_info;
  * the memory used for the ring buffer.
  */
 #define MAX_RXRINGS	32
-#define MAX_RXLEN	100
-#define MAX_ENTRIES	(200 * 8)
+#define MAX_RXLEN	300
+#define MAX_ENTRIES	(300 * 8)
 #define TXRINGS		2
 // BUG: TXRINGLEN can be 160
-#define TXRINGLEN	16
+#define TXRINGLEN	160
 #define NOTIFY_EVENTS	10
 #define NOTIFY_BLOCKS	10
 #define TX_EN		0x8
@@ -447,7 +447,7 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 //	bool triggered = false;
 	int i;
 
-	pr_info("%s: called\n", __func__);
+	pr_debug("%s: called\n", __func__);
 	
 	spin_lock(&priv->lock);
 	/*  Ignore TX interrupt */
@@ -1624,7 +1624,7 @@ static int rtl838x_get_link_ksettings(struct net_device *ndev,
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(ndev);
 
-	pr_info("%s called\n", __func__);
+	pr_debug("%s called\n", __func__);
 	return phylink_ethtool_ksettings_get(priv->phylink, cmd);
 }
 
@@ -1633,7 +1633,7 @@ static int rtl838x_set_link_ksettings(struct net_device *ndev,
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(ndev);
 
-	pr_info("%s called\n", __func__);
+	pr_debug("%s called\n", __func__);
 	return phylink_ethtool_ksettings_set(priv->phylink, cmd);
 }
 
