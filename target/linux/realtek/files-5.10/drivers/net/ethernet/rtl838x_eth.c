@@ -159,6 +159,7 @@ static void rtl931x_create_tx_header(struct p_hdr *h, int dest_port, int prio)
 {
 	h->cpu_tag[0] = 0x8000;
 	h->cpu_tag[1] = h->cpu_tag[2] = 0;
+	h->cpu_tag[2] = 0;
 	if (prio >= 0)
 		h->cpu_tag[2] = BIT(13) | prio << 8; // Enable and set  Priority Queue
 	h->cpu_tag[3] = 0;
@@ -253,8 +254,12 @@ void rtl931x_update_cntr(int r, int released)
 {
 	int pos = (r % 3) * 10;
 	u32 reg = RTL931X_DMA_IF_RX_RING_CNTR + ((r / 3) << 2);
+	u32 v = sw_r32(reg);
 
+	v = (v >> pos) & 0x3ff;
+	pr_debug("RX: Work done %d, old value: %d, pos %d, reg %04x\n", released, v, pos, reg);
 	sw_w32_mask(0x3ff << pos, released << pos, reg);
+	sw_w32(v, reg);
 }
 
 struct dsa_tag {
@@ -322,8 +327,9 @@ bool rtl931x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
 	t->port = (h->cpu_tag[0] >> 8) & 0x3f;
 	t->crc_error = h->cpu_tag[1] & BIT(6);
 
-	pr_debug("%s: Reason %d, port %d, queue %d\n", __func__, t->reason, t->port, t->queue);
-	if (t->reason >= 19 && t->reason <= 27)
+	if (t->reason != 63)
+		pr_info("%s: Reason %d, port %d, queue %d\n", __func__, t->reason, t->port, t->queue);
+	if (t->reason >= 19 && t->reason <= 27)	// NIC_RX_REASON_RMA
 		t->l2_offloaded = 0;
 	else
 		t->l2_offloaded = 1;
