@@ -2519,7 +2519,7 @@ static struct phy_driver rtl83xx_phy_driver[] = {
 		.set_eee	= rtl8218d_set_eee,
 		.get_eee	= rtl8218d_get_eee,
 	},
-	{
+/*	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8221B),
 		.name		= "REALTEK RTL8221B",
 		.features	= PHY_GBIT_FEATURES,
@@ -2553,7 +2553,7 @@ static struct phy_driver rtl83xx_phy_driver[] = {
 		.set_eee	= rtl8226_set_eee,
 		.get_eee	= rtl8226_get_eee,
 	},
-	{
+*/	{
 		PHY_ID_MATCH_MODEL(PHY_ID_RTL8218B_I),
 		.name		= "Realtek RTL8218B (internal)",
 		.features	= PHY_GBIT_FEATURES,

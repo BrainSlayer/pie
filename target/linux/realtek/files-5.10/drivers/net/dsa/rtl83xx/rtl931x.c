@@ -213,7 +213,7 @@ int rtl931x_write_phy(u32 port, u32 page, u32 reg, u32 val)
 		return -ENOTSUPP;
 
 	mutex_lock(&smi_lock);
-	pr_info("%s: writing to phy %d %d %d %d\n", __func__, port, page, reg, val);
+	pr_debug("%s: writing to phy %d %d %d %d\n", __func__, port, page, reg, val);
 	/* Clear both port registers */
 	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2);
 	sw_w32(0, RTL931X_SMI_INDRT_ACCESS_CTRL_2 + 4);
@@ -738,7 +738,8 @@ static void rtl931x_vlan_profile_setup(int profile)
 
 	// Enable routing of Ipv4/6 Unicast and IPv4/6 Multicast traffic
 	//p[0] |= BIT(17) | BIT(16) | BIT(13) | BIT(12);
-	
+	p[0] |= 0x3 << 11; // COPY2CPU
+
 	p[1] = 0x1FFFFFF; // L2 unknwon MC flooding portmask all ports, including the CPU-port
 	p[2] = 0xFFFFFFFF;
 	p[3] = 0x1FFFFFF; // IPv4 unknwon MC flooding portmask
