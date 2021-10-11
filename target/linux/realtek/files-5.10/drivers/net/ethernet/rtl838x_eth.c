@@ -441,7 +441,7 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 //	bool triggered = false;
 	int i;
 
-	pr_info("%s: called\n", __func__);
+	pr_debug("%s: called\n", __func__);
 	
 	spin_lock(&priv->lock);
 	/*  Ignore TX interrupt */
@@ -1618,7 +1618,7 @@ static int rtl838x_get_link_ksettings(struct net_device *ndev,
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(ndev);
 
-	pr_info("%s called\n", __func__);
+	pr_debug("%s called\n", __func__);
 	return phylink_ethtool_ksettings_get(priv->phylink, cmd);
 }
 
@@ -1627,7 +1627,7 @@ static int rtl838x_set_link_ksettings(struct net_device *ndev,
 {
 	struct rtl838x_eth_priv *priv = netdev_priv(ndev);
 
-	pr_info("%s called\n", __func__);
+	pr_debug("%s called\n", __func__);
 	return phylink_ethtool_ksettings_set(priv->phylink, cmd);
 }
 
