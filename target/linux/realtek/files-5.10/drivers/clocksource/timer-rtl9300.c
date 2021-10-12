@@ -185,6 +185,7 @@ static int __init rtl9300_timer_init(struct device_node *node)
 
 	// Configure clock event source
 	rtl9300_timer_setup(TIMER_CLK_EVT);
+	t_of.clkevt.cpumask = cpumask_of(smp_processor_id());
 	clockevents_config_and_register(&t_of.clkevt, rate, 100, 0x0fffffff);
 
 	// Enable interrupt
