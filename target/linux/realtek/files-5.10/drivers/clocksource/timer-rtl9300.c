@@ -128,6 +128,7 @@ static struct timer_of t_of = {
 		.set_state_oneshot = rtl9300_set_state_oneshot,
 		.set_state_periodic = rtl9300_set_state_periodic,
 		.set_state_shutdown = rtl9300_set_state_shutdown,
+		.cpumask = cpu_possible_mask,
 	},
 
 	.of_irq = {
@@ -185,7 +186,7 @@ static int __init rtl9300_timer_init(struct device_node *node)
 
 	// Configure clock event source
 	rtl9300_timer_setup(TIMER_CLK_EVT);
-	t_of.clkevt.cpumask = cpumask_of(smp_processor_id());
+//	t_of.clkevt.cpumask = cpumask_of(smp_processor_id());
 	clockevents_config_and_register(&t_of.clkevt, rate, 100, 0x0fffffff);
 
 	// Enable interrupt
