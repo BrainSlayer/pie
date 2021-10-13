@@ -179,7 +179,7 @@ static int __init rtl9300_timer_init(struct device_node *node)
 
     
 	for_each_possible_cpu(cpu) {
-		pr_info("With base %08x IRQ: %d\n", (u32)timer_of_base(&t_of), cpu + irqbase);
+		pr_info("With base %08x IRQ: %d\n", (u32)timer_of_base(&t_of) + (cpu << 4), cpu + irqbase);
 		struct timer_of *cpu_to = per_cpu_ptr(&t_of, cpu);
 		unsigned long flags = IRQF_TIMER | IRQF_NOBALANCING;
 
