@@ -37,6 +37,7 @@
 #define DIVISOR_RTL9300		2
 
 #define N_BITS			28
+static int irqbase;
 
 static void __iomem *rtl9300_sched_reg __read_mostly;
 
@@ -51,11 +52,11 @@ static irqreturn_t rtl9300_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *clk = dev_id;
 	struct timer_of *to = to_timer_of(clk);
-	u32 v = readl(timer_of_base(to) + ((to->clkevt.irq - 8) << 4) + RTL9300_TC_INT);
+	u32 v = readl(timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_INT);
 
 	// Acknowledge the IRQ
 	v |= RTL9300_TC_INT_IP;
-	writel(v, timer_of_base(to) + ((to->clkevt.irq - 8) << 4) + RTL9300_TC_INT);
+	writel(v, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_INT);
 
 	clk->event_handler(clk);
 	return IRQ_HANDLED;
@@ -65,12 +66,12 @@ static void rtl9300_timer_stop(struct timer_of *to)
 {
 	u32 v;
 
-	writel(0, timer_of_base(to) + ((to->clkevt.irq - 8) << 4) + RTL9300_TC_CTRL);
+	writel(0, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_CTRL);
 
 	// Acknowledge possibly pending IRQ
-	v = readl(timer_of_base(to) + ((to->clkevt.irq - 8) << 4) + RTL9300_TC_INT);
+	v = readl(timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_INT);
 	if (v & RTL9300_TC_INT_IP)
-		writel(v, timer_of_base(to) + ((to->clkevt.irq - 8) << 4) + RTL9300_TC_INT);
+		writel(v, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_INT);
 }
 
 static void rtl9300_timer_start(struct timer_of *to, int timer, bool periodic)
@@ -84,8 +85,8 @@ static int rtl9300_set_next_event(unsigned long delta, struct clock_event_device
 	struct timer_of *to = to_timer_of(clk);
 
 	rtl9300_timer_stop(to);
-	writel(delta, timer_of_base(to) + ((to->clkevt.irq - 8) << 4) + RTL9300_TC_DATA);
-	rtl9300_timer_start(to, to->clkevt.irq - 8, TIMER_MODE_ONCE);
+	writel(delta, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_DATA);
+	rtl9300_timer_start(to, to->clkevt.irq - irqbase, TIMER_MODE_ONCE);
 	return 0;
 }
 
@@ -94,8 +95,8 @@ static int rtl9300_set_state_periodic(struct clock_event_device *clk)
 	struct timer_of *to = to_timer_of(clk);
 
 	rtl9300_timer_stop(to);
-	writel(to->of_clk.period, timer_of_base(to) + ((to->clkevt.irq - 8) << 4) + RTL9300_TC_DATA);
-	rtl9300_timer_start(to, to->clkevt.irq - 8, TIMER_MODE_REPEAT);
+	writel(to->of_clk.period, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_DATA);
+	rtl9300_timer_start(to, to->clkevt.irq - irqbase, TIMER_MODE_REPEAT);
 	return 0;
 }
 
@@ -105,7 +106,7 @@ static int rtl9300_set_state_oneshot(struct clock_event_device *clk)
 
 	rtl9300_timer_stop(to);
 	writel(to->of_clk.period, timer_of_base(to) + to->clkevt.irq + RTL9300_TC_DATA);
-	rtl9300_timer_start(to, to->clkevt.irq - 8, TIMER_MODE_ONCE);
+	rtl9300_timer_start(to, to->clkevt.irq - irqbase, TIMER_MODE_ONCE);
 	return 0;
 }
 
@@ -129,6 +130,13 @@ static DEFINE_PER_CPU(struct timer_of, t_of) = {
 		.set_state_periodic = rtl9300_set_state_periodic,
 		.set_state_shutdown = rtl9300_set_state_shutdown,
 	},
+	// dummy
+	.of_irq = {
+		.name = "ostimer",
+		.handler = rtl9300_timer_interrupt,
+		.flags = IRQF_TIMER,
+ 	},
+
 };
 
 static void __init rtl9300_timer_setup(u8 timer)
@@ -157,24 +165,25 @@ static int __init rtl9300_timer_init(struct device_node *node)
 	pr_info("%s: setting up timer\n", __func__);
 
 	err = timer_of_init(node, &t_of);
+	irqbase = irq_of_parse_and_map(node, t_of.of_irq.index);
 	if (err)
 		return err;
 
 	rate = timer_of_rate(&t_of) / DIVISOR_RTL9300;
 	pr_info("Frequency in dts: %ld, my rate is %ld, period %ld\n",
 		timer_of_rate(&t_of), rate, timer_of_period(&t_of));
-	pr_info("With base %08x IRQ: %d\n", (u32)timer_of_base(&t_of), timer_of_irq(&t_of));
+	pr_info("With base %08x IRQ: %d\n", (u32)timer_of_base(&t_of), cpu + irqbase);
 
 
 	// Configure clock source and register it for scheduling
 
 
-
+    
 	for_each_possible_cpu(cpu) {
 		struct timer_of *cpu_to = per_cpu_ptr(&t_of, cpu);
 		unsigned long flags = IRQF_TIMER | IRQF_NOBALANCING;
 
-		cpu_to->clkevt.irq = 8 + cpu;
+		cpu_to->clkevt.irq = irqbase + cpu;
 		cpu_to->clkevt.cpumask = cpumask_of(cpu);
 
 		err = request_irq(cpu_to->clkevt.irq, rtl9300_timer_interrupt, flags,
@@ -182,7 +191,6 @@ static int __init rtl9300_timer_init(struct device_node *node)
 		if (err) {
 			pr_err("failed to set up irq for cpu%d: %d\n",
 			       cpu, err);
-			irq_dispose_mapping(cpu_to->clkevt.irq);
 			cpu_to->clkevt.irq = 0;
 			goto out_irq;
 		}
