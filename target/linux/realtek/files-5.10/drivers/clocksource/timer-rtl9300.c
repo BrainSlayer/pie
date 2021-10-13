@@ -172,7 +172,6 @@ static int __init rtl9300_timer_init(struct device_node *node)
 	rate = timer_of_rate(&t_of) / DIVISOR_RTL9300;
 	pr_info("Frequency in dts: %ld, my rate is %ld, period %ld\n",
 		timer_of_rate(&t_of), rate, timer_of_period(&t_of));
-	pr_info("With base %08x IRQ: %d\n", (u32)timer_of_base(&t_of), cpu + irqbase);
 
 
 	// Configure clock source and register it for scheduling
@@ -180,6 +179,7 @@ static int __init rtl9300_timer_init(struct device_node *node)
 
     
 	for_each_possible_cpu(cpu) {
+		pr_info("With base %08x IRQ: %d\n", (u32)timer_of_base(&t_of), cpu + irqbase);
 		struct timer_of *cpu_to = per_cpu_ptr(&t_of, cpu);
 		unsigned long flags = IRQF_TIMER | IRQF_NOBALANCING;
 
