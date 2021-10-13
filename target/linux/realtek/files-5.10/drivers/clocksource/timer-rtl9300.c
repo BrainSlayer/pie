@@ -185,6 +185,9 @@ static int __init rtl9300_timer_init(struct device_node *node)
 
 		cpu_to->clkevt.irq = irqbase + cpu;
 		cpu_to->clkevt.cpumask = cpumask_of(cpu);
+		cpu_to->of_base.base = timer_of_base(&t_of);
+		cpu_to->of_clk.rate = timer_of_rate(&t_of);
+		cpu_to->of_clk.period = DIV_ROUND_UP(cpu_to->of_clk.rate, HZ);
 
 		err = request_irq(cpu_to->clkevt.irq, rtl9300_timer_interrupt, flags,
 				  cpu_to->clkevt.name, &cpu_to->clkevt);
