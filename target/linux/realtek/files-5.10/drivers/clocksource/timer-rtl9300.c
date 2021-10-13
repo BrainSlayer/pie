@@ -37,7 +37,6 @@
 #define DIVISOR_RTL9300		2
 
 #define N_BITS			28
-static int irqbase;
 
 static void __iomem *rtl9300_sched_reg __read_mostly;
 
@@ -52,11 +51,11 @@ static irqreturn_t rtl9300_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *clk = dev_id;
 	struct timer_of *to = to_timer_of(clk);
-	u32 v = readl(timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_INT);
+	u32 v = readl(timer_of_base(to) + RTL9300_TC_INT);
 
 	// Acknowledge the IRQ
 	v |= RTL9300_TC_INT_IP;
-	writel(v, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_INT);
+	writel(v, timer_of_base(to) + RTL9300_TC_INT);
 
 	clk->event_handler(clk);
 	return IRQ_HANDLED;
@@ -66,18 +65,18 @@ static void rtl9300_timer_stop(struct timer_of *to)
 {
 	u32 v;
 
-	writel(0, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_CTRL);
+	writel(0, timer_of_base(to) + RTL9300_TC_CTRL);
 
 	// Acknowledge possibly pending IRQ
-	v = readl(timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_INT);
+	v = readl(timer_of_base(to) + RTL9300_TC_INT);
 	if (v & RTL9300_TC_INT_IP)
-		writel(v, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_INT);
+		writel(v, timer_of_base(to) + RTL9300_TC_INT);
 }
 
-static void rtl9300_timer_start(struct timer_of *to, int timer, bool periodic)
+static void rtl9300_timer_start(struct timer_of *to, bool periodic)
 {
 	u32 v = (periodic ? RTL9300_TC_CTRL_MODE : 0) | RTL9300_TC_CTRL_EN | DIVISOR_RTL9300;
-	writel(v, timer_of_base(to) + timer * 0x10 + RTL9300_TC_CTRL);
+	writel(v, timer_of_base(to) + RTL9300_TC_CTRL);
 }
 
 static int rtl9300_set_next_event(unsigned long delta, struct clock_event_device *clk)
@@ -85,8 +84,8 @@ static int rtl9300_set_next_event(unsigned long delta, struct clock_event_device
 	struct timer_of *to = to_timer_of(clk);
 
 	rtl9300_timer_stop(to);
-	writel(delta, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_DATA);
-	rtl9300_timer_start(to, to->clkevt.irq - irqbase, TIMER_MODE_ONCE);
+	writel(delta, timer_of_base(to) + RTL9300_TC_DATA);
+	rtl9300_timer_start(to, TIMER_MODE_ONCE);
 	return 0;
 }
 
@@ -95,8 +94,8 @@ static int rtl9300_set_state_periodic(struct clock_event_device *clk)
 	struct timer_of *to = to_timer_of(clk);
 
 	rtl9300_timer_stop(to);
-	writel(to->of_clk.period, timer_of_base(to) + ((to->clkevt.irq - irqbase) << 4) + RTL9300_TC_DATA);
-	rtl9300_timer_start(to, to->clkevt.irq - irqbase, TIMER_MODE_REPEAT);
+	writel(to->of_clk.period, timer_of_base(to) + RTL9300_TC_DATA);
+	rtl9300_timer_start(to, TIMER_MODE_REPEAT);
 	return 0;
 }
 
@@ -105,8 +104,8 @@ static int rtl9300_set_state_oneshot(struct clock_event_device *clk)
 	struct timer_of *to = to_timer_of(clk);
 
 	rtl9300_timer_stop(to);
-	writel(to->of_clk.period, timer_of_base(to) + to->clkevt.irq + RTL9300_TC_DATA);
-	rtl9300_timer_start(to, to->clkevt.irq - irqbase, TIMER_MODE_ONCE);
+	writel(to->of_clk.period, timer_of_base(to) + RTL9300_TC_DATA);
+	rtl9300_timer_start(to, TIMER_MODE_ONCE);
 	return 0;
 }
 
@@ -139,20 +138,20 @@ static DEFINE_PER_CPU(struct timer_of, t_of) = {
 
 };
 
-static void __init rtl9300_timer_setup(u8 timer)
+static void __init rtl9300_timer_setup(struct timer_of *timer_of)
 {
 	u32 v;
 
 	// Disable timer
-	writel(0, timer_of_base(&t_of) + 0x10 * timer + RTL9300_TC_CTRL);
+	writel(0, timer_of_base(timer_of) + RTL9300_TC_CTRL);
 
 	// Acknowledge possibly pending IRQ
-	v = readl(timer_of_base(&t_of) + 0x10 * timer + RTL9300_TC_INT);
+	v = readl(timer_of_base(timer_of) + RTL9300_TC_INT);
 	if (v & RTL9300_TC_INT_IP)
-		writel(v, timer_of_base(&t_of) + 0x10 * timer + RTL9300_TC_INT);
+		writel(v, timer_of_base(timer_of) + RTL9300_TC_INT);
 
 	// Setup maximum period (for use as clock-source)
-	writel(0x0fffffff, timer_of_base(&t_of) + 0x10 * timer + RTL9300_TC_DATA);
+	writel(0x0fffffff, timer_of_base(timer_of) + RTL9300_TC_DATA);
 }
 
 
@@ -160,12 +159,12 @@ static int __init rtl9300_timer_init(struct device_node *node)
 {
 	int err = 0;
 	unsigned long rate;
+	int irqbase;
 	int cpu = smp_processor_id();
 
 	pr_info("%s: setting up timer\n", __func__);
 
 	err = timer_of_init(node, &t_of);
-	irqbase = irq_of_parse_and_map(node, t_of.of_irq.index);
 	if (err)
 		return err;
 
@@ -179,13 +178,14 @@ static int __init rtl9300_timer_init(struct device_node *node)
 
     
 	for_each_possible_cpu(cpu) {
-		pr_info("With base %08x IRQ: %d\n", (u32)timer_of_base(&t_of) + (cpu << 4), cpu + irqbase);
+		irqbase = irq_of_parse_and_map(node, t_of.of_irq.index + cpu);
 		struct timer_of *cpu_to = per_cpu_ptr(&t_of, cpu);
 		unsigned long flags = IRQF_TIMER | IRQF_NOBALANCING;
 
-		cpu_to->clkevt.irq = irqbase + cpu;
+		cpu_to->clkevt.irq = irqbase;
 		cpu_to->clkevt.cpumask = cpumask_of(cpu);
-		cpu_to->of_base.base = timer_of_base(&t_of);
+		cpu_to->of_base.base = timer_of_base(&t_of) + (cpu << 4);
+		pr_info("With base %08x IRQ: %d\n", (u32)cpu_to->of_base.base, cpu_to->clkevt.irq);
 		cpu_to->of_clk.rate = timer_of_rate(&t_of);
 		cpu_to->of_clk.period = DIV_ROUND_UP(cpu_to->of_clk.rate, HZ);
 
@@ -199,9 +199,9 @@ static int __init rtl9300_timer_init(struct device_node *node)
 		}
 		irq_force_affinity(cpu_to->clkevt.irq, cpumask_of(cpu));
 		clockevents_config_and_register(&cpu_to->clkevt, rate, 100, 0x0fffffff);
-		rtl9300_timer_setup(cpu);
-		rtl9300_timer_start(cpu_to, cpu, TIMER_MODE_REPEAT);
-		writel(RTL9300_TC_INT_IE, timer_of_base(&t_of) + (cpu << 4) + RTL9300_TC_INT);
+		rtl9300_timer_setup(cpu_to);
+		rtl9300_timer_start(cpu_to, TIMER_MODE_REPEAT);
+		writel(RTL9300_TC_INT_IE, cpu_to->of_base.base + RTL9300_TC_INT);
 	}
 	out_irq:
 	rtl9300_sched_reg = timer_of_base(&t_of) + TIMER_CLK_SRC * 0x10 + RTL9300_TC_CNT;
