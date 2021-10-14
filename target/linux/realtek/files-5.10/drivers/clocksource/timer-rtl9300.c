@@ -131,7 +131,7 @@ static DEFINE_PER_CPU(struct timer_of, t_of) = {
 	},
 	// dummy
 	.of_irq = {
-		.name = "ostimer",
+		.name = "cpu0-ostimer",
 		.handler = rtl9300_timer_interrupt,
 		.flags = IRQF_TIMER,
  	},
@@ -161,6 +161,8 @@ static int __init rtl9300_timer_init(struct device_node *node)
 	unsigned long rate;
 	int irqbase;
 	int cpu = smp_processor_id();
+	struct device_node *np;
+	np = of_find_node_by_name(NULL, "timer2");
 
 	pr_info("%s: setting up timer\n", __func__);
 
@@ -178,9 +180,13 @@ static int __init rtl9300_timer_init(struct device_node *node)
 
     
 	for_each_possible_cpu(cpu) {
-		irqbase = irq_of_parse_and_map(node, t_of.of_irq.index + cpu);
 		struct timer_of *cpu_to = per_cpu_ptr(&t_of, cpu);
 		unsigned long flags = IRQF_TIMER | IRQF_NOBALANCING;
+		if (cpu)
+			irqbase = of_irq_get_byname(np, "cpu1-ostimer");
+		else 
+			irqbase = irq_of_parse_and_map(node, t_of.of_irq.index);
+
 
 		cpu_to->clkevt.irq = irqbase;
 		cpu_to->clkevt.cpumask = cpumask_of(cpu);
@@ -219,4 +225,4 @@ static int __init rtl9300_timer_init(struct device_node *node)
 	return err;
 }
 
-TIMER_OF_DECLARE(rtl9300_timer, "realtek,rtl9300-timer", rtl9300_timer_init);
+TIMER_OF_DECLARE(rtl9300_timer, "realtek,cpu0-rtl9300-timer", rtl9300_timer_init);

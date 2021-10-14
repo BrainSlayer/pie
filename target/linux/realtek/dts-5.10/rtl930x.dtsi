@@ -112,13 +112,21 @@
 				<8 &cpuintc 1>,  /* TC1 */
 				<7 &cpuintc 5>;  /* TC0 */
 		};
+		timer1: timer1@3200 {
+			compatible = "realtek,cpu0-rtl9300-timer";
+			reg = <0x3200 0x60>;
+			interrupt-parent = <&intc>;
+			interrupts = <7>;
+			interrupt-names = "cpu0-ostimer";
+			clocks = <&osc 0>;
+		};
 
-		timer: timer@3200 {
-			compatible = "realtek,rtl9300-timer";
+		timer2: timer2@3200 {
+			compatible = "realtek,cpu1-rtl9300-timer";
 			reg = <0x3200 0x60>;
 			interrupt-parent = <&intc>;
 			interrupts = <8>;
-			interrupt-names = "ostimer";
+			interrupt-names = "cpu1-ostimer";
 			clocks = <&osc 0>;
 		};
 
