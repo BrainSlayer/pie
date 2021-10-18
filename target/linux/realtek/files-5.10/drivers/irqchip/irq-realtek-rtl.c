@@ -30,13 +30,11 @@ struct realtek_intc_chip_data {
 
 static void realtek_ictl_unmask_irq(struct irq_data *i)
 {
-	struct realtek_intc_chip_data *cd;
+	struct realtek_intc_chip_data *cd = i->domain->host_data;
 	unsigned long flags;
 	u32 value;
 
-	pr_info("%s i: %08x chip data %08x\n", __func__, (u32)i, (u32)i->chip_data);
-	cd = irq_data_get_irq_chip_data(i);
-	pr_info("%s: cd %08x base %08x irq %d\n", __func__, (u32)cd, (u32)cd->base, i->hwirq);
+	pr_debug("%s: cd %08x base %08x irq %d\n", __func__, (u32)cd, (u32)cd->base, i->hwirq);
 	raw_spin_lock_irqsave(&cd->lock, flags);
 
 	value = readl(REG(RTL_ICTL_GIMR));
@@ -48,7 +46,7 @@ static void realtek_ictl_unmask_irq(struct irq_data *i)
 
 static void realtek_ictl_mask_irq(struct irq_data *i)
 {
-	struct realtek_intc_chip_data *cd = irq_data_get_irq_chip_data(i);
+	struct realtek_intc_chip_data *cd = i->domain->host_data;
 	unsigned long flags;
 	u32 value;
 
@@ -88,7 +86,7 @@ static void realtek_irq_dispatch(struct irq_desc *desc)
 
 	chained_irq_enter(chip, desc);
 	pending = readl(REG(RTL_ICTL_GIMR)) & readl(REG(RTL_ICTL_GISR));
-	pr_info("%s: with base %08x pending %08x\n", __func__, (u32)cd->base, pending);
+	pr_debug("%s: with base %08x pending %08x\n", __func__, (u32)cd->base, pending);
 	if (unlikely(!pending)) {
 		spurious_interrupt();
 		goto out;
@@ -119,6 +117,7 @@ static int __init map_interrupts(struct device_node *node, struct irq_domain *do
 	};
 	u8 mips_irqs_set;
 
+	pr_info("%s, chip data %08x\n", __func__, (u32)cd);
 	ret = of_property_read_u32(node, "#address-cells", &tmp);
 	if (ret || tmp)
 		return -EINVAL;
@@ -185,6 +184,7 @@ static int __init realtek_rtl_of_init(struct device_node *node, struct device_no
 	domain = irq_domain_add_simple(node, 32, 0,
 				       &irq_domain_ops, cd);
 
+	pr_info("Domain data %08x\n", (u32)domain->host_data);
 	ret = map_interrupts(node, domain);
 	if (ret) {
 		pr_err("invalid interrupt map\n");
