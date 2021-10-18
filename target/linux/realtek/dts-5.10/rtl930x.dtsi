@@ -95,7 +95,7 @@
 
 		intc: rtlintc@3000 {
 			compatible = "realtek,rtl-intc";
-			reg = <0x3000 0x20>;
+			reg = <0x3000 0x18>;
 			#address-cells = <0>;
 			#interrupt-cells = <1>;
 			interrupt-controller;
@@ -109,8 +109,18 @@
 				<11 &cpuintc 1>, /* TC4 */
 				<10 &cpuintc 1>, /* TC3 */
 				<9 &cpuintc 1>,  /* TC2 */
-				<8 &cpuintc 1>,  /* TC1 */
+//				<8 &cpuintc 1>,  /* TC1 */
 				<7 &cpuintc 5>;  /* TC0 */
+		};
+
+		intc1: rtlintc@3018 {
+			compatible = "realtek,rtl-intc";
+			reg = <0x3018 0x18>;
+			#address-cells = <0>;
+			#interrupt-cells = <1>;
+			interrupt-controller;
+			interrupt-map =
+				<8 &cpuintc 1>;  /* TC1 */
 		};
 		timer1: timer1@3200 {
 			compatible = "realtek,cpu0-rtl9300-timer";
@@ -124,7 +134,7 @@
 		timer2: timer2@3200 {
 			compatible = "realtek,cpu1-rtl9300-timer";
 			reg = <0x3200 0x60>;
-			interrupt-parent = <&intc>;
+			interrupt-parent = <&intc1>;
 			interrupts = <9>;
 			interrupt-names = "cpu1-ostimer";
 			clocks = <&osc 0>;
