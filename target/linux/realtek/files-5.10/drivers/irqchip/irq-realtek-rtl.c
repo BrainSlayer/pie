@@ -21,53 +21,120 @@
 #define RTL_ICTL_IRR2		0x10
 #define RTL_ICTL_IRR3		0x14
 
-#define REG(x)		(cd->base + x)
+#define N_CPU_IRQ	2
 
-struct realtek_intc_chip_data {
-	raw_spinlock_t	lock;
-	void __iomem	*base;
-};
+#define REG(x)		(base[cpu] + x)
+
+void __iomem	*base[2];
+u8 cpu_map[32];
+
+static DEFINE_RAW_SPINLOCK(realtek_ictl_lock);
 
 static void realtek_ictl_unmask_irq(struct irq_data *i)
 {
-	struct realtek_intc_chip_data *cd = i->domain->host_data;
 	unsigned long flags;
 	u32 value;
+	int cpu = cpu_map[i->hwirq];
 
-	pr_debug("%s: cd %08x base %08x irq %d\n", __func__, (u32)cd, (u32)cd->base, i->hwirq);
-	raw_spin_lock_irqsave(&cd->lock, flags);
+/*	if (i->hwirq != 10)
+		pr_debug("%s: cd %08x base %08x irq %lu\n",
+			__func__, (u32)cd, (u32)cd->base[cpu], i->hwirq); */
+	raw_spin_lock_irqsave(&realtek_ictl_lock, flags);
 
 	value = readl(REG(RTL_ICTL_GIMR));
 	value |= BIT(i->hwirq);
 	writel(value, REG(RTL_ICTL_GIMR));
 
-	raw_spin_unlock_irqrestore(&cd->lock, flags);
+	raw_spin_unlock_irqrestore(&realtek_ictl_lock, flags);
 }
 
 static void realtek_ictl_mask_irq(struct irq_data *i)
 {
-	struct realtek_intc_chip_data *cd = i->domain->host_data;
 	unsigned long flags;
 	u32 value;
+	int cpu = cpu_map[i->hwirq];
 
-	raw_spin_lock_irqsave(&cd->lock, flags);
+	raw_spin_lock_irqsave(&realtek_ictl_lock, flags);
 
 	value = readl(REG(RTL_ICTL_GIMR));
 	value &= ~BIT(i->hwirq);
 	writel(value, REG(RTL_ICTL_GIMR));
 
-	raw_spin_unlock_irqrestore(&cd->lock, flags);
+	raw_spin_unlock_irqrestore(&realtek_ictl_lock, flags);
 }
+
+#ifdef CONFIG_SMP
+static int realtek_ictl_set_affinity(struct irq_data *d, const struct cpumask *mask, bool force)
+{
+	unsigned long flags;
+	int cpu, new_cpu = cpumask_first(mask);
+	u32 v, w, cpu_int, irq = d->hwirq;
+	int irr_regs[] = {
+		RTL_ICTL_IRR3,
+		RTL_ICTL_IRR2,
+		RTL_ICTL_IRR1,
+		RTL_ICTL_IRR0,
+	};
+	bool irq_on;
+
+	pr_info("%s for hw-irq %d\n", __func__, irq);
+	raw_spin_lock_irqsave(&realtek_ictl_lock, flags);
+
+	// Save the current IRR register
+	cpu = cpu_map[irq];
+	v = readl(REG(irr_regs[irq >> 3]));
+	cpu_int = v & (0xf << ((irq * 4) % 32));
+	w = v & ~(0xf << ((irq * 4) % 32));
+
+	// Clear the current routing in IRR
+	writel(w, REG(irr_regs[irq >> 3]));
+
+	// Mask the Interrupt if it was on
+	w = readl(REG(RTL_ICTL_GIMR));
+	irq_on = w & BIT(irq);
+	if (irq_on) {
+		w &= ~BIT(irq);
+		writel(w, REG(RTL_ICTL_GIMR));
+	}
+
+	cpu = new_cpu;
+	if (cpu >= NR_CPUS)
+		return -EINVAL;
+
+	// Set target IRR
+	v = readl(REG(irr_regs[irq >> 3]));
+	w = v & ~(0xf << ((irq * 4) % 32));
+	w |= cpu_int;
+	writel(w, REG(irr_regs[irq >> 3]));
+
+	// Unmask the Interrupt on the new GIMR
+	if (irq_on) {
+		w = readl(REG(RTL_ICTL_GIMR));
+		w |= BIT(irq);
+		writel(w, REG(RTL_ICTL_GIMR));
+	}
+
+	irq_data_update_effective_affinity(d, cpumask_of(cpu));
+
+	raw_spin_unlock_irqrestore(&realtek_ictl_lock, flags);
+
+	return IRQ_SET_MASK_OK_DONE;
+}
+#endif
 
 static struct irq_chip realtek_ictl_irq = {
 	.name = "realtek-rtl-intc",
 	.irq_mask = realtek_ictl_mask_irq,
 	.irq_unmask = realtek_ictl_unmask_irq,
+#ifdef CONFIG_SMP
+	.irq_set_affinity = realtek_ictl_set_affinity,
+#endif
 };
 
 static int intc_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
 {
-	irq_set_chip_and_handler(hw, &realtek_ictl_irq, handle_level_irq);
+	pr_info("%s mapping hw-irq %lu linux irq %lu\n", __func__, hw, irq);
+	irq_set_chip_and_handler(irq, &realtek_ictl_irq, handle_level_irq);
 
 	return 0;
 }
@@ -82,16 +149,25 @@ static void realtek_irq_dispatch(struct irq_desc *desc)
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 	struct irq_domain *domain = irq_desc_get_handler_data(desc);
 	struct realtek_intc_chip_data *cd = domain->host_data;
-	unsigned int pending;
+	unsigned int pending[N_CPU_IRQ];
+	unsigned int all_pending = 0;
+	int cpu;
 
 	chained_irq_enter(chip, desc);
-	pending = readl(REG(RTL_ICTL_GIMR)) & readl(REG(RTL_ICTL_GISR));
-	pr_debug("%s: with base %08x pending %08x\n", __func__, (u32)cd->base, pending);
-	if (unlikely(!pending)) {
+	for (cpu = 0; cpu < N_CPU_IRQ; cpu++) {
+		pending[cpu] = readl(REG(RTL_ICTL_GIMR)) & readl(REG(RTL_ICTL_GISR));
+		all_pending |= pending[cpu];
+	}
+//	if (pending[1])
+//		pr_info("%s: with base %08x pending0 %08x pending1 %08x all pending %08x cpu%d\n",
+//			__func__, (u32)cd->base[0], pending[0], pending[1], all_pending, smp_processor_id());
+	if (unlikely(!all_pending)) {
 		spurious_interrupt();
 		goto out;
 	}
-	generic_handle_irq(irq_find_mapping(domain, __ffs(pending)));
+
+	for (cpu = 0; cpu < N_CPU_IRQ; cpu++)
+		generic_handle_irq(irq_find_mapping(domain, __ffs(pending[cpu])));
 
 out:
 	chained_irq_exit(chip, desc);
@@ -108,7 +184,7 @@ static int __init map_interrupts(struct device_node *node, struct irq_domain *do
 	struct realtek_intc_chip_data *cd = domain->host_data;
 	struct device_node *cpu_ictl;
 	const __be32 *imap;
-	u32 imaplen, soc_int, cpu_int, tmp, regs[4];
+	u32 imaplen, soc_int, cpu_int, tmp, regs[4 * N_CPU_IRQ];
 	int ret, i, irr_regs[] = {
 		RTL_ICTL_IRR3,
 		RTL_ICTL_IRR2,
@@ -116,6 +192,7 @@ static int __init map_interrupts(struct device_node *node, struct irq_domain *do
 		RTL_ICTL_IRR0,
 	};
 	u8 mips_irqs_set;
+	int cpu;
 
 	pr_info("%s, chip data %08x\n", __func__, (u32)cd);
 	ret = of_property_read_u32(node, "#address-cells", &tmp);
@@ -123,12 +200,12 @@ static int __init map_interrupts(struct device_node *node, struct irq_domain *do
 		return -EINVAL;
 
 	imap = of_get_property(node, "interrupt-map", &imaplen);
-	if (!imap || imaplen % 3)
+	if (!imap || imaplen % 4)
 		return -EINVAL;
 
 	mips_irqs_set = 0;
 	memset(regs, 0, sizeof(regs));
-	for (i = 0; i < imaplen; i += 3 * sizeof(u32)) {
+	for (i = 0; i < imaplen; i += 4 * sizeof(u32)) {
 		soc_int = be32_to_cpup(imap);
 		if (soc_int > 31)
 			return -EINVAL;
@@ -151,12 +228,26 @@ static int __init map_interrupts(struct device_node *node, struct irq_domain *do
 			mips_irqs_set |= BIT(cpu_int);
 		}
 
-		regs[(soc_int * 4) / 32] |= cpu_int << (soc_int * 4) % 32;
-		imap += 3;
+		cpu = be32_to_cpup(imap + 3);
+		if (cpu > 1)
+			return -EINVAL;
+
+		cpu_map[soc_int] = cpu;
+
+		regs[((soc_int * 4) / 32) + (cpu * 4)] |= cpu_int << (soc_int * 4) % 32;
+		imap += 4;
 	}
 
-	for (i = 0; i < 4; i++)
-		writel(regs[i], REG(irr_regs[i]));
+	for (i = 0; i < 4 * N_CPU_IRQ; i++) {
+		cpu = i >> 2;
+		pr_debug("%s: %d writing %08x to %08x\n", __func__, i, regs[i], (u32)REG(irr_regs[i % 4]));
+		writel(regs[i], REG(irr_regs[i % 4]));
+	}
+	for (i = 0; i < 2; i++)
+		pr_info("%d %08x %08x %08x %08x %08x %08x\n", i,
+			readl(0xb8003000 + i * 24), readl(0xb8003004 + i * 24),
+			readl(0xb8003008 + i * 24), readl(0xb800300c + i * 24),
+			readl(0xb8003010 + i * 24), readl(0xb8003014 + i * 24));
 
 	return 0;
 }
@@ -166,23 +257,22 @@ static int __init realtek_rtl_of_init(struct device_node *node, struct device_no
 	struct irq_domain *domain;
 	struct realtek_intc_chip_data *cd;
 	int ret;
+	int cpu;
 
-	cd = kzalloc(sizeof(*cd), GFP_KERNEL);
-	if (!cd)
-		return -ENOMEM;
-
-	cd->base = of_iomap(node, 0);
-	if (!cd->base)
+	base[0] = of_iomap(node, 0);
+	if (!base[0])
 		return -ENXIO;
 
-	raw_spin_lock_init(&cd->lock);
+	base[1] = base[0] + 0x18;
 
 	/* Disable all cascaded interrupts */
-	writel(0, REG(RTL_ICTL_GIMR));
-	pr_info("%s: new handler with base %08x\n", __func__, (u32)cd->base);
+	for (cpu = 0; cpu < N_CPU_IRQ; cpu++)
+		writel(0, REG(RTL_ICTL_GIMR));
 
-	domain = irq_domain_add_simple(node, 32, 0,
-				       &irq_domain_ops, cd);
+	pr_info("%s: new handler with base 0 %08x and base 1 %08x\n",
+		__func__, (u32)(base[0]), (u32)(base[1]));
+
+	domain = irq_domain_add_simple(node, 32, 0, &irq_domain_ops, cd);
 
 	pr_info("Domain data %08x\n", (u32)domain->host_data);
 	ret = map_interrupts(node, domain);
