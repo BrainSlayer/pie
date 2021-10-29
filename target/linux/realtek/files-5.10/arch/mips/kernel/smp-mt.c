@@ -115,7 +115,8 @@ static void vsmp_init_secondary(void)
 					 STATUSF_IP4 | STATUSF_IP5 |
 					 STATUSF_IP6 | STATUSF_IP7);
 	else
-		change_c0_status(ST0_IM, STATUSF_IP2 | STATUSF_IP3 |
+		change_c0_status(ST0_IM, STATUSF_IP0 | STATUSF_IP1 |
+					 STATUSF_IP2 | STATUSF_IP3 |
 					 STATUSF_IP4 | STATUSF_IP5 |
 					 STATUSF_IP6 | STATUSF_IP7);
 }

@@ -100,17 +100,17 @@
 			#interrupt-cells = <1>;
 			interrupt-controller;
 			interrupt-map =
-				<31 &cpuintc 1 0>, /* UART1 */
-				<30 &cpuintc 5 0>, /* UART0 */
-				<28 &cpuintc 1 0>, /* USB_H2 */
-				<24 &cpuintc 4 0>, /* NIC */
-				<23 &cpuintc 3 0>, /* SWCORE */
-				<13 &cpuintc 4 0>, /* GPIO_ABCD */
-				<11 &cpuintc 5 1>, /* TC4 */
-				<10 &cpuintc 5 0>, /* TC3 */
-				<9 &cpuintc 1 0>,  /* TC2 */
-				<8 &cpuintc 2 1>,  /* TC1 */
-				<7 &cpuintc 1 0>;  /* TC0 */
+				<31 &cpuintc 1>, /* UART1 */
+				<30 &cpuintc 5>, /* UART0 */
+				<28 &cpuintc 1>, /* USB_H2 */
+				<24 &cpuintc 4>, /* NIC */
+				<23 &cpuintc 3>, /* SWCORE */
+				<13 &cpuintc 4>, /* GPIO_ABCD */
+				<11 &cpuintc 5>, /* TC4 */
+				<10 &cpuintc 5>, /* TC3 */
+				<9 &cpuintc 1>,  /* TC2 */
+				<8 &cpuintc 2>,  /* TC1 */
+				<7 &cpuintc 1>;  /* TC0 */
 		};
 /*
 		intc1: rtlintc@3018 {
