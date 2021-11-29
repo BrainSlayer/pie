@@ -96,7 +96,7 @@
 				<31 &cpuintc 2>, /* UART0 */
 				<30 &cpuintc 1>, /* UART1 */
 				<29 &cpuintc 5>, /* TC0 */
-				/* <28 &cpuintc 1>,  TC1 */
+				/* <28 &cpuintc 1>, */ /* TC1 */
 				<27 &cpuintc 1>, /* OCPTO */
 				<26 &cpuintc 1>, /* HLXTO */
 				<25 &cpuintc 1>, /* SLXTO */
@@ -106,7 +106,10 @@
 				<21 &cpuintc 4>, /* RTC */
 				<20 &cpuintc 3>, /* SWCORE */
 				<19 &cpuintc 4>, /* WDT_IP1 */
-				<18 &cpuintc 5>; /* WDT_IP2 */
+				<18 &cpuintc 5>, /* WDT_IP2 */
+				<17 &cpuintc 1>, /* TC2 */
+				<16 &cpuintc 1>, /* TC3 */
+				<15 &cpuintc 1>; /* TC4 */
 		};
 
 		intc1: rtlintc@3018 {
