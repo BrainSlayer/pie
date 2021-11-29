@@ -191,7 +191,7 @@ Signed-off-by: Mark Brown <broonie@kernel.org>
 +	struct spi_controller *ctrl;
 +	struct rtspi *rtspi;
 +	int err;
-+
++	dump_stack();
 +	ctrl = devm_spi_alloc_master(&pdev->dev, sizeof(*rtspi));
 +	if (!ctrl) {
 +		dev_err(&pdev->dev, "Error allocating SPI controller\n");

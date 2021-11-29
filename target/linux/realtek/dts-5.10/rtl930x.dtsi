@@ -87,35 +87,35 @@
 		clock-output-names = "osc";
 	};
 
-	soc: soc {
+/*	soc: soc {
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges = <0x0 0x18000000 0x10000>;
-
+*/
 		intc: rtlintc@3000 {
 			compatible = "realtek,rtl-intc";
-			reg = <0x3000 0x18>;
+			reg = <0xb8003000 0x18>;
 			#address-cells = <0>;
 			#interrupt-cells = <1>;
 			interrupt-controller;
 			interrupt-map =
-				<31 &cpuintc 1>, /* UART1 */
+				<31 &cpuintc 4>, /* UART1 */
 				<30 &cpuintc 5>, /* UART0 */
-				<28 &cpuintc 1>, /* USB_H2 */
+				<28 &cpuintc 4>, /* USB_H2 */
 				<24 &cpuintc 4>, /* NIC */
 				<23 &cpuintc 3>, /* SWCORE */
 				<13 &cpuintc 4>, /* GPIO_ABCD */
 				<11 &cpuintc 5>, /* TC4 */
 				<10 &cpuintc 5>, /* TC3 */
-				<9 &cpuintc 1>,  /* TC2 */
-				<8 &cpuintc 2>,  /* TC1 */
-				<7 &cpuintc 1>;  /* TC0 */
+				<9 &cpuintc 3>,  /* TC2 */
+				<8 &cpuintc 3>,  /* TC1 */
+				<7 &cpuintc 2>;  /* TC0 */
 		};
 /*
 		intc1: rtlintc@3018 {
 			compatible = "realtek,rtl-intc";
-			reg = <0x3018 0x18>;
+			reg = <0xb8003018 0x18>;
 			#address-cells = <0>;
 			#interrupt-cells = <1>;
 			interrupt-controller;
@@ -125,7 +125,7 @@
 */
 		rtl9300clock: rtl9300clock@3200 {
 			compatible = "realtek,rtl9300clock";
-			reg = <0x3200 0x10>;
+			reg = <0xb8003200 0x10>;
 			#address-cells = <0>;
 			#interrupt-cells = <1>;
 
@@ -135,7 +135,7 @@
 
 		spi0: spi@1200 {
 			compatible = "realtek,rtl8380-spi";
-			reg = <0x1200 0x100>;
+			reg = <0xb8001200 0x100>;
 
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -143,7 +143,7 @@
 
 		uart0: uart@2000 {
 			compatible = "ns16550a";
-			reg = <0x2000 0x100>;
+			reg = <0xb8002000 0x100>;
 
 			clock-frequency = <175000000>;
 
@@ -158,7 +158,7 @@
 
 		uart1: uart@2100 {
 			compatible = "ns16550a";
-			reg = <0x2100 0x100>;
+			reg = <0xb8002100 0x100>;
 
 			clock-frequency = <175000000>;
 
@@ -173,35 +173,36 @@
 			status = "disabled";
 		};
 
-	};
-
-	gpio0: gpio-controller@b8003500 {
-		compatible = "realtek,rtl838x-gpio";
-		reg = <0xb8003500 0x20>;
-		gpio-controller;
-		#gpio-cells = <2>;
-		interrupt-parent = <&intc>;
-		interrupts = <13>;
-	};
-
-	ethernet0: ethernet@1b00a300 {
-		compatible = "realtek,rtl838x-eth";
-		reg = <0x1b00a300 0x100>;
-		interrupt-parent = <&intc>;
-		interrupts = <24>;
-		#interrupt-cells = <1>;
-		phy-mode = "internal";
-
-		fixed-link {
-			speed = <1000>;
-			full-duplex;
+		gpio0: gpio-controller@b8003500 {
+			compatible = "realtek,rtl838x-gpio";
+			reg = <0xb8003500 0x20>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			interrupt-parent = <&intc>;
+			interrupts = <13>;
 		};
-	};
 
-	switch0: switch@1b000000 {
-		compatible = "realtek,rtl83xx-switch";
+		ethernet0: ethernet@1b00a300 {
+			compatible = "realtek,rtl838x-eth";
+			reg = <0xbb00a300 0x100>;
+			interrupt-parent = <&intc>;
+			interrupts = <24>;
+			#interrupt-cells = <1>;
+			phy-mode = "internal";
 
-		interrupt-parent = <&intc>;
-		interrupts = <20>;
-	};
+			fixed-link {
+				speed = <1000>;
+				full-duplex;
+			};
+
+		};
+
+		switch0: switch@1b000000 {
+			compatible = "realtek,rtl83xx-switch";
+
+			interrupt-parent = <&intc>;
+			interrupts = <20>;
+		};
+//	};
+
 };

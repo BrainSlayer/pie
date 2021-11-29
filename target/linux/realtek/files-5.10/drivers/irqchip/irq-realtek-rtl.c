@@ -22,7 +22,7 @@
 #define RTL_ICTL_IRR3		0x14
 
 #define N_CPU_IRQ	2
-
+#define RTL_ICTL_SIZE 0x18
 #define REG(x)		(base[cpu] + x)
 
 void __iomem	*base[2];
@@ -60,6 +60,8 @@ static void realtek_ictl_mask_irq(struct irq_data *i)
 
 	raw_spin_lock_irqsave(&realtek_ictl_lock, flags);
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (cpu_map[i->hwirq] >= 0 && cpu != cpu_map[i->hwirq])
+			continue;
 		value = readl(REG(RTL_ICTL_GIMR));
 		value &= ~BIT(i->hwirq);
 		writel(value, REG(RTL_ICTL_GIMR));
@@ -163,26 +165,26 @@ static void realtek_irq_dispatch(struct irq_desc *desc)
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 	struct irq_domain *domain = irq_desc_get_handler_data(desc);
 	struct realtek_intc_chip_data *cd = domain->host_data;
-	unsigned int pending[N_CPU_IRQ];
-	unsigned int all_pending = 0;
-	int cpu;
+	unsigned long pending;
+	int irqn;
+	int cpu = smp_processor_id();
 
 	chained_irq_enter(chip, desc);
-	for (cpu = 0; cpu < N_CPU_IRQ; cpu++) {
-		pending[cpu] = readl(REG(RTL_ICTL_GIMR)) & readl(REG(RTL_ICTL_GISR));
-		all_pending |= pending[cpu];
-	}
-//	if (pending[1])
+	pending = readl(REG(RTL_ICTL_GIMR)) & readl(REG(RTL_ICTL_GISR));
+
+//	if (pending)
 //		pr_info("%s: with base %08x pending0 %08x pending1 %08x all pending %08x cpu%d\n",
 //			__func__, (u32)cd->base[0], pending[0], pending[1], all_pending, smp_processor_id());
-	if (unlikely(!all_pending)) {
+	if (unlikely(!pending)) {
 		spurious_interrupt();
 		goto out;
 	}
 
-	for (cpu = 0; cpu < N_CPU_IRQ; cpu++)
-		generic_handle_irq(irq_find_mapping(domain, __ffs(pending[cpu])));
-
+//	generic_handle_irq(irq_find_mapping(domain, __ffs(pending)));
+//	if (__sw_hweight32(pending) > 1)
+//		pr_info("%s: more than one pending: %llu\n", __func__, pending);
+	for_each_set_bit(irqn, &pending, BITS_PER_LONG)
+		generic_handle_irq(irq_find_mapping(domain, irqn));
 out:
 	chained_irq_exit(chip, desc);
 }
@@ -206,7 +208,7 @@ static int __init map_interrupts(struct device_node *node, struct irq_domain *do
 		RTL_ICTL_IRR0,
 	};
 	u8 mips_irqs_set;
-	int cpu;
+	int cpu = 0;
 
 	pr_info("%s, chip data %08x\n", __func__, (u32)cd);
 	ret = of_property_read_u32(node, "#address-cells", &tmp);
@@ -246,13 +248,13 @@ static int __init map_interrupts(struct device_node *node, struct irq_domain *do
 		imap += 3;
 	}
 
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+//	for (cpu = 0; cpu < NR_CPUS; cpu++) {
 		for (i = 0; i < 4; i++) {
 			pr_info("%s: %d writing %08x to %08x\n",
 				__func__, i, regs[i], (u32)REG(irr_regs[i % 4]));
 			writel(regs[i], REG(irr_regs[i]));
 		}
-	}
+//	}
 	for (i = 0; i < 2; i++)
 		pr_info("%d %08x %08x %08x %08x %08x %08x\n", i,
 			readl(0xb8003000 + i * 24), readl(0xb8003004 + i * 24),
@@ -273,14 +275,17 @@ static int __init realtek_rtl_of_init(struct device_node *node, struct device_no
 	if (!base[0])
 		return -ENXIO;
 
-	base[1] = base[0] + 0x18;
+	if (NR_CPUS > N_CPU_IRQ)
+		return -ENXIO;
+
+	/* Set per CPU base, disable all cascaded interrupts */
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		base[cpu] = base[0] + RTL_ICTL_SIZE * cpu;
+		writel(0, REG(RTL_ICTL_GIMR));
+	}
 
 	for (i = 0; i < 32; i++)
-		cpu_map[i] = -1;
-	
-	/* Disable all cascaded interrupts */
-	for (cpu = 0; cpu < N_CPU_IRQ; cpu++)
-		writel(0, REG(RTL_ICTL_GIMR));
+		cpu_map[i] = 0;
 
 	pr_info("%s: new handler with base 0 %08x and base 1 %08x\n",
 		__func__, (u32)(base[0]), (u32)(base[1]));

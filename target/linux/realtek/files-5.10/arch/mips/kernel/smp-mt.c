@@ -110,6 +110,10 @@ static void vsmp_init_secondary(void)
 	pr_info("%s ++++++++++++++\n", __func__);
 
 	/* This is Malta specific: IPI,performance and timer interrupts */
+
+	/* RTL9300 Clear internal timer interrupt */
+	write_c0_compare(0);
+
 	if (mips_gic_present())
 		change_c0_status(ST0_IM, STATUSF_IP2 | STATUSF_IP3 |
 					 STATUSF_IP4 | STATUSF_IP5 |

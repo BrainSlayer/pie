@@ -55,19 +55,27 @@ static void __iomem *rtl9300_tc_base(struct clock_event_device *clk)
 static irqreturn_t rtl9300_timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *clk = dev_id;
-	int cpu = smp_processor_id();
+//	int cpu = smp_processor_id();
 	struct irq_desc *desc = irq_to_desc(irq);
 	int tc = desc->irq_data.hwirq - irq_tc0;
 	void __iomem *base = RTL9300_TC0_BASE + (tc << 4);
-
+	static atomic_t count = ATOMIC_INIT(0);
+	unsigned int c;
 	u32 v = readl(base + RTL9300_TC_INT);
 
-	if ((desc->irq_data.hwirq == 7 && cpu) || (desc->irq_data.hwirq == 8 && !cpu))
-		pr_info("--------------- Timer-IRQ: %lu cpu%d base %08x\n",
-			desc->irq_data.hwirq, cpu, (u32)base);
+	c = (unsigned int)atomic_inc_return(&count);
+
+//	if ((desc->irq_data.hwirq == 7 && cpu) || (desc->irq_data.hwirq == 8 && !cpu))
+/*	if (c > 600)
+		pr_info("--------------- Timer-IRQ: %lu cpu%d base %08x, count %d\n",
+			desc->irq_data.hwirq, cpu, (u32)base, c);
+	if (c > 800)
+		dump_stack();*/
 	// Acknowledge the IRQ
 	v |= RTL9300_TC_INT_IP;
 	writel(v, base + RTL9300_TC_INT);
+	if (readl(base + RTL9300_TC_INT) & RTL9300_TC_INT_IP)
+		dump_stack();
 
 	clk->event_handler(clk);
 	return IRQ_HANDLED;
@@ -81,8 +89,10 @@ static void rtl9300_clock_stop(void __iomem *base)
 
 	// Acknowledge possibly pending IRQ
 	v = readl(base + RTL9300_TC_INT);
-	if (v & RTL9300_TC_INT_IP)
-		writel(v, base + RTL9300_TC_INT);
+//	if (v & RTL9300_TC_INT_IP)
+		writel(v | RTL9300_TC_INT_IP, base + RTL9300_TC_INT);
+	if (readl(base + RTL9300_TC_INT) & RTL9300_TC_INT_IP)
+		dump_stack();
 }
 
 static void rtl9300_timer_start(void __iomem *base, bool periodic)
@@ -90,7 +100,7 @@ static void rtl9300_timer_start(void __iomem *base, bool periodic)
 	u32 v = (periodic ? RTL9300_TC_CTRL_MODE : 0) | RTL9300_TC_CTRL_EN | DIVISOR_RTL9300;
 
 	writel(0, base + RTL9300_TC_CNT);
-	pr_info("------------- starting timer base %08x\n", (u32)base);
+	pr_debug("------------- starting timer base %08x\n", (u32)base);
 	writel(v, base + RTL9300_TC_CTRL);
 }
 
@@ -101,6 +111,7 @@ static int rtl9300_next_event(unsigned long delta, struct clock_event_device *cl
 	rtl9300_clock_stop(base);
 	writel(delta, base + RTL9300_TC_DATA);
 	rtl9300_timer_start(base, TIMER_MODE_ONCE);
+
 	return 0;
 }
 
@@ -108,7 +119,7 @@ static int rtl9300_state_periodic(struct clock_event_device *clk)
 {
 	void __iomem *base = rtl9300_tc_base(clk);
 
-	pr_info("------------- rtl9300_state_periodic %08x\n", (u32)base);
+	pr_debug("------------- rtl9300_state_periodic %08x\n", (u32)base);
 	rtl9300_clock_stop(base);
 	writel(RTL9300_CLOCK_RATE / HZ, base + RTL9300_TC_DATA);
 	rtl9300_timer_start(base, TIMER_MODE_REPEAT);
@@ -119,7 +130,7 @@ static int rtl9300_state_oneshot(struct clock_event_device *clk)
 {
 	void __iomem *base = rtl9300_tc_base(clk);
 
-	pr_info("------------- rtl9300_state_oneshot %08x\n", (u32)base);
+	pr_debug("------------- rtl9300_state_oneshot %08x\n", (u32)base);
 	rtl9300_clock_stop(base);
 	writel(RTL9300_CLOCK_RATE / HZ, base + RTL9300_TC_DATA);
 	rtl9300_timer_start(base, TIMER_MODE_ONCE);
@@ -130,9 +141,8 @@ static int rtl9300_shutdown(struct clock_event_device *clk)
 {
 	void __iomem *base = rtl9300_tc_base(clk);
 
-	pr_info("------------- rtl9300_shutdown %08x\n", (u32)base);
+	pr_debug("------------- rtl9300_shutdown %08x\n", (u32)base);
 	rtl9300_clock_stop(base);
-
 	return 0;
 }
 
@@ -145,8 +155,10 @@ static void rtl9300_clock_setup(void __iomem *base)
 
 	// Acknowledge possibly pending IRQ
 	v = readl(base + RTL9300_TC_INT);
-	if (v & RTL9300_TC_INT_IP)
-		writel(v, base + RTL9300_TC_INT);
+//	if (v & RTL9300_TC_INT_IP)
+		writel(v | RTL9300_TC_INT_IP, base + RTL9300_TC_INT);
+	if (readl(base + RTL9300_TC_INT) & RTL9300_TC_INT_IP)
+		dump_stack();
 
 	// Setup maximum period (for use as clock-source)
 	writel(0x0fffffff, base + RTL9300_TC_DATA);
@@ -161,7 +173,7 @@ void rtl9300_clockevent_init(void)
 	int irq;
 	struct clock_event_device *cd = &per_cpu(rtl9300_clockevent, cpu);
 	unsigned char *name = per_cpu(rtl9300_clock_name, cpu);
-	unsigned long flags =  IRQF_PERCPU | IRQF_TIMER | IRQF_SHARED;
+	unsigned long flags =  IRQF_PERCPU | IRQF_TIMER;
 	struct device_node *node;
 	int i;
 	void *b = RTL9300_TC0_BASE;
@@ -209,5 +221,4 @@ void rtl9300_clockevent_init(void)
 	for (i = 0; i < 5; i++)
 		pr_info("%d %08x %08x %08x %08x\n", i, readl(b + i * 16 + 0x0), readl(b + i * 16 + 0x4),
 			readl(b + i * 16 + 0x8), readl(b + i * 16 + 0xc));
-
 }
