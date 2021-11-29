@@ -58,8 +58,6 @@ static struct sk_buff *trailer_rcv(struct sk_buff *skb, struct net_device *dev,
 {
 	struct dsa_port *cpu_dp = dev->dsa_ptr;
 	struct dsa_switch *ds = cpu_dp->ds;
-	int i;
-	struct rtl838x_switch_priv *priv = ds->priv;
 	u8 *trailer;
 	bool trunk = false;
 	int source_port;
@@ -75,9 +73,9 @@ static struct sk_buff *trailer_rcv(struct sk_buff *skb, struct net_device *dev,
 		return NULL;
 
 	if (trailer[1] & 0x40) { // forward
-		skb->offload_fwd_mark = 1;
 		struct dsa_switch *ds = cpu_dp->ds;
 		struct rtl838x_switch_priv *priv = ds->priv;
+
 		skb->offload_fwd_mark = 1;
 		if (priv->lagmembers & (1ULL << source_port)) {
 			pr_info("lag member %d found\n", source_port);

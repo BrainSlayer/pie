@@ -12,7 +12,7 @@ diff -urpN linux-5.10.72.old/arch/mips/Kbuild.platforms linux-5.10.72/arch/mips/
 diff -urpN linux-5.10.72.old/arch/mips/Kconfig linux-5.10.72/arch/mips/Kconfig
 --- linux-5.10.72.old/arch/mips/Kconfig	2021-10-20 00:53:01.998912517 +0700
 +++ linux-5.10.72/arch/mips/Kconfig	2021-10-20 00:54:35.994824025 +0700
-@@ -1032,8 +1032,55 @@ config NLM_XLP_BOARD
+@@ -1032,8 +1032,56 @@
  	  This board is based on Netlogic XLP Processor.
  	  Say Y here if you have a XLP based board.
  
@@ -35,7 +35,6 @@ diff -urpN linux-5.10.72.old/arch/mips/Kconfig linux-5.10.72/arch/mips/Kconfig
 +
  endchoice
  
-+
 +config RTL838X
 +	bool "Realtek RTL838X based platforms"
 +	depends on RTL83XX
@@ -53,6 +52,8 @@ diff -urpN linux-5.10.72.old/arch/mips/Kconfig linux-5.10.72/arch/mips/Kconfig
 +	bool "Realtek RTL839X based platforms"
 +	depends on RTL83XX
 +	select MIPS_CPU_SCACHE
++	select CSRC_R4K
++	select CEVT_RTL9300
 +	select SYS_SUPPORTS_MULTITHREADING
 +
 +config RTL931X
@@ -68,3 +69,13 @@ diff -urpN linux-5.10.72.old/arch/mips/Kconfig linux-5.10.72/arch/mips/Kconfig
  source "arch/mips/alchemy/Kconfig"
  source "arch/mips/ath25/Kconfig"
  source "arch/mips/ath79/Kconfig"
+@@ -1095,6 +1143,9 @@
+ config CEVT_R4K
+ 	bool
+ 
++config CEVT_RTL9300
++	bool
++
+ config CEVT_SB1250
+ 	bool
+ 
