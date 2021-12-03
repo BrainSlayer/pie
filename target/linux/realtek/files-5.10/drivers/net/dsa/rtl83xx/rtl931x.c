@@ -772,12 +772,12 @@ static u64 rtl931x_read_mcast_pmask(int idx)
 
 static void rtl931x_write_mcast_pmask(int idx, u64 portmask)
 {
-	u32 pm = portmask;
+	u64 pm = portmask;
 
 	// Access MC_PMSK (2) via register RTL9310_TBL_0
 	struct table_reg *q = rtl_table_get(RTL9310_TBL_0, 2);
 
-	pr_info("%s: Index idx %d has portmask %08x\n", __func__, idx, pm);
+	pr_info("%s: Index idx %d has portmask %016llx\n", __func__, idx, pm);
 	pm <<= 7;
 	sw_w32((u32)(pm >> 32), rtl_table_data(q, 0));
 	sw_w32((u32)pm, rtl_table_data(q, 1));
