@@ -795,8 +795,8 @@ static void rtl931x_phylink_mac_config(struct dsa_switch *ds, int port,
 	if (state->link)
 		reg |= RTL931X_FORCE_LINK_EN;
 
-	reg |= RTL931X_FORCE_EN;
-
+//	reg |= RTL931X_FORCE_EN;
+ 
 	sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
 }
 
