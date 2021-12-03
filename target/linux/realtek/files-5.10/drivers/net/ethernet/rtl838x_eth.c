@@ -207,6 +207,7 @@ struct rtl838x_eth_priv {
 	u8 smi_addr[MAX_PORTS];
 	char sds_id[MAX_PORTS];
 	bool smi_bus_isc45[MAX_SMI_BUSSES];
+	bool phy_is_internal[MAX_PORTS];
 };
 
 extern int rtl838x_phy_init(struct rtl838x_eth_priv *priv);
@@ -337,17 +338,28 @@ bool rtl931x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
 	return t->l2_offloaded;
 }
 
+struct cleanup_work {
+	struct work_struct work;
+	int status;
+	struct rtl838x_eth_priv *priv;
+};
+
 /*
  * Discard the RX ring-buffers, called as part of the net-ISR
  * when the buffer runs over
- * Caller needs to hold priv->lock
  */
-static void rtl838x_rb_cleanup(struct rtl838x_eth_priv *priv, int status)
+static void rtl838x_rb_cleanup(struct work_struct *work)
 {
 	int r;
 	u32	*last;
 	struct p_hdr *h;
-	struct ring_b *ring = priv->membase;
+	const struct cleanup_work *cw = container_of(work, struct cleanup_work, work);
+	struct ring_b *ring = cw->priv->membase;
+	struct rtl838x_eth_priv *priv = cw->priv;
+	int status = cw->status;
+	int flags;
+
+	spin_lock_irqsave(&priv->lock, flags);
 
 	for (r = 0; r < priv->rxrings; r++) {
 		pr_debug("In %s working on r: %d\n", __func__, r);
@@ -370,6 +382,8 @@ static void rtl838x_rb_cleanup(struct rtl838x_eth_priv *priv, int status)
 			ring->c_rx[r] = (ring->c_rx[r] + 1) % priv->rxringlen;
 		} while (&ring->rx_r[r][ring->c_rx[r]] != last);
 	}
+	spin_unlock_irqrestore(&priv->lock, flags);
+	kfree(work);
 }
 
 struct fdb_update_work {
@@ -443,13 +457,13 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 {
 	struct net_device *dev = dev_id;
 	struct rtl838x_eth_priv *priv = netdev_priv(dev);
-	u32 status = sw_r32(priv->r->dma_if_intr_sts);
-//	bool triggered = false;
+	u32 status;
+	unsigned long flags;
 	int i;
 
 	pr_debug("%s: called\n", __func__);
-	
-	spin_lock(&priv->lock);
+	status = sw_r32(priv->r->dma_if_intr_sts);
+
 	/*  Ignore TX interrupt */
 	if ((status & 0xf0000)) {
 		/* Clear ISR */
@@ -474,7 +488,16 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 		pr_debug("RX buffer overrun: status %x, mask: %x\n",
 			 status, sw_r32(priv->r->dma_if_intr_msk));
 		sw_w32(status, priv->r->dma_if_intr_sts);
-		rtl838x_rb_cleanup(priv, status & 0xff);
+//		rtl838x_rb_cleanup(priv, status & 0xff);
+		struct cleanup_work *w = kzalloc(sizeof(*w), GFP_ATOMIC);
+		if (!w) {
+			pr_err("Out of memory: %s", __func__);
+			return IRQ_HANDLED;
+		}
+		INIT_WORK(&w->work, rtl838x_rb_cleanup);
+		w->status = status;
+		w->priv = priv;
+		schedule_work(&w->work);
 	}
 
 	if (priv->family_id == RTL8390_FAMILY_ID && status & 0x00100000) {
@@ -492,7 +515,6 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 		rtl839x_l2_notification_handler(priv);
 	}
 
-	spin_unlock(&priv->lock);
 	return IRQ_HANDLED;
 }
 
@@ -500,14 +522,17 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 {
 	struct net_device *dev = dev_id;
 	struct rtl838x_eth_priv *priv = netdev_priv(dev);
-	u32 status_rx_r = sw_r32(priv->r->dma_if_intr_rx_runout_sts);
-	u32 status_rx = sw_r32(priv->r->dma_if_intr_rx_done_sts);
-	u32 status_tx = sw_r32(priv->r->dma_if_intr_tx_done_sts);
+	u32 status_rx_r, status_rx, status_tx;
 	int i;
+	unsigned long flags;
 
 	pr_debug("In %s, status_tx: %08x, status_rx: %08x, status_rx_r: %08x, notify: %08x\n",
 		__func__, status_tx, status_rx, status_rx_r, sw_r32(priv->r->l2_ntfy_if_intr_sts));
-	spin_lock(&priv->lock);
+//	spin_lock_irqsave(&priv->lock, flags);
+
+	status_rx_r = sw_r32(priv->r->dma_if_intr_rx_runout_sts);
+	status_rx = sw_r32(priv->r->dma_if_intr_rx_done_sts);
+	status_tx = sw_r32(priv->r->dma_if_intr_tx_done_sts);
 
 	/*  Ignore TX interrupt */
 	if (status_tx) {
@@ -535,10 +560,19 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 		pr_debug("RX buffer overrun: status %x, mask: %x\n",
 			 status_rx_r, sw_r32(priv->r->dma_if_intr_rx_runout_msk));
 		sw_w32(status_rx_r, priv->r->dma_if_intr_rx_runout_sts);
-		rtl838x_rb_cleanup(priv, status_rx_r);
+//		rtl838x_rb_cleanup(priv, status_rx_r);
+		struct cleanup_work *w = kzalloc(sizeof(*w), GFP_ATOMIC);
+		if (!w) {
+			pr_err("Out of memory: %s", __func__);
+			return IRQ_HANDLED;
+		}
+		INIT_WORK(&w->work, rtl838x_rb_cleanup);
+		w->status = status_rx_r;
+		w->priv = priv;
+		schedule_work(&w->work);
 	}
 
-	spin_unlock(&priv->lock);
+//	spin_unlock_irqrestore(&priv->lock, flags);
 	return IRQ_HANDLED;
 }
 
@@ -1239,6 +1273,7 @@ static int rtl838x_eth_tx(struct sk_buff *skb, struct net_device *dev)
 	}
 txdone:
 	spin_unlock_irqrestore(&priv->lock, flags);
+
 	return ret;
 }
 
@@ -1271,7 +1306,6 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 	struct rtl838x_eth_priv *priv = netdev_priv(dev);
 	struct ring_b *ring = priv->membase;
 	struct sk_buff *skb;
-	unsigned long flags;
 	int i, len, work_done = 0;
 	u8 *data, *skb_data;
 	unsigned int val;
@@ -1279,8 +1313,10 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 	struct p_hdr *h;
 	bool dsa = netdev_uses_dsa(dev);
 	struct dsa_tag tag;
+	unsigned long flags;
 
 	spin_lock_irqsave(&priv->lock, flags);
+
 	last = (u32 *)KSEG1ADDR(sw_r32(priv->r->dma_if_rx_cur + r * 4));
 	pr_debug("---------------------------------------------------------- RX - %d\n", r);
 
@@ -1371,6 +1407,7 @@ static int rtl838x_hw_receive(struct net_device *dev, int r, int budget)
 	priv->r->update_cntr(r, 0);
 
 	spin_unlock_irqrestore(&priv->lock, flags);
+
 	return work_done;
 }
 
@@ -1398,6 +1435,7 @@ static int rtl838x_poll_rx(struct napi_struct *napi, int budget)
 		else
 			sw_w32_mask(0, 0xf00ff | BIT(r + 8), priv->r->dma_if_intr_msk);
 	}
+
 	return work_done;
 }
 
@@ -1670,16 +1708,20 @@ static int rtl930x_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 {
 	u32 val;
 	int err;
+	struct rtl838x_eth_priv *priv = bus->priv;
 
-	// TODO: These are hard-coded for the 2 Fibre Ports of the XGS1210
-	if (mii_id >= 26 && mii_id <= 27)
-		return rtl930x_read_sds_phy(mii_id - 23, 0, regnum);
+	if (priv->phy_is_internal[mii_id])
+		return rtl930x_read_sds_phy(priv->sds_id[mii_id], 0, regnum);
 
 	if (regnum & MII_ADDR_C45) {
 		regnum &= ~MII_ADDR_C45;
 		err = rtl930x_read_mmd_phy(mii_id, regnum >> 16, regnum & 0xffff, &val);
+		pr_debug("MMD: %d register %d read %x, err %d\n", mii_id, regnum & 0xffff, val, err);
 	} else {
 		err = rtl930x_read_phy(mii_id, 0, regnum, &val);
+		pr_debug("PHY: %d register %d read %x, err %d\n", mii_id, regnum, val, err);
+/*		if (mii_id < 2 && regnum == 2)
+			dump_stack();*/
 	}
 	if (err)
 		return err;
@@ -1692,6 +1734,7 @@ static int rtl931x_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 	int err, v;
 	struct rtl838x_eth_priv *priv = bus->priv;
 
+	pr_info("%s: In here, port %d\n", __func__, mii_id);
 	if (priv->sds_id[mii_id] >= 0 && mii_id >= 52) {
 		v = rtl931x_read_sds_phy(priv->sds_id[mii_id], 0, regnum);
 		if (v < 0) {
@@ -1833,12 +1876,14 @@ static int rtl930x_mdio_reset(struct mii_bus *bus)
 	pr_info("c45_mask: %08x\n", c45_mask);
 	sw_w32_mask(0, c45_mask, RTL930X_SMI_GLB_CTRL);
 
-	// Ports 24 and 25 are 2.5 Gig, set this type (1)
-	sw_w32_mask(0x7 << 12, 1 << 12, RTL930X_SMI_MAC_TYPE_CTRL);
-	sw_w32_mask(0x7 << 15, 1 << 15, RTL930X_SMI_MAC_TYPE_CTRL);
-	// Ports 26 and 27 are 10 Gig SerDes, set this type (0)
-	sw_w32_mask(0x7 << 18, 0, RTL930X_SMI_MAC_TYPE_CTRL);
-	sw_w32_mask(0x7 << 21, 0, RTL930X_SMI_MAC_TYPE_CTRL);
+	// Ports 24 to 27 are 2.5 or 10Gig, set this type (1) or (0) for internal SerDes
+	for (i = 24; i < 28; i++) {
+		pos = (i - 24) * 3 + 12;
+		if (priv->phy_is_internal[i])
+			sw_w32_mask(0x7 << pos, 0 << pos, RTL930X_SMI_MAC_TYPE_CTRL);
+		else
+			sw_w32_mask(0x7 << pos, 1 << pos, RTL930X_SMI_MAC_TYPE_CTRL);
+	}
 
 	// TODO: Set up RTL9300_SMI_10GPHY_POLLING_SEL_0_ADDR for Aquantia PHYs on 1250
 
@@ -2028,6 +2073,10 @@ static int rtl838x_mdio_init(struct rtl838x_eth_priv *priv)
 
 		if (of_device_is_compatible(dn, "ethernet-phy-ieee802.3-c45"))
 			priv->smi_bus_isc45[smi_addr[0]] = true;
+
+		if (of_property_read_bool(dn, "phy-is-integrated")) {
+			priv->phy_is_internal[pn] = true;
+		}
 	}
 
 	snprintf(priv->mii_bus->id, MII_BUS_ID_SIZE, "%pOFn", mii_np);
