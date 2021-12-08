@@ -187,17 +187,22 @@ irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 
 	/* Clear status */
 	rtl839x_set_port_reg_le(ports, RTL931X_ISR_PORT_LINK_STS_CHG);
-	pr_info("RTL9310 Link change: status: %x, ports %llx\n", status, ports);
+	pr_debug("RTL9310 Link change: status: %x, ports %016llx\n", status, ports);
+
+	link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
+	// Must re-read this to get correct status
+	link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
+	pr_debug("RTL9310 Link change: status: %x, link status %016llx\n", status, link);
 
 	for (i = 0; i < 56; i++) {
 		if (ports & BIT_ULL(i)) {
-			link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
-			// Must re-read this to get correct status
-			link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
-			if (link & BIT_ULL(i))
+			if (link & BIT_ULL(i)) {
+				pr_info("%s port %d up\n", __func__, i);
 				dsa_port_phylink_mac_change(ds, i, true);
-			else
+			} else {
+				pr_info("%s port %d down\n", __func__, i);
 				dsa_port_phylink_mac_change(ds, i, false);
+			}
 		}
 	}
 	return IRQ_HANDLED;
@@ -766,7 +771,7 @@ static u64 rtl931x_read_mcast_pmask(int idx)
 	portmask >>= 7;
 	rtl_table_release(q);
 
-	pr_info("%s: Index idx %d has portmask %016llx\n", __func__, idx, portmask);
+	pr_debug("%s: Index idx %d has portmask %016llx\n", __func__, idx, portmask);
 	return portmask;
 }
 

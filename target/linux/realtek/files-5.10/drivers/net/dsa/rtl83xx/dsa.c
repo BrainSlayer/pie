@@ -40,7 +40,7 @@ static void rtl83xx_enable_phy_polling(struct rtl838x_switch_priv *priv)
 	int i;
 	u64 v = 0;
 
-	msleep(1000);
+	msleep(500);
 	/* Enable all ports with a PHY, including the SFP-ports */
 	for (i = 0; i < priv->cpu_port; i++) {
 		if (priv->ports[i].phy)
@@ -48,12 +48,7 @@ static void rtl83xx_enable_phy_polling(struct rtl838x_switch_priv *priv)
 	}
 
 	pr_info("%s: %16llx\n", __func__, v);
-	if (priv->family_id != RTL9310_FAMILY_ID) {
-		priv->r->set_port_reg_le(v, priv->r->smi_poll_ctrl);
-	} else {
-		sw_w32(0xffffffff, RTL931X_SMI_PORT_POLLING_CTRL);
-		sw_w32(0x7fffff, RTL931X_SMI_PORT_POLLING_CTRL + 4);
-	}
+	priv->r->set_port_reg_le(v, priv->r->smi_poll_ctrl);
 
 	/* PHY update complete, there is no global PHY polling enable bit on the 9300 */
 	if (priv->family_id == RTL8390_FAMILY_ID)
@@ -415,7 +410,7 @@ static int rtl83xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	link = priv->r->get_port_reg_le(priv->r->mac_link_sts);
 	if (link & BIT_ULL(port))
 		state->link = 1;
-	pr_debug("%s: link state port %d: %llx\n", __func__, port, link & BIT_ULL(port));
+	pr_info("%s: link state port %d: %llx\n", __func__, port, link & BIT_ULL(port));
 
 	state->duplex = 0;
 	if (priv->r->get_port_reg_le(priv->r->mac_link_dup_sts) & BIT_ULL(port))
@@ -792,8 +787,8 @@ static void rtl931x_phylink_mac_config(struct dsa_switch *ds, int port,
 	if (state->duplex == DUPLEX_FULL)
 		reg |= RTL931X_DUPLEX_MODE;
 
-	if (state->link)
-		reg |= RTL931X_FORCE_LINK_EN;
+//	if (state->link)
+//		reg |= RTL931X_FORCE_LINK_EN;
 
 //	reg |= RTL931X_FORCE_EN;
  
@@ -925,12 +920,13 @@ static void rtl93xx_phylink_mac_link_up(struct dsa_switch *ds, int port,
 
 	pr_info("%s called\n", __func__);
 
-	/* Restart TX/RX to port */
+	msleep(100);
+	/* DO NOT DO THIS !!! Restart TX/RX to port
 	if (priv->family_id == RTL9300_FAMILY_ID)
 		v = RTL930X_FORCE_EN | RTL930X_FORCE_LINK_EN;
 	else if (priv->family_id == RTL9310_FAMILY_ID)
 		v = RTL931X_FORCE_EN | RTL931X_FORCE_LINK_EN;
-	sw_w32_mask(0, v, priv->r->mac_port_ctrl(port));
+	sw_w32_mask(0, v, priv->r->mac_port_ctrl(port)); */
 }
 
 static void rtl83xx_get_strings(struct dsa_switch *ds,

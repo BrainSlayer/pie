@@ -357,7 +357,7 @@ static void rtl838x_rb_cleanup(struct work_struct *work)
 	struct ring_b *ring = cw->priv->membase;
 	struct rtl838x_eth_priv *priv = cw->priv;
 	int status = cw->status;
-	int flags;
+	unsigned long flags;
 
 	spin_lock_irqsave(&priv->lock, flags);
 
@@ -458,7 +458,6 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 	struct net_device *dev = dev_id;
 	struct rtl838x_eth_priv *priv = netdev_priv(dev);
 	u32 status;
-	unsigned long flags;
 	int i;
 
 	pr_debug("%s: called\n", __func__);
@@ -524,7 +523,6 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 	struct rtl838x_eth_priv *priv = netdev_priv(dev);
 	u32 status_rx_r, status_rx, status_tx;
 	int i;
-	unsigned long flags;
 
 	pr_debug("In %s, status_tx: %08x, status_rx: %08x, status_rx_r: %08x, notify: %08x\n",
 		__func__, status_tx, status_rx, status_rx_r, sw_r32(priv->r->l2_ntfy_if_intr_sts));
@@ -1734,7 +1732,7 @@ static int rtl931x_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 	int err, v;
 	struct rtl838x_eth_priv *priv = bus->priv;
 
-	pr_info("%s: In here, port %d\n", __func__, mii_id);
+	pr_debug("%s: In here, port %d\n", __func__, mii_id);
 	if (priv->sds_id[mii_id] >= 0 && mii_id >= 52) {
 		v = rtl931x_read_sds_phy(priv->sds_id[mii_id], 0, regnum);
 		if (v < 0) {
@@ -1935,9 +1933,9 @@ static int rtl931x_mdio_reset(struct mii_bus *bus)
 		if (mdc_on[i]) {
 			sw_w32_mask(0, BIT(9 + i), RTL931X_MAC_L2_GLOBAL_CTRL2);
 			// Private field
-			sw_w32_mask(0, BIT(20 + i), RTL931X_SMI_GLB_CTRL0);
+//			sw_w32_mask(0, BIT(20 + i), RTL931X_SMI_GLB_CTRL0);
 			// Park page
-			sw_w32_mask(0, BIT(16 + i), RTL931X_SMI_GLB_CTRL0);
+//			sw_w32_mask(0, BIT(16 + i), RTL931X_SMI_GLB_CTRL0);
 		}
 	}
 
@@ -2055,7 +2053,6 @@ static int rtl838x_mdio_init(struct rtl838x_eth_priv *priv)
 		if (of_property_read_u32(dn, "reg", &pn))
 			continue;
 
-		pr_info("%s: looking at port %d\n", __func__, pn);
 		if (of_property_read_u32_array(dn, "rtl9300,smi-address", &smi_addr[0], 2)) {
 			smi_addr[0] = 0;
 			smi_addr[1] = pn;
@@ -2211,7 +2208,7 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 	struct resource *res, *mem;
 	phy_interface_t phy_mode;
 	struct phylink *phylink;
-	int err = 0, i, rxrings, rxringlen;
+	int err = 0, i, rxrings, rxringlen; 
 	struct ring_b *ring;
 
 	pr_info("Probing RTL838X eth device pdev: %x, dev: %x\n",
