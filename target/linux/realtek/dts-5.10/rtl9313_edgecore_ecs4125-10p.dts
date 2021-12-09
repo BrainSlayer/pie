@@ -59,18 +59,11 @@
 
 			partition@0 {
 				label = "u-boot";
-				reg = <0x0 0xe0000>;
-				read-only;
+				reg = <0x0 0x100000>;
 			};
 			partition@100000 {
-				label = "bdinfo";
-				reg = <0x100000 0x10000>;
-				read-only;
-			};
-			partition@110000 {
 				label = "u-boot-env";
-				reg = <0x110000 0x10000>;
-				read-only;
+				reg = <0x100000 0x10000>;
 			};
 			partition@120000 {
 				label = "jffs";
@@ -149,19 +142,19 @@
 			rtl9300,smi-address = <1 1>;
 		};
 
-		/* RTL9313 Internal Serdes
-		phy52: ethernet-phy@48 {
+		/* RTL9313 Internal Serdes */
+		phy52: ethernet-phy@8 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			phy-is-integrated;
 			reg = <52>;
 			rtl9300,smi-address = <2 0>;
 		};
-		phy53: ethernet-phy@49 {
+		phy53: ethernet-phy@9 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			phy-is-integrated;
 			reg = <53>;
 			rtl9300,smi-address = <3 0>;
-		}; */
+		};
 
 	};
 };
@@ -220,7 +213,7 @@
 			phy-mode = "usxgmii";
 		};
 
-		/* RTL9313 Internal SerDes
+		/* RTL9313 Internal SerDes */
 		port@52 {
 			reg = <52>;
 			label = "lan9";
@@ -232,7 +225,7 @@
 			label = "lan10";
 			phy-mode = "internal";
 			phy-handle = <&phy53>;
-		}; */
+		};
 
 		/* CPU-Port */
 		port@56 {
