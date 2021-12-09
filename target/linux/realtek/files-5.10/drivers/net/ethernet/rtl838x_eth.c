@@ -1734,7 +1734,7 @@ static int rtl931x_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 	int err, v;
 	struct rtl838x_eth_priv *priv = bus->priv;
 
-	pr_info("%s: In here, port %d\n", __func__, mii_id);
+	pr_debug("%s: In here, port %d\n", __func__, mii_id);
 	if (priv->sds_id[mii_id] >= 0 && mii_id >= 52) {
 		v = rtl931x_read_sds_phy(priv->sds_id[mii_id], 0, regnum);
 		if (v < 0) {
