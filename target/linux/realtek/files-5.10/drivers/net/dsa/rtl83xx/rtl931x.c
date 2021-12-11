@@ -77,7 +77,7 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 {
 	u32 v, w, x, y;
 	// Read VLAN table (3) via register 0
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 3);
+	struct table_reg *r = rtl_table_get(RTL931X_TBL_0, 3);
 
 	rtl_table_read(r, vlan);
 	v = sw_r32(rtl_table_data(r, 0));
@@ -104,7 +104,7 @@ static void rtl931x_vlan_tables_read(u32 vlan, struct rtl838x_vlan_info *info)
 		info->if_id);
 
 	// Read UNTAG table via table register 3
-	r = rtl_table_get(RTL9310_TBL_3, 0);
+	r = rtl_table_get(RTL931X_TBL_3, 0);
 	rtl_table_read(r, vlan);
 	v = ((u64)sw_r32(rtl_table_data(r, 0))) << 25;
 	v |= sw_r32(rtl_table_data(r, 1)) >> 7;
@@ -117,7 +117,7 @@ static void rtl931x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
 {
 	u32 v, w, x, y;
 	// Access VLAN table (1) via register 0
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 3);
+	struct table_reg *r = rtl_table_get(RTL931X_TBL_0, 3);
 
 	v = info->tagged_ports >> 25;
 	w = (info->tagged_ports & 0x1fffff) << 7;
@@ -145,7 +145,7 @@ static void rtl931x_vlan_set_tagged(u32 vlan, struct rtl838x_vlan_info *info)
 
 static void rtl931x_vlan_set_untagged(u32 vlan, u64 portmask)
 {
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_3, 0);
+	struct table_reg *r = rtl_table_get(RTL931X_TBL_3, 0);
 
 	rtl839x_set_port_reg_be(portmask << 7, rtl_table_data(r, 0));
 	rtl_table_write(r, vlan);
@@ -159,12 +159,12 @@ static inline int rtl931x_mac_force_mode_ctrl(int p)
 
 static inline int rtl931x_mac_link_spd_sts(int p)
 {
-	return RTL931X_MAC_LINK_SPD_STS(p);
+	return RTL931X_MAC_LINK_SPD_STS + (((p >> 3) << 2));
 }
 
 static inline int rtl931x_mac_port_ctrl(int p)
 {
-	return RTL930X_MAC_L2_PORT_CTRL(p);
+	return RTL930X_MAC_L2_PORT_CTRL + (p << 7);
 }
 
 static inline int rtl931x_l2_port_new_salrn(int p)
@@ -187,12 +187,12 @@ irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 
 	/* Clear status */
 	rtl839x_set_port_reg_le(ports, RTL931X_ISR_PORT_LINK_STS_CHG);
-	pr_debug("RTL9310 Link change: status: %x, ports %016llx\n", status, ports);
+	pr_debug("RTL931X Link change: status: %x, ports %016llx\n", status, ports);
 
 	link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
 	// Must re-read this to get correct status
 	link = rtl839x_get_port_reg_le(RTL931X_MAC_LINK_STS);
-	pr_debug("RTL9310 Link change: status: %x, link status %016llx\n", status, link);
+	pr_debug("RTL931X Link change: status: %x, link status %016llx\n", status, link);
 
 	for (i = 0; i < 56; i++) {
 		if (ports & BIT_ULL(i)) {
@@ -217,7 +217,7 @@ irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 #define RTL931X_SMI_PORT_POLLING_CTRL	(0x0CCC)
 #define RTL931X_SMI_PORT_ADDR		(0x0C74)
 #define RTL931X_SMI_PORT_POLLING_SEL	(0x0C9C)
-#define RTL9310_SMI_PORT_POLLING_CTRL	(0x0CCC)
+#define RTL931X_SMI_PORT_POLLING_CTRL	(0x0CCC)
 #define RTL931X_SMI_INDRT_ACCESS_CTRL_0	(0x0C00)
 #define RTL931X_SMI_INDRT_ACCESS_CTRL_1	(0x0C04)
 #define RTL931X_SMI_INDRT_ACCESS_CTRL_2	(0x0C08)
@@ -471,7 +471,7 @@ void rtl931x_set_receive_management_action(int port, rma_ctrl_t type, action_typ
 u64 rtl931x_traffic_get(int source)
 {
 	u32 v;
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	struct table_reg *r = rtl_table_get(RTL931X_TBL_0, 6);
 
 	rtl_table_read(r, source);
 	v = sw_r32(rtl_table_data(r, 0));
@@ -484,7 +484,7 @@ u64 rtl931x_traffic_get(int source)
  */
 void rtl931x_traffic_set(int source, u64 dest_matrix)
 {
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	struct table_reg *r = rtl_table_get(RTL931X_TBL_0, 6);
 
 	sw_w32((dest_matrix << 3), rtl_table_data(r, 0));
 	rtl_table_write(r, source);
@@ -493,7 +493,7 @@ void rtl931x_traffic_set(int source, u64 dest_matrix)
 
 void rtl931x_traffic_enable(int source, int dest)
 {
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	struct table_reg *r = rtl_table_get(RTL931X_TBL_0, 6);
 	rtl_table_read(r, source);
 	sw_w32_mask(0, BIT(dest + 3), rtl_table_data(r, 0));
 	rtl_table_write(r, source);
@@ -502,7 +502,7 @@ void rtl931x_traffic_enable(int source, int dest)
 
 void rtl931x_traffic_disable(int source, int dest)
 {
-	struct table_reg *r = rtl_table_get(RTL9310_TBL_0, 6);
+	struct table_reg *r = rtl_table_get(RTL931X_TBL_0, 6);
 	rtl_table_read(r, source);
 	sw_w32_mask(BIT(dest + 3), 0, rtl_table_data(r, 0));
 	rtl_table_write(r, source);
@@ -690,7 +690,7 @@ static void rtl931x_fill_l2_row(u32 r[], struct rtl838x_l2_entry *e)
 static u64 rtl931x_read_l2_entry_using_hash(u32 hash, u32 pos, struct rtl838x_l2_entry *e)
 {
 	u32 r[4];
-	struct table_reg *q = rtl_table_get(RTL9310_TBL_0, 0);
+	struct table_reg *q = rtl_table_get(RTL931X_TBL_0, 0);
 	u32 idx;
 	int i;
 	u64 mac;
@@ -780,8 +780,8 @@ static void rtl931x_vlan_profile_setup(int profile)
 static u64 rtl931x_read_mcast_pmask(int idx)
 {
 	u64 portmask;
-	// Read MC_PMSK (2) via register RTL9310_TBL_0
-	struct table_reg *q = rtl_table_get(RTL9310_TBL_0, 2);
+	// Read MC_PMSK (2) via register RTL931X_TBL_0
+	struct table_reg *q = rtl_table_get(RTL931X_TBL_0, 2);
 
 	rtl_table_read(q, idx);
 	portmask = sw_r32(rtl_table_data(q, 0));
@@ -798,8 +798,8 @@ static void rtl931x_write_mcast_pmask(int idx, u64 portmask)
 {
 	u64 pm = portmask;
 
-	// Access MC_PMSK (2) via register RTL9310_TBL_0
-	struct table_reg *q = rtl_table_get(RTL9310_TBL_0, 2);
+	// Access MC_PMSK (2) via register RTL931X_TBL_0
+	struct table_reg *q = rtl_table_get(RTL931X_TBL_0, 2);
 
 	pr_info("%s: Index idx %d has portmask %016llx\n", __func__, idx, pm);
 	pm <<= 7;
@@ -819,7 +819,7 @@ typedef struct {
 	u16 data;
 } sds_config;
 
-sds_config dal_mango_construct_ana_common[] = {
+static sds_config dal_mango_construct_ana_common[] = {
 	{ 0x21, 0x00, 0x1800 }, { 0x21, 0x01, 0x0060 }, { 0x21, 0x02, 0x3000 }, { 0x21, 0x03, 0xFFFF },
 	{ 0x21, 0x04, 0x0603 }, { 0x21, 0x05, 0x1104 }, { 0x21, 0x06, 0x4444 }, { 0x21, 0x07, 0x7044 },
 	{ 0x21, 0x08, 0xF104 }, { 0x21, 0x09, 0xF104 }, { 0x21, 0x0A, 0xF104 }, { 0x21, 0x0B, 0x0003 },
@@ -829,7 +829,7 @@ sds_config dal_mango_construct_ana_common[] = {
 	{ 0x21, 0x18, 0x210A }, { 0x21, 0x19, 0xF0F0 }
 };
 
-sds_config dal_mango_construct_ana_10p3125g[] = {
+static sds_config dal_mango_construct_ana_10p3125g[] = {
 	{ 0x2E, 0x00, 0x0107 }, { 0x2E, 0x01, 0x0200 }, { 0x2E, 0x02, 0x6A24 }, { 0x2E, 0x03, 0xD10D },
 	{ 0x2E, 0x04, 0xD550 }, { 0x2E, 0x05, 0xA95E }, { 0x2E, 0x06, 0xE31D }, { 0x2E, 0x07, 0x000E },
 	{ 0x2E, 0x08, 0x0294 }, { 0x2E, 0x09, 0x0CE4 }, { 0x2E, 0x0a, 0x7FC8 }, { 0x2E, 0x0b, 0xE0E7 },
@@ -842,7 +842,7 @@ sds_config dal_mango_construct_ana_10p3125g[] = {
 	{ 0x2F, 0x12, 0x0EEE }, { 0x2F, 0x13, 0x0000 }, { 0x6, 0x0, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana_10p3125g_cmu[] = {
+static sds_config dal_mango_construct_ana_10p3125g_cmu[] = {
 	{ 0x2F, 0x03, 0x4210 }, { 0x2F, 0x04, 0x0000 }, { 0x2F, 0x05, 0x3FD9 }, { 0x2F, 0x06, 0x58A6 },
 	{ 0x2F, 0x07, 0x2990 }, { 0x2F, 0x08, 0xFFF4 }, { 0x2F, 0x09, 0x1F08 }, { 0x2F, 0x0A, 0x0000 },
 	{ 0x2F, 0x0B, 0x8000 }, { 0x2F, 0x0C, 0x4224 }, { 0x2F, 0x0D, 0x0000 }, { 0x2F, 0x0E, 0x0400 },
@@ -850,7 +850,7 @@ sds_config dal_mango_construct_ana_10p3125g_cmu[] = {
 	{ 0x20, 0x12, 0x510F }, { 0x20, 0x00, 0x0030 }
 };
 
-sds_config dal_mango_construct_ana_5g[] = {
+static sds_config dal_mango_construct_ana_5g[] = {
 	{ 0x2A, 0x00, 0x0104 }, { 0x2A, 0x01, 0x0200 }, { 0x2A, 0x02, 0x2A24 }, { 0x2A, 0x03, 0xD10D },
 	{ 0x2A, 0x04, 0xD550 }, { 0x2A, 0x05, 0xA95E }, { 0x2A, 0x06, 0xE31D }, { 0x2A, 0x07, 0x800E },
 	{ 0x2A, 0x08, 0x0294 }, { 0x2A, 0x09, 0x28E4 }, { 0x2A, 0x0A, 0x7FC8 }, { 0x2A, 0x0B, 0xE0E7 },
@@ -863,14 +863,14 @@ sds_config dal_mango_construct_ana_5g[] = {
 	{ 0x2B, 0x12, 0x0EEE }, { 0x2B, 0x13, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana_5g_cmu[] = {
+static sds_config dal_mango_construct_ana_5g_cmu[] = {
 	{ 0x2B, 0x03, 0x5010 }, { 0x2B, 0x04, 0x0000 }, { 0x2B, 0x05, 0x27D9 }, { 0x2B, 0x06, 0x58A6 },
 	{ 0x2B, 0x07, 0x2990 }, { 0x2B, 0x08, 0xFFF4 }, { 0x2B, 0x09, 0x2682 }, { 0x2B, 0x0A, 0x0000 },
 	{ 0x2B, 0x0B, 0x8000 }, { 0x2B, 0x0C, 0x5024 }, { 0x2B, 0x0D, 0x0000 }, { 0x2B, 0x0E, 0x0000 },
 	{ 0x2B, 0x0F, 0xA470 }, { 0x2B, 0x10, 0x8000 }, { 0x2B, 0x11, 0x0362 }
 };
 
-sds_config dal_mango_construct_ana_3p125g[] = {
+static sds_config dal_mango_construct_ana_3p125g[] = {
 	{ 0x28, 0x00, 0x0104 }, { 0x28, 0x01, 0x0200 }, { 0x28, 0x02, 0x2A24 }, { 0x28, 0x03, 0xD10D },
 	{ 0x28, 0x04, 0xD550 }, { 0x28, 0x05, 0xA95E }, { 0x28, 0x06, 0xE31D }, { 0x28, 0x07, 0x800E },
 	{ 0x28, 0x08, 0x0294 }, { 0x28, 0x09, 0x04E4 }, { 0x28, 0x0A, 0x7FC8 }, { 0x28, 0x0B, 0xE0E7 },
@@ -883,14 +883,14 @@ sds_config dal_mango_construct_ana_3p125g[] = {
 	{ 0x29, 0x12, 0x0EEE }, { 0x29, 0x13, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana_3p125g_cmu[] = {
+static sds_config dal_mango_construct_ana_3p125g_cmu[] = {
 	{ 0x2D, 0x03, 0x6410 }, { 0x2D, 0x04, 0x0000 }, { 0x2D, 0x05, 0x27D9 }, { 0x2D, 0x06, 0x58A6 },
 	{ 0x2D, 0x07, 0x2990 }, { 0x2D, 0x08, 0xFFF4 }, { 0x2D, 0x09, 0x3082 }, { 0x2D, 0x0A, 0x0000 },
 	{ 0x2D, 0x0B, 0x8000 }, { 0x2D, 0x0C, 0x6424 }, { 0x2D, 0x0D, 0x0000 }, { 0x2D, 0x0E, 0x0000 },
 	{ 0x2D, 0x0F, 0xA470 }, { 0x2D, 0x10, 0x8000 }, { 0x2D, 0x11, 0x037B }
 };
 
-sds_config dal_mango_construct_ana_2p5g[] = {
+static sds_config dal_mango_construct_ana_2p5g[] = {
 	{ 0x26, 0x00, 0x0104 }, { 0x26, 0x01, 0x0200 }, { 0x26, 0x02, 0x2A24 }, { 0x26, 0x03, 0xD10D },
 	{ 0x26, 0x04, 0xD550 }, { 0x26, 0x05, 0xA95E }, { 0x26, 0x06, 0xE31D }, { 0x26, 0x07, 0x800E },
 	{ 0x26, 0x08, 0x0294 }, { 0x26, 0x09, 0x80E4 }, { 0x26, 0x0A, 0x7FC8 }, { 0x26, 0x0B, 0xE0E7 },
@@ -903,7 +903,7 @@ sds_config dal_mango_construct_ana_2p5g[] = {
 	{ 0x27, 0x12, 0x0EEE }, { 0x27, 0x13, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana_1p25g[] = {
+static sds_config dal_mango_construct_ana_1p25g[] = {
 	{ 0x24, 0x00, 0x0104 }, { 0x24, 0x01, 0x0200 }, { 0x24, 0x02, 0x2A24 }, { 0x24, 0x03, 0xD10D },
 	{ 0x24, 0x04, 0xD550 }, { 0x24, 0x05, 0xA95E }, { 0x24, 0x06, 0xE31D }, { 0x24, 0x07, 0x800E },
 	{ 0x24, 0x08, 0x0294 }, { 0x24, 0x09, 0x04E4 }, { 0x24, 0x0A, 0x7FC8 }, { 0x24, 0x0B, 0xE0E7 },
@@ -916,7 +916,7 @@ sds_config dal_mango_construct_ana_1p25g[] = {
 	{ 0x25, 0x12, 0x0EEE }, { 0x25, 0x13, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana2[] = {
+static sds_config dal_mango_construct_ana2[] = {
 	{ 0x20, 0x12, 0x150F },
 	{ 0x2E, 0x7, 0x800E },
 	{ 0x2A, 0x7, 0x800E },
@@ -945,7 +945,7 @@ sds_config dal_mango_construct_ana2[] = {
 	{ 0x21, 0x19, 0xF0A5 },
 };
 
-sds_config dal_mango_construct_ana_common_type1[] = {
+static sds_config dal_mango_construct_ana_common_type1[] = {
 	{ 0x21, 0x00, 0x1800 }, { 0x21, 0x01, 0x0060 }, { 0x21, 0x02, 0x3000 }, { 0x21, 0x03, 0xFFFF },
 	{ 0x21, 0x04, 0x0603 }, { 0x21, 0x05, 0x1104 }, { 0x21, 0x06, 0x4444 }, { 0x21, 0x07, 0x7044 },
 	{ 0x21, 0x08, 0xF104 }, { 0x21, 0x09, 0xF104 }, { 0x21, 0x0A, 0xF104 }, { 0x21, 0x0B, 0x0003 },
@@ -955,7 +955,7 @@ sds_config dal_mango_construct_ana_common_type1[] = {
 	{ 0x21, 0x18, 0x210A }, { 0x21, 0x19, 0xF0F1 }
 };
 
-sds_config dal_mango_construct_ana_10p3125g_type1[] = {
+static sds_config dal_mango_construct_ana_10p3125g_type1[] = {
 	{ 0x2E, 0x00, 0x0107 }, { 0x2E, 0x01, 0x01A3 }, { 0x2E, 0x02, 0x6A24 }, { 0x2E, 0x03, 0xD10D },
 	{ 0x2E, 0x04, 0x8000 }, { 0x2E, 0x05, 0xA17E }, { 0x2E, 0x06, 0xE31D }, { 0x2E, 0x07, 0x800E },
 	{ 0x2E, 0x08, 0x0294 }, { 0x2E, 0x09, 0x0CE4 }, { 0x2E, 0x0A, 0x7FC8 }, { 0x2E, 0x0B, 0xE0E7 },
@@ -968,14 +968,14 @@ sds_config dal_mango_construct_ana_10p3125g_type1[] = {
 	{ 0x2F, 0x12, 0x0EE7 }, { 0x2F, 0x13, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana_10p3125g_cmu_type1[] = {
+static sds_config dal_mango_construct_ana_10p3125g_cmu_type1[] = {
 	{ 0x2F, 0x03, 0x4210 }, { 0x2F, 0x04, 0x0000 }, { 0x2F, 0x05, 0x0019 }, { 0x2F, 0x06, 0x18A6 },
 	{ 0x2F, 0x07, 0x2990 }, { 0x2F, 0x08, 0xFFF4 }, { 0x2F, 0x09, 0x1F08 }, { 0x2F, 0x0A, 0x0000 },
 	{ 0x2F, 0x0B, 0x8000 }, { 0x2F, 0x0C, 0x4224 }, { 0x2F, 0x0D, 0x0000 }, { 0x2F, 0x0E, 0x0000 },
 	{ 0x2F, 0x0F, 0xA470 }, { 0x2F, 0x10, 0x8000 }, { 0x2F, 0x11, 0x037B }
 };
 
-sds_config dal_mango_construct_ana_5g_type1[] = {
+static sds_config dal_mango_construct_ana_5g_type1[] = {
 	{ 0x2A, 0x00, 0xF904 }, { 0x2A, 0x01, 0x0200 }, { 0x2A, 0x02, 0x2A20 }, { 0x2A, 0x03, 0xD10D },
 	{ 0x2A, 0x04, 0x8000 }, { 0x2A, 0x05, 0xA17E }, { 0x2A, 0x06, 0xE115 }, { 0x2A, 0x07, 0x000E },
 	{ 0x2A, 0x08, 0x0294 }, { 0x2A, 0x09, 0x28E4 }, { 0x2A, 0x0A, 0x7FC8 }, { 0x2A, 0x0B, 0xE0E7 },
@@ -988,14 +988,14 @@ sds_config dal_mango_construct_ana_5g_type1[] = {
 	{ 0x2B, 0x12, 0x0EE7 }, { 0x2B, 0x13, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana_5g_cmu_type1[] = {
+static sds_config dal_mango_construct_ana_5g_cmu_type1[] = {
 	{ 0x2B, 0x03, 0x5010 }, { 0x2B, 0x04, 0x0000 }, { 0x2B, 0x05, 0x0019 }, { 0x2B, 0x06, 0x18A6 },
 	{ 0x2B, 0x07, 0x2990 }, { 0x2B, 0x08, 0xFF84 }, { 0x2B, 0x09, 0x2682 }, { 0x2B, 0x0A, 0x0000 },
 	{ 0x2B, 0x0B, 0x8000 }, { 0x2B, 0x0C, 0x5024 }, { 0x2B, 0x0D, 0x0000 }, { 0x2B, 0x0E, 0x0000 },
 	{ 0x2B, 0x0F, 0xA470 }, { 0x2B, 0x10, 0x8000 }, { 0x2B, 0x11, 0x0362 }
 };
 
-sds_config dal_mango_construct_ana_3p125g_type1[] = {
+static sds_config dal_mango_construct_ana_3p125g_type1[] = {
 	{ 0x28, 0x00, 0xF904 }, { 0x28, 0x01, 0x0200 }, { 0x28, 0x02, 0x2A20 }, { 0x28, 0x03, 0xD10D },
 	{ 0x28, 0x04, 0x8000 }, { 0x28, 0x05, 0xA17E }, { 0x28, 0x06, 0xE115 }, { 0x28, 0x07, 0x000E },
 	{ 0x28, 0x08, 0x0294 }, { 0x28, 0x09, 0x04E4 }, { 0x28, 0x0A, 0x7FC8 }, { 0x28, 0x0B, 0xE0E7 },
@@ -1008,14 +1008,14 @@ sds_config dal_mango_construct_ana_3p125g_type1[] = {
 	{ 0x29, 0x12, 0x0EE7 }, { 0x29, 0x13, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana_3p125g_cmu_type1[] = {
+static sds_config dal_mango_construct_ana_3p125g_cmu_type1[] = {
 	{ 0x2D, 0x03, 0x6410 }, { 0x2D, 0x04, 0x0000 }, { 0x2D, 0x05, 0x0019 }, { 0x2D, 0x06, 0x18A6 },
 	{ 0x2D, 0x07, 0x2990 }, { 0x2D, 0x08, 0xFF84 }, { 0x2D, 0x09, 0x3082 }, { 0x2D, 0x0A, 0x0000 },
 	{ 0x2D, 0x0B, 0x8000 }, { 0x2D, 0x0C, 0x6424 }, { 0x2D, 0x0D, 0x0000 }, { 0x2D, 0x0E, 0x0000 },
 	{ 0x2D, 0x0F, 0xA470 }, { 0x2D, 0x10, 0x8000 }, { 0x2D, 0x11, 0x037B }
 };
 
-sds_config dal_mango_construct_ana_2p5g_type1[] = {
+static sds_config dal_mango_construct_ana_2p5g_type1[] = {
 	{ 0x26, 0x00, 0xF904 }, { 0x26, 0x01, 0x0200 }, { 0x26, 0x02, 0x2A20 }, { 0x26, 0x03, 0xD10D },
 	{ 0x26, 0x04, 0x8000 }, { 0x26, 0x05, 0xA17E }, { 0x26, 0x06, 0xE115 }, { 0x26, 0x07, 0x000E },
 	{ 0x26, 0x08, 0x0294 }, { 0x26, 0x09, 0x04E4 }, { 0x26, 0x0A, 0x7FC8 }, { 0x26, 0x0B, 0xE0E7 },
@@ -1028,7 +1028,7 @@ sds_config dal_mango_construct_ana_2p5g_type1[] = {
 	{ 0x27, 0x12, 0x0EE7 }, { 0x27, 0x13, 0x0000 }
 };
 
-sds_config dal_mango_construct_ana_1p25g_type1[] = {
+static sds_config dal_mango_construct_ana_1p25g_type1[] = {
 	{ 0x24, 0x00, 0xF904 }, { 0x24, 0x01, 0x0200 }, { 0x24, 0x02, 0x2A20 }, { 0x24, 0x03, 0xD10D },
 	{ 0x24, 0x04, 0x8000 }, { 0x24, 0x05, 0xA17E }, { 0x24, 0x06, 0xE115 }, { 0x24, 0x07, 0x000E },
 	{ 0x24, 0x08, 0x0294 }, { 0x24, 0x09, 0x84E4 }, { 0x24, 0x0A, 0x7FC8 }, { 0x24, 0x0B, 0xE0E7 },
@@ -1041,49 +1041,6 @@ sds_config dal_mango_construct_ana_1p25g_type1[] = {
 	{ 0x25, 0x12, 0x0EE7 }, { 0x25, 0x13, 0x0000 }
 };
 
-#define RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR                                                                   (0x13F4)
-#define RTL9310_MODEL_NAME_INFO_ADDR                                                                           (0x4)
-#define RTL9310_CHIP_INFO_ADDR                                                                                 (0x8)
-#define RTL9310_MAC_SERDES_MODE_CTRL_ADDR(index)                                                               (0x136C + (((index) << 2)))	/* index: 0-13 */
-
-typedef enum serdes_mode {
-	MII_NONE = 0,
-	MII_DISABLE,
-	MII_10GR,
-	MII_RXAUI,
-	MII_RXAUI_LITE,
-	MII_RXAUISGMII_AUTO,
-	MII_RXAUI1000BX_AUTO,
-	MII_RSGMII_PLUS,
-	MII_SGMII,
-	MII_QSGMII,
-	MII_1000BX_FIBER,
-	MII_100BX_FIBER,
-	MII_1000BX100BX_AUTO,
-	MII_10GR1000BX_AUTO,
-	MII_10GRSGMII_AUTO,
-	MII_XAUI,
-	MII_RMII,
-	MII_SMII,
-	MII_SSSMII,
-	MII_RSGMII,
-	MII_XSMII,
-	MII_RS8MII = MII_XSMII,	/* MII_RS8MII is obsoleted */
-	MII_XSGMII,
-	MII_QHSGMII,
-	MII_HISGMII,
-	MII_HISGMII_5G,
-	MII_DUAL_HISGMII,
-	MII_2500Base_X,
-	MII_RXAUI_PLUS,
-	MII_USXGMII_10GSXGMII,
-	MII_USXGMII_10GDXGMII,
-	MII_USXGMII_10GQXGMII,
-	MII_USXGMII_5GSXGMII,
-	MII_USXGMII_5GDXGMII,
-	MII_USXGMII_2_5GSXGMII,
-	MII_END,
-} serdes_mode_t;
 
 static u16 rtl931x_read_sds_phy(int phy_addr, int page, int phy_reg)
 {
@@ -1182,7 +1139,7 @@ static void sds_field_write(u32 sds, u32 page, u32 reg, u32 endBit, u32 startBit
 #define SDS_FIELD_W(_s, _p, _r, _end, _start, _d) \
      sds_field_write(_s, _p, _r, _end,  _start, _d)
 
-void rtl931x_sds_rst(u32 sds)
+static void rtl931x_sds_rst(u32 sds)
 {
 	u32 asds;
 	int ret;
@@ -1204,7 +1161,7 @@ void rtl931x_sds_rst(u32 sds)
 	mdelay(50);
 }
 
-void rtl931x_sds_mii_mode_set(u32 sds, serdes_mode_t mode)
+static void rtl931x_sds_mii_mode_set(u32 sds, serdes_mode_t mode)
 {
 	u32 val;
 	int ret;
@@ -1246,8 +1203,8 @@ void rtl931x_sds_mii_mode_set(u32 sds, serdes_mode_t mode)
 
 	val |= (1 << 7);	// mac1g mode
 	
-	pr_debug("%s: RTL9310_MAC_SERDES_MODE_CTRL_ADDR(%d) 0x%08X\n", __func__, sds, sw_r32(RTL9310_MAC_SERDES_MODE_CTRL_ADDR(sds)));
-	sw_w32(val, RTL9310_MAC_SERDES_MODE_CTRL_ADDR(sds));
+	pr_debug("%s: RTL931X_MAC_SERDES_MODE_CTRL_ADDR(%d) 0x%08X\n", __func__, sds, sw_r32(RTL931X_MAC_SERDES_MODE_CTRL_ADDR(sds)));
+	sw_w32(val, RTL931X_MAC_SERDES_MODE_CTRL_ADDR(sds));
 
 	return;
 }
@@ -1307,7 +1264,7 @@ int rtl931x_10gr_symErr_get(u32 sds, rtk_sds_symErr_t * info)
 	return ret;
 }				/* end of _phy_rtl9310_10gr_symErr_get */
 #endif
-void rtl931x_symerr_clear(u32 sds, serdes_mode_t mode)
+static void rtl931x_symerr_clear(u32 sds, serdes_mode_t mode)
 {
 	u32 i;
 	u32 xsg_sdsid_0, xsg_sdsid_1;
@@ -1349,7 +1306,7 @@ void rtl931x_symerr_clear(u32 sds, serdes_mode_t mode)
 	return;
 }
 
-void rtl931x_sds_fiber_mode_set(u32 sds, serdes_mode_t mode)
+static void rtl931x_sds_fiber_mode_set(u32 sds, serdes_mode_t mode)
 {
 	u32 val, asds;
 	int ret;
@@ -1360,7 +1317,7 @@ void rtl931x_sds_fiber_mode_set(u32 sds, serdes_mode_t mode)
 	rtl931x_symerr_clear(sds, mode);
 
 	val = 0x9F;
-	sw_w32(val, RTL9310_MAC_SERDES_MODE_CTRL_ADDR(sds));
+	sw_w32(val, RTL931X_MAC_SERDES_MODE_CTRL_ADDR(sds));
 
 	switch (mode) {
 	case MII_SGMII:
@@ -1508,16 +1465,8 @@ static void cmuType_set(u32 aSds, serdes_mode_t mode, int chiptype)
 	return;
 }
 
-static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
+void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 {
-/*
-    Warning: this sds 2 and mode sgmii is a hack for testing only
-    this combination works for edgecore 4125. other devices might
-    have different values. 
-    so this is only for testing
-*/
-	int sds = 2;
-	enum serdes_mode mode = MII_SGMII;
 
 	u32 board_sds_tx_type1[] = { 0x1C3, 0x1C3, 0x1C3, 0x1A3, 0x1A3,
 		0x1A3, 0x143, 0x143, 0x143, 0x143, 0x163, 0x163
@@ -1536,13 +1485,13 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	aSds = sdsMap[sds];
 	int ret;
 	int chiptype = 0;
-	
+	pr_debug("%s: set sds %d to mode %d\n", __func__, sds, mode);
 	pr_debug("%s: fibermode %08X", __func__, rtl931x_read_sds_phy(aSds, 0x1f, 0x9));
-	pr_debug("%s: serdes_mode_ctrl %08X", __func__, RTL9310_MAC_SERDES_MODE_CTRL_ADDR(2));
+	pr_debug("%s: serdes_mode_ctrl %08X", __func__, RTL931X_MAC_SERDES_MODE_CTRL_ADDR(2));
 	if (14 <= sds)
 		return;
 
-	model_info = sw_r32(RTL9310_MODEL_NAME_INFO_ADDR);
+	model_info = sw_r32(RTL931X_MODEL_NAME_INFO_ADDR);
 	if ((model_info >> 4) & 0x1) {
 		pr_info("detected chiptype 1\n");
 		chiptype = 1;
@@ -1555,10 +1504,10 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	else
 		dSds = (sds - 1) * 2;
 
-	pr_debug("%s: RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR));
-	ori = sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
+	pr_debug("%s: RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR));
+	ori = sw_r32(RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR);
 	val = ori | (1 << sds);
-	sw_w32(val, RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
+	sw_w32(val, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR);
 
 	switch (mode) {
 	case MII_DISABLE:
@@ -1689,8 +1638,8 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 			rtl931x_write_sds_phy(aSds, 0x2E, 0x1, board_sds_tx_type1[sds - 2]);
 		else {
 			val = 0xa0000;
-			sw_w32(val, RTL9310_CHIP_INFO_ADDR);
-			val = sw_r32(RTL9310_CHIP_INFO_ADDR);
+			sw_w32(val, RTL931X_CHIP_INFO_ADDR);
+			val = sw_r32(RTL931X_CHIP_INFO_ADDR);
 			if (1 == (val >> 28))	// consider 9311 etc. RTL9313_CHIP_ID == HWP_CHIP_ID(unit))
 			{
 				rtl931x_write_sds_phy(aSds, 0x2E, 0x1, board_sds_tx2[sds - 2]);
@@ -1698,13 +1647,13 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 				rtl931x_write_sds_phy(aSds, 0x2E, 0x1, board_sds_tx[sds - 2]);
 			}
 			val = 0;
-			sw_w32(val, RTL9310_CHIP_INFO_ADDR);
+			sw_w32(val, RTL931X_CHIP_INFO_ADDR);
 		}
 	}
 
 	val = ori & ~(1 << sds);
-	sw_w32(val, RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
-	pr_debug("%s: RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR));
+	sw_w32(val, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR);
+	pr_debug("%s: RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR));
 
 	switch (mode) {
 	case MII_XSGMII:
@@ -1735,7 +1684,7 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 
 void rtl931x_sw_init(struct rtl838x_switch_priv *priv)
 {
-	rtl931x_sds_init(priv);
+//	rtl931x_sds_init(priv);
 }
 
 int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)

@@ -74,12 +74,12 @@ static struct table_reg rtl838x_tbl_regs[] = {
 	TBL_DESC(0xD600, 0xD604, 30, 7, 6, 0),		// RTL9300_TBL_HSB
 	TBL_DESC(0x7880, 0x7884, 22, 9, 8, 0),		// RTL9300_TBL_HSA
 
-	TBL_DESC(0x8500, 0x8508, 8, 19, 15, 0),		// RTL9310_TBL_0
-	TBL_DESC(0x40C0, 0x40C4, 22, 16, 14, 0),	// RTL9310_TBL_1
-	TBL_DESC(0x8528, 0x852C, 6, 18, 14, 0),		// RTL9310_TBL_2
-	TBL_DESC(0x0200, 0x0204, 9, 15, 12, 0),		// RTL9310_TBL_3
-	TBL_DESC(0x20dc, 0x20e0, 29, 7, 6, 0),		// RTL9310_TBL_4
-	TBL_DESC(0x7e1c, 0x7e20, 53, 8, 6, 0),		// RTL9310_TBL_5
+	TBL_DESC(0x8500, 0x8508, 8, 19, 15, 0),		// RTL931X_TBL_0
+	TBL_DESC(0x40C0, 0x40C4, 22, 16, 14, 0),	// RTL931X_TBL_1
+	TBL_DESC(0x8528, 0x852C, 6, 18, 14, 0),		// RTL931X_TBL_2
+	TBL_DESC(0x0200, 0x0204, 9, 15, 12, 0),		// RTL931X_TBL_3
+	TBL_DESC(0x20dc, 0x20e0, 29, 7, 6, 0),		// RTL931X_TBL_4
+	TBL_DESC(0x7e1c, 0x7e20, 53, 8, 6, 0),		// RTL931X_TBL_5
 };
 
 void rtl_table_init(void)
@@ -707,6 +707,8 @@ static int rtl83xx_l3_nexthop_update(struct rtl838x_switch_priv *priv,  __be32 i
 {
 	struct rtl83xx_route *r;
 	struct rhlist_head *tmp, *list;
+	if (!priv->r->route_read)
+		return -ENOENT;
 
 	rcu_read_lock();
 	list = rhltable_lookup(&priv->routes, &ip_addr, route_ht_params);
@@ -1534,7 +1536,7 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 
 	/* Enable link and media change interrupts. Are the SERDES masks needed? */
 	sw_w32_mask(0, 1, priv->r->isr_glb_src);
-	pr_info("RTL9310 Link status raw 1 %08x %08x\n", sw_r32(0x12b8), sw_r32(0x12bc));
+	pr_info("RTL931X Link status raw 1 %08x %08x\n", sw_r32(0x12b8), sw_r32(0x12bc));
 
 	priv->link_state_irq = platform_get_irq(pdev, 0);
 	pr_info("LINK state irq: %d\n", priv->link_state_irq);

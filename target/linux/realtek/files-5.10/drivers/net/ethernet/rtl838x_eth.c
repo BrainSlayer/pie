@@ -52,13 +52,6 @@ extern struct rtl83xx_soc_info soc_info;
 
 #define RING_BUFFER	1600
 
-#define RTL838X_STORM_CTRL_PORT_BC_EXCEED	(0x470C)
-#define RTL838X_STORM_CTRL_PORT_MC_EXCEED	(0x4710)
-#define RTL838X_STORM_CTRL_PORT_UC_EXCEED	(0x4714)
-
-#define RTL839X_STORM_CTRL_PORT_BC_EXCEED	(0x180C)
-#define RTL839X_STORM_CTRL_PORT_MC_EXCEED	(0x1814)
-#define RTL839X_STORM_CTRL_PORT_UC_EXCEED	(0x181C)
 #define RTL838X_ATK_PRVNT_STS			(0x5B1C)
 
 struct p_hdr {
@@ -198,14 +191,14 @@ struct rtl838x_eth_priv {
 	struct phylink_config phylink_config;
 	u16 id;
 	u16 family_id;
-	const struct rtl838x_reg *r;
+	const struct rtl838x_eth_reg *r;
 	u8 cpu_port;
 	u32 lastEvent;
 	u16 rxrings;
 	u16 rxringlen;
 	u8 smi_bus[MAX_PORTS];
 	u8 smi_addr[MAX_PORTS];
-	char sds_id[MAX_PORTS];
+	u32 sds_id[MAX_PORTS];
 	bool smi_bus_isc45[MAX_SMI_BUSSES];
 	bool phy_is_internal[MAX_PORTS];
 };
@@ -574,7 +567,7 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static const struct rtl838x_reg rtl838x_reg = {
+static const struct rtl838x_eth_reg rtl838x_reg = {
 	.net_irq = rtl83xx_net_irq,
 	.mac_port_ctrl = rtl838x_mac_port_ctrl,
 	.dma_if_intr_sts = RTL838X_DMA_IF_INTR_STS,
@@ -599,7 +592,7 @@ static const struct rtl838x_reg rtl838x_reg = {
 	.decode_tag = rtl838x_decode_tag,
 };
 
-static const struct rtl838x_reg rtl839x_reg = {
+static const struct rtl838x_eth_reg rtl839x_reg = {
 	.net_irq = rtl83xx_net_irq,
 	.mac_port_ctrl = rtl839x_mac_port_ctrl,
 	.dma_if_intr_sts = RTL839X_DMA_IF_INTR_STS,
@@ -624,7 +617,7 @@ static const struct rtl838x_reg rtl839x_reg = {
 	.decode_tag = rtl839x_decode_tag,
 };
 
-static const struct rtl838x_reg rtl930x_reg = {
+static const struct rtl838x_eth_reg rtl930x_reg = {
 	.net_irq = rtl93xx_net_irq,
 	.mac_port_ctrl = rtl930x_mac_port_ctrl,
 	.dma_if_intr_rx_runout_sts = RTL930X_DMA_IF_INTR_RX_RUNOUT_STS,
@@ -655,7 +648,7 @@ static const struct rtl838x_reg rtl930x_reg = {
 	.decode_tag = rtl930x_decode_tag,
 };
 
-static const struct rtl838x_reg rtl931x_reg = {
+static const struct rtl838x_eth_reg rtl931x_reg = {
 	.net_irq = rtl93xx_net_irq,
 	.mac_port_ctrl = rtl931x_mac_port_ctrl,
 	.dma_if_intr_rx_runout_sts = RTL931X_DMA_IF_INTR_RX_RUNOUT_STS,
@@ -1990,6 +1983,7 @@ static int rtl931x_chip_init(struct rtl838x_eth_priv *priv)
 
 	return 0;
 }
+void rtl931x_sds_init(u32 sds, serdes_mode_t mode);
 
 static int rtl838x_mdio_init(struct rtl838x_eth_priv *priv)
 {
@@ -2058,8 +2052,10 @@ static int rtl838x_mdio_init(struct rtl838x_eth_priv *priv)
 			smi_addr[1] = pn;
 		}
 
-		if (of_property_read_u8(dn, "sds", &priv->sds_id[pn]))
+		if (of_property_read_u32(dn, "sds", &priv->sds_id[pn]))
 			priv->sds_id[pn] = -1;
+		else
+			rtl931x_sds_init(priv->sds_id[pn], MII_SGMII);
 
 		if (pn < MAX_PORTS) {
 			priv->smi_bus[pn] = smi_addr[0];

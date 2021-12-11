@@ -306,12 +306,12 @@ static inline int rtl930x_mac_force_mode_ctrl(int p)
 
 static inline int rtl930x_mac_port_ctrl(int p)
 {
-	return RTL930X_MAC_L2_PORT_CTRL(p);
+	return RTL930X_MAC_L2_PORT_CTRL + (p << 6);
 }
 
 static inline int rtl930x_mac_link_spd_sts(int p)
 {
-	return RTL930X_MAC_LINK_SPD_STS(p);
+	return RTL930X_MAC_LINK_SPD_STS + (((p >> 3) << 2));
 }
 
 static u64 rtl930x_l2_hash_seed(u64 mac, u32 vid)
@@ -1547,7 +1547,7 @@ static void rtl930x_pie_lookup_enable(struct rtl838x_switch_priv *priv, int inde
  * PIE rule in the pie_rule structure and fills in the raw data fields in the
  * raw register space r[].
  * The register space configuration size is identical for the RTL8380/90 and RTL9300,
- * however the RTL9310 has 2 more registers / fields and the physical field-ids are different
+ * however the RTL931X has 2 more registers / fields and the physical field-ids are different
  * on all SoCs
  * On the RTL9300 the mask fields are not word-aligend!
  */
