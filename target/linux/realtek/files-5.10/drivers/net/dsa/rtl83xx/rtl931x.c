@@ -1090,7 +1090,7 @@ static u16 rtl931x_read_sds_phy(int phy_addr, int page, int phy_reg)
 	int i;
 	u32 cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 1;
 
-	pr_info("%s: phy_addr(SDS-ID) %d, phy_reg: %d\n", __func__, phy_addr, phy_reg);
+	pr_debug("%s: phy_addr(SDS-ID) %d, page: 0x%08X phy_reg: 0x%08X\n", __func__, phy_addr, page, phy_reg);
 	sw_w32(cmd, RTL931X_SERDES_INDRT_ACCESS_CTRL);
 
 	for (i = 0; i < 100; i++) {
@@ -1102,17 +1102,21 @@ static u16 rtl931x_read_sds_phy(int phy_addr, int page, int phy_reg)
 	if (i >= 100)
 		return -EIO;
 
-	pr_info("%s: returning %04x\n", __func__, sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL));
+	pr_debug("%s: returning %04x\n", __func__, sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL));
 	return sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL) & 0xffff;
 }
+
 
 static int rtl931x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v)
 {
 	int i;
 	u32 cmd;
+	cmd = phy_addr << 2 | page << 7 | phy_reg << 13;
+	sw_w32(cmd, RTL931X_SERDES_INDRT_ACCESS_CTRL);
 
 	sw_w32(v, RTL931X_SERDES_INDRT_DATA_CTRL);
-	cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 0x3;
+		
+	cmd =  sw_r32(RTL931X_SERDES_INDRT_ACCESS_CTRL) | 0x3;
 	sw_w32(cmd, RTL931X_SERDES_INDRT_ACCESS_CTRL);
 
 	for (i = 0; i < 100; i++) {
@@ -1241,7 +1245,8 @@ void rtl931x_sds_mii_mode_set(u32 sds, serdes_mode_t mode)
 	}
 
 	val |= (1 << 7);	// mac1g mode
-
+	
+	pr_debug("%s: RTL9310_MAC_SERDES_MODE_CTRL_ADDR(%d) 0x%08X\n", __func__, sds, sw_r32(RTL9310_MAC_SERDES_MODE_CTRL_ADDR(sds)));
 	sw_w32(val, RTL9310_MAC_SERDES_MODE_CTRL_ADDR(sds));
 
 	return;
@@ -1526,6 +1531,8 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	int ret;
 	int chiptype = 0;
 
+	pr_debug("%s: fibermode %08X", __func__, rtl931x_read_sds_phy(aSds, 0x1f, 0x9));
+	pr_debug("%s: serdes_mode_ctrl %08X", __func__, RTL9310_MAC_SERDES_MODE_CTRL_ADDR(2));
 	if (14 <= sds)
 		return;
 
@@ -1542,6 +1549,7 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	else
 		dSds = (sds - 1) * 2;
 
+	pr_info("%s: RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR));
 	ori = sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
 	val = ori | (1 << sds);
 	sw_w32(val, RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
@@ -1690,6 +1698,7 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 
 	val = ori & ~(1 << sds);
 	sw_w32(val, RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
+	pr_info("%s: RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR));
 
 	switch (mode) {
 	case MII_XSGMII:
@@ -1701,7 +1710,10 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	case MII_USXGMII_10GDXGMII:
 	case MII_USXGMII_10GQXGMII:
 
-		rtl931x_sds_mii_mode_set(sds, mode);
+		if (mode == MII_XSGMII)
+			rtl931x_sds_mii_mode_set(sds, mode);
+		else
+			rtl931x_sds_fiber_mode_set(sds, mode);
 
 		break;
 	case MII_100BX_FIBER:

@@ -380,8 +380,12 @@ int rtl931x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v)
 	int i;
 	u32 cmd;
 
+	cmd = phy_addr << 2 | page << 7 | phy_reg << 13;
+	sw_w32(cmd, RTL931X_SERDES_INDRT_ACCESS_CTRL);
+
 	sw_w32(v, RTL931X_SERDES_INDRT_DATA_CTRL);
-	cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 0x3;
+		
+	cmd =  sw_r32(RTL931X_SERDES_INDRT_ACCESS_CTRL) | 0x3;
 	sw_w32(cmd, RTL931X_SERDES_INDRT_ACCESS_CTRL);
 
 	for (i = 0; i < 100; i++) {
