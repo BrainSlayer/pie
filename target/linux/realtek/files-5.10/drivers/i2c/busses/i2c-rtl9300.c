@@ -67,7 +67,6 @@ static void rtl9310_i2c_config_io(struct rtl9300_i2c *i2c, int scl_num, int sda_
 {
 	u32 v;
 
-	pr_info("%s CTRL: %08x\n", __func__, *(u32 *)REG(RTL9310_I2C_CTRL));
 	// Set SCL pin
 	REG_MASK(0, BIT(RTL9310_I2C_MST_IF_SEL_GPIO_SCL_SEL + scl_num), RTL9310_I2C_MST_IF_SEL);
 
@@ -98,12 +97,6 @@ static int rtl9300_i2c_config_xfer(struct rtl9300_i2c *i2c, u16 addr, u16 len)
 	// Set read mode to random
 	REG_MASK(0x1 << RTL9300_I2C_CTRL2_READ_MODE, 0, RTL9300_I2C_CTRL2);
 
-	// Check the ACK delay to cause transfer fails
-//	REG_MASK(0xf << I2C_CTRL2_CHECK_ACK_DELAY, 2 << I2C_CTRL2_CHECK_ACK_DELAY, I2C_CTRL2);
-//	REG_MASK(0xf << I2C_CTRL2_DRIVE_ACK_DELAY, 4 << I2C_CTRL2_DRIVE_ACK_DELAY, I2C_CTRL2);
-
-	pr_debug("%s CTRL1: %08x, CTRL2: %08x\n", __func__,
-		 *(u32 *)REG(RTL9300_I2C_CTRL1), *(u32 *)REG(RTL9300_I2C_CTRL2));
 	return 0;
 }
 
@@ -206,8 +199,6 @@ static int rtl9300_execute_xfer(struct rtl9300_i2c *i2c, char read_write,
 	else
 		REG_MASK(0, BIT(RTL9300_I2C_CTRL1_RWOP), RTL9300_I2C_CTRL1);
 
-	pr_debug("%s: CTRL1 %08x CTRL2: %08x GLB-CTRL %08x\n", __func__,
-		readl(REG(RTL9300_I2C_CTRL1)), readl(REG(RTL9300_I2C_CTRL2)), readl(REG(RTL9300_I2C_MST_GLB_CTRL)));
 	REG_MASK(0, BIT(RTL9300_I2C_CTRL1_I2C_TRIG), RTL9300_I2C_CTRL1);
 	do {
 		v = readl(REG(RTL9300_I2C_CTRL1));
@@ -219,14 +210,10 @@ static int rtl9300_execute_xfer(struct rtl9300_i2c *i2c, char read_write,
 	if (read_write == I2C_SMBUS_READ) {
 		if (size == I2C_SMBUS_BYTE || size == I2C_SMBUS_BYTE_DATA){
 			data->byte = readl(REG(RTL9300_I2C_DATA_WORD0));
-			pr_debug("Read reg %08x byte: %02x\n", readl(REG(RTL9300_I2C_DATA_WORD0)), data->byte);
 		} else if (size == I2C_SMBUS_WORD_DATA) {
 			data->word = readl(REG(RTL9300_I2C_DATA_WORD0));
-			pr_debug("Read %08x word: %04x\n", readl(REG(RTL9300_I2C_DATA_WORD0)), data->word);
 		} else if (len > 0) {
 			rtl9300_i2c_read(i2c, &data->block[0], len);
-			pr_debug("Block read len %d: %02x %02x %02x\n", len,
-				data->block[0], data->block[1], data->block[0]);
 		}
 	}
 
@@ -243,8 +230,6 @@ static int rtl9310_execute_xfer(struct rtl9300_i2c *i2c, char read_write,
 	else
 		REG_MASK(0, BIT(RTL9310_I2C_CTRL_RWOP), RTL9310_I2C_CTRL);
 
-	pr_debug("%s: CTRL1 %08x IF_SEL %08x\n", __func__,
-		readl(REG(RTL9310_I2C_CTRL)), readl(REG(RTL9310_I2C_MST_IF_SEL)));
 	REG_MASK(0, BIT(RTL9310_I2C_CTRL_I2C_TRIG), RTL9310_I2C_CTRL);
 	do {
 		v = readl(REG(RTL9310_I2C_CTRL));
@@ -256,14 +241,10 @@ static int rtl9310_execute_xfer(struct rtl9300_i2c *i2c, char read_write,
 	if (read_write == I2C_SMBUS_READ) {
 		if (size == I2C_SMBUS_BYTE || size == I2C_SMBUS_BYTE_DATA){
 			data->byte = readl(REG(RTL9310_I2C_DATA));
-			pr_debug("Read reg %08x byte: %02x\n", readl(REG(RTL9310_I2C_DATA)), data->byte);
 		} else if (size == I2C_SMBUS_WORD_DATA) {
 			data->word = readl(REG(RTL9310_I2C_DATA));
-			pr_debug("Read %08x word: %04x\n", readl(REG(RTL9310_I2C_DATA)), data->word);
 		} else if (len > 0) {
 			rtl9310_i2c_read(i2c, &data->block[0], len);
-			pr_debug("Block read len %d: %02x %02x %02x\n", len,
-				data->block[0], data->block[1], data->block[0]);
 		}
 	}
 
@@ -281,18 +262,15 @@ static int rtl9300_i2c_smbus_xfer(struct i2c_adapter * adap, u16 addr,
 	mutex_lock(&i2c_lock);
 	switch (size) {
 	case I2C_SMBUS_QUICK:
-		pr_debug("I2C_SMBUS_QUICK %02x read %d\n", addr, read_write);
 		drv_data->config_xfer(i2c, addr, 0);
 		drv_data->reg_addr_set(i2c, 0, 0);
 		break;
 
 	case I2C_SMBUS_BYTE:
 		if (read_write == I2C_SMBUS_WRITE) {
-			pr_debug("I2C_SMBUS_BYTE WRITE addr %02x\n", addr);
 			drv_data->config_xfer(i2c, addr, 0);
 			drv_data->reg_addr_set(i2c, command, 1);
 		} else {
-			pr_debug("I2C_SMBUS_BYTE READ addr %02x\n", addr);
 			drv_data->config_xfer(i2c, addr, 1);
 			drv_data->reg_addr_set(i2c, 0, 0);
 		}

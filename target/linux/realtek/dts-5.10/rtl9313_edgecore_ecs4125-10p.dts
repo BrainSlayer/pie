@@ -40,7 +40,6 @@
 		};
 	}; */
 
-	/* i2c of the SFP cage: port 9 */
 	i2c0: i2c-rtl9310 {
 		compatible = "realtek,rtl9310-i2c";
 		reg = <0x1b001004 0x3c>;
@@ -51,10 +50,32 @@
 		clock-frequency = <100000>;
 	};
 
+	i2cmux {
+		compatible = "realtek,i2c-mux-rtl9310";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		i2c-parent = <&i2c0>;
+
+		i2c01: i2c-rtl9310-1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			sda-pin = <4>;
+			scl-pin = <13>;
+		};
+
+		i2c02: i2c-rtl9310-2 {
+			reg = <2>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			sda-pin = <5>;
+			scl-pin = <13>;
+		};
+	};
 
 	sfp0: sfp-p12 {
 		compatible = "sff,sfp";
-		i2c-bus = <&i2c0>;
+		i2c-bus = <&i2c01>;
 //		los-gpio = <&gpio0 17 GPIO_ACTIVE_HIGH>;
 //		tx-fault-gpio = <&gpio0 20 GPIO_ACTIVE_HIGH>;
 //		mod-def0-gpio = <&gpio0 16 GPIO_ACTIVE_LOW>;
