@@ -331,28 +331,19 @@ bool rtl931x_decode_tag(struct p_hdr *h, struct dsa_tag *t)
 	return t->l2_offloaded;
 }
 
-struct cleanup_work {
-	struct work_struct work;
-	int status;
-	struct rtl838x_eth_priv *priv;
-};
 
 /*
  * Discard the RX ring-buffers, called as part of the net-ISR
  * when the buffer runs over
  */
-static void rtl838x_rb_cleanup(struct work_struct *work)
+static void rtl838x_rb_cleanup(struct rtl838x_eth_priv *priv, int status)
 {
 	int r;
 	u32	*last;
 	struct p_hdr *h;
-	const struct cleanup_work *cw = container_of(work, struct cleanup_work, work);
-	struct ring_b *ring = cw->priv->membase;
-	struct rtl838x_eth_priv *priv = cw->priv;
-	int status = cw->status;
+	struct ring_b *ring = priv->membase;
 	unsigned long flags;
 
-	spin_lock_irqsave(&priv->lock, flags);
 
 	for (r = 0; r < priv->rxrings; r++) {
 		pr_debug("In %s working on r: %d\n", __func__, r);
@@ -375,8 +366,6 @@ static void rtl838x_rb_cleanup(struct work_struct *work)
 			ring->c_rx[r] = (ring->c_rx[r] + 1) % priv->rxringlen;
 		} while (&ring->rx_r[r][ring->c_rx[r]] != last);
 	}
-	spin_unlock_irqrestore(&priv->lock, flags);
-	kfree(work);
 }
 
 struct fdb_update_work {
@@ -480,16 +469,7 @@ static irqreturn_t rtl83xx_net_irq(int irq, void *dev_id)
 		pr_debug("RX buffer overrun: status %x, mask: %x\n",
 			 status, sw_r32(priv->r->dma_if_intr_msk));
 		sw_w32(status, priv->r->dma_if_intr_sts);
-//		rtl838x_rb_cleanup(priv, status & 0xff);
-		struct cleanup_work *w = kzalloc(sizeof(*w), GFP_ATOMIC);
-		if (!w) {
-			pr_err("Out of memory: %s", __func__);
-			return IRQ_HANDLED;
-		}
-		INIT_WORK(&w->work, rtl838x_rb_cleanup);
-		w->status = status;
-		w->priv = priv;
-		schedule_work(&w->work);
+		rtl838x_rb_cleanup(priv, status & 0xff);
 	}
 
 	if (priv->family_id == RTL8390_FAMILY_ID && status & 0x00100000) {
@@ -551,16 +531,7 @@ static irqreturn_t rtl93xx_net_irq(int irq, void *dev_id)
 		pr_debug("RX buffer overrun: status %x, mask: %x\n",
 			 status_rx_r, sw_r32(priv->r->dma_if_intr_rx_runout_msk));
 		sw_w32(status_rx_r, priv->r->dma_if_intr_rx_runout_sts);
-//		rtl838x_rb_cleanup(priv, status_rx_r);
-		struct cleanup_work *w = kzalloc(sizeof(*w), GFP_ATOMIC);
-		if (!w) {
-			pr_err("Out of memory: %s", __func__);
-			return IRQ_HANDLED;
-		}
-		INIT_WORK(&w->work, rtl838x_rb_cleanup);
-		w->status = status_rx_r;
-		w->priv = priv;
-		schedule_work(&w->work);
+		rtl838x_rb_cleanup(priv, status_rx_r);
 	}
 
 //	spin_unlock_irqrestore(&priv->lock, flags);
