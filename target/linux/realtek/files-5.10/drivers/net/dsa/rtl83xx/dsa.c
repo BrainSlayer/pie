@@ -566,7 +566,7 @@ static void rtl83xx_phylink_mac_config(struct dsa_switch *ds, int port,
 		if (priv->family_id == RTL8380_FAMILY_ID) {
 			sw_w32(0x6192F, priv->r->mac_force_mode_ctrl(priv->cpu_port));
 			/* allow CRC errors on CPU-port */
-			sw_w32_mask(0, 0x8, RTL838X_MAC_PORT_CTRL(priv->cpu_port));
+			sw_w32_mask(0, 0x8, priv->r->mac_port_ctrl(priv->cpu_port));
 		} else {
 			sw_w32_mask(0, 3, priv->r->mac_force_mode_ctrl(priv->cpu_port));
 		}

@@ -235,7 +235,7 @@ static inline int rtl838x_mac_force_mode_ctrl(int p)
 
 static inline int rtl838x_mac_port_ctrl(int p)
 {
-	return RTL838X_MAC_PORT_CTRL(p);
+	return RTL838X_MAC_PORT_CTRL + (p << 7);
 }
 
 static inline int rtl838x_l2_port_new_salrn(int p)
@@ -250,7 +250,7 @@ static inline int rtl838x_l2_port_new_sa_fwd(int p)
 
 static inline int rtl838x_mac_link_spd_sts(int p)
 {
-	return RTL838X_MAC_LINK_SPD_STS(p);
+	return RTL838X_MAC_LINK_SPD_STS + (((p >> 4) << 2));
 }
 
 inline static int rtl838x_trk_mbr_ctr(int group)

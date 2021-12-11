@@ -9,11 +9,12 @@
 /*
  * Register definition
  */
-#define RTL838X_MAC_PORT_CTRL(port)		(0xd560 + (((port) << 7)))
-#define RTL839X_MAC_PORT_CTRL(port)		(0x8004 + (((port) << 7)))
-#define RTL930X_MAC_PORT_CTRL(port)		(0x3260 + (((port) << 6)))
-#define RTL930X_MAC_L2_PORT_CTRL(port)		(0x3268 + (((port) << 6)))
-#define RTL931X_MAC_PORT_CTRL(port)		(0x6004 + (((port) << 7)))
+#define RTL838X_MAC_PORT_CTRL			(0xd560)
+#define RTL839X_MAC_PORT_CTRL			(0x8004)
+#define RTL930X_MAC_L2_PORT_CTRL		(0x3268)
+#define RTL930X_MAC_PORT_CTRL			(0x3260)
+#define RTL931X_MAC_L2_PORT_CTRL		(0x6000)
+#define RTL931X_MAC_PORT_CTRL			(0x6004)
 
 #define RTL838X_RST_GLB_CTRL_0			(0x003c)
 
@@ -129,10 +130,10 @@
 #define RTL839X_MAC_LINK_STS			(0x0390)
 #define RTL930X_MAC_LINK_STS			(0xCB10)
 #define RTL931X_MAC_LINK_STS			(0x0EC0)
-#define RTL838X_MAC_LINK_SPD_STS(p)		(0xa190 + (((p >> 4) << 2)))
-#define RTL839X_MAC_LINK_SPD_STS(p)		(0x03a0 + (((p >> 4) << 2)))
-#define RTL930X_MAC_LINK_SPD_STS(p)		(0xCB18 + (((p >> 3) << 2)))
-#define RTL931X_MAC_LINK_SPD_STS(p)		(0x0ED0 + (((p >> 3) << 2)))
+#define RTL838X_MAC_LINK_SPD_STS		(0xa190)
+#define RTL839X_MAC_LINK_SPD_STS		(0x03a0)
+#define RTL930X_MAC_LINK_SPD_STS		(0xCB18)
+#define RTL931X_MAC_LINK_SPD_STS		(0x0ED0)
 #define RTL838X_MAC_LINK_DUP_STS		(0xa19c)
 #define RTL839X_MAC_LINK_DUP_STS		(0x03b0)
 #define RTL930X_MAC_LINK_DUP_STS		(0xCB28)
@@ -317,9 +318,9 @@
 #define RTL838X_STORM_CTRL_PORT_BC_EXCEED	(0x470C)
 #define RTL838X_STORM_CTRL_PORT_MC_EXCEED	(0x4710)
 #define RTL838X_STORM_CTRL_PORT_UC_EXCEED	(0x4714)
-#define RTL839X_STORM_CTRL_PORT_BC_EXCEED(p)	(0x180c + (((p >> 5) << 2)))
-#define RTL839X_STORM_CTRL_PORT_MC_EXCEED(p)	(0x1814 + (((p >> 5) << 2)))
-#define RTL839X_STORM_CTRL_PORT_UC_EXCEED(p)	(0x181c + (((p >> 5) << 2)))
+#define RTL839X_STORM_CTRL_PORT_BC_EXCEED	(0x180c)
+#define RTL839X_STORM_CTRL_PORT_MC_EXCEED	(0x1814)
+#define RTL839X_STORM_CTRL_PORT_UC_EXCEED	(0x181c)
 #define RTL838X_STORM_CTRL_PORT_UC(p)		(0x4718 + (((p) << 2)))
 #define RTL838X_STORM_CTRL_PORT_MC(p)		(0x478c + (((p) << 2)))
 #define RTL838X_STORM_CTRL_PORT_BC(p)		(0x4800 + (((p) << 2)))
@@ -532,6 +533,10 @@ typedef enum {
 #define RTL838X_ACL_PORT_LOOKUP_CTRL(p)		(0x616C + (((p) << 2)))
 #define RTL930X_ACL_PORT_LOOKUP_CTRL(p)		(0xA784 + (((p) << 2)))
 #define RTL930X_PIE_BLK_PHASE_CTRL		(0xA5A4)
+#define RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR                                                                   (0x13F4)
+#define RTL931X_MODEL_NAME_INFO_ADDR                                                                           (0x4)
+#define RTL931X_CHIP_INFO_ADDR                                                                                 (0x8)
+#define RTL931X_MAC_SERDES_MODE_CTRL_ADDR(index)                                                               (0x136C + (((index) << 2)))	/* index: 0-13 */
 
 // PIE actions
 #define PIE_ACT_COPY_TO_PORT	2
@@ -586,6 +591,46 @@ typedef enum {
 #define MAX_ROUTER_MACS 64
 #define L3_EGRESS_DMACS 2048
 #define MAX_SMACS 64
+
+
+typedef enum serdes_mode {
+	MII_NONE = 0,
+	MII_DISABLE,
+	MII_10GR,
+	MII_RXAUI,
+	MII_RXAUI_LITE,
+	MII_RXAUISGMII_AUTO,
+	MII_RXAUI1000BX_AUTO,
+	MII_RSGMII_PLUS,
+	MII_SGMII,
+	MII_QSGMII,
+	MII_1000BX_FIBER,
+	MII_100BX_FIBER,
+	MII_1000BX100BX_AUTO,
+	MII_10GR1000BX_AUTO,
+	MII_10GRSGMII_AUTO,
+	MII_XAUI,
+	MII_RMII,
+	MII_SMII,
+	MII_SSSMII,
+	MII_RSGMII,
+	MII_XSMII,
+	MII_RS8MII = MII_XSMII,	/* MII_RS8MII is obsoleted */
+	MII_XSGMII,
+	MII_QHSGMII,
+	MII_HISGMII,
+	MII_HISGMII_5G,
+	MII_DUAL_HISGMII,
+	MII_2500Base_X,
+	MII_RXAUI_PLUS,
+	MII_USXGMII_10GSXGMII,
+	MII_USXGMII_10GDXGMII,
+	MII_USXGMII_10GQXGMII,
+	MII_USXGMII_5GSXGMII,
+	MII_USXGMII_5GDXGMII,
+	MII_USXGMII_2_5GSXGMII,
+	MII_END,
+} serdes_mode_t;
 
 enum phy_type {
 	PHY_NONE = 0,
@@ -981,6 +1026,7 @@ struct rtl838x_reg {
 	void (*route_write)(int idx, struct rtl83xx_route *rt);
 	void (*host_route_write)(int idx, struct rtl83xx_route *rt);
 	int (*l3_setup)(struct rtl838x_switch_priv *priv);
+	void (*sw_init)(struct rtl838x_switch_priv *priv);
 	void (*set_l3_nexthop)(int idx, u16 dmac_id, u16 interface);
 	void (*get_l3_nexthop)(int idx, u16 *dmac_id, u16 *interface);
 	void (*l2_learning_setup)(void);

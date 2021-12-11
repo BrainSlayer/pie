@@ -3,17 +3,11 @@
 #ifndef _RTL838X_ETH_H
 #define _RTL838X_ETH_H
 
+#include <linux/rtl838x.h>
+
 /*
  * Register definition
  */
-
-/* Per port MAC control */
-#define RTL838X_MAC_PORT_CTRL			(0xd560)
-#define RTL839X_MAC_PORT_CTRL			(0x8004)
-#define RTL930X_MAC_L2_PORT_CTRL		(0x3268)
-#define RTL930X_MAC_PORT_CTRL			(0x3260)
-#define RTL931X_MAC_L2_PORT_CTRL		(0x6000)
-#define RTL931X_MAC_PORT_CTRL			(0x6004)
 
 /* DMA interrupt control and status registers */
 #define RTL838X_DMA_IF_CTRL			(0x9f58)
@@ -44,11 +38,6 @@
 #define RTL931X_DMA_IF_INTR_TX_DONE_MSK		(0x0918)
 #define RTL931X_L2_NTFY_IF_INTR_MSK		(0x09E4)
 #define RTL931X_L2_NTFY_IF_INTR_STS		(0x09E8)
-
-#define RTL838X_MAC_FORCE_MODE_CTRL		(0xa104)
-#define RTL839X_MAC_FORCE_MODE_CTRL		(0x02bc)
-#define RTL930X_MAC_FORCE_MODE_CTRL		(0xCA1C)
-#define RTL931X_MAC_FORCE_MODE_CTRL		(0x0dcc)
 
 /* MAC address settings */
 #define RTL838X_MAC				(0xa9ec)
@@ -96,40 +85,8 @@
 #define RTL838X_SDS4_DUMMY0			(0xef8c)
 #define RTL838X_SDS5_EXT_REG6			(0xf18c)
 
-/* L2 features */
-#define RTL839X_TBL_ACCESS_L2_CTRL		(0x1180)
-#define RTL839X_TBL_ACCESS_L2_DATA(idx)		(0x1184 + ((idx) << 2))
-#define RTL838X_TBL_ACCESS_CTRL_0		(0x6914)
-#define RTL838X_TBL_ACCESS_DATA_0(idx)		(0x6918 + ((idx) << 2))
-
 /* MAC-side link state handling */
-#define RTL838X_MAC_LINK_STS			(0xa188)
-#define RTL839X_MAC_LINK_STS			(0x0390)
-#define RTL930X_MAC_LINK_STS			(0xCB10)
-#define RTL931X_MAC_LINK_STS			(0x0ec0)
-
-#define RTL838X_MAC_LINK_SPD_STS		(0xa190)
-#define RTL839X_MAC_LINK_SPD_STS		(0x03a0)
-#define RTL930X_MAC_LINK_SPD_STS		(0xCB18)
-#define RTL931X_MAC_LINK_SPD_STS		(0x0ed0)
-
-#define RTL838X_MAC_LINK_DUP_STS		(0xa19c)
-#define RTL839X_MAC_LINK_DUP_STS		(0x03b0)
-#define RTL930X_MAC_LINK_DUP_STS		(0xCB28)
-#define RTL931X_MAC_LINK_DUP_STS		(0x0ef0)
-
 // TODO: RTL8390_MAC_LINK_MEDIA_STS_ADDR ???
-
-#define RTL838X_MAC_TX_PAUSE_STS		(0xa1a0)
-#define RTL839X_MAC_TX_PAUSE_STS		(0x03b8)
-#define RTL930X_MAC_TX_PAUSE_STS		(0xCB2C)
-#define RTL931X_MAC_TX_PAUSE_STS		(0x0ef8)
-
-#define RTL838X_MAC_RX_PAUSE_STS		(0xa1a4)
-#define RTL839X_MAC_RX_PAUSE_STS		(0xCB30)
-#define RTL930X_MAC_RX_PAUSE_STS		(0xC2F8)
-#define RTL931X_MAC_RX_PAUSE_STS		(0x0f00)
-
 #define RTL838X_EEE_TX_TIMER_GIGA_CTRL		(0xaa04)
 #define RTL838X_EEE_TX_TIMER_GELITE_CTRL	(0xaa08)
 
@@ -137,12 +94,6 @@
 #define RTL931X_L2_UNKN_UC_FLD_PMSK		(0xC8F4)
 
 #define RTL839X_MAC_GLB_CTRL			(0x02a8)
-#define RTL839X_SCHED_LB_TICK_TKN_CTRL		(0x60f8)
-
-#define RTL838X_L2_TBL_FLUSH_CTRL		(0x3370)
-#define RTL839X_L2_TBL_FLUSH_CTRL		(0x3ba0)
-#define RTL930X_L2_TBL_FLUSH_CTRL		(0x9404)
-#define RTL931X_L2_TBL_FLUSH_CTRL		(0xCD9C)
 
 #define RTL930X_L2_PORT_SABLK_CTRL		(0x905c)
 #define RTL930X_L2_PORT_DABLK_CTRL		(0x9060)
@@ -162,10 +113,6 @@
 #define RTL931X_L2_NTFY_RING_CUR_ADDR		(0x09E0)
 #define RTL839X_L2_NOTIFICATION_CTRL		(0x7808)
 #define RTL931X_L2_NTFY_CTRL			(0xCDC8)
-#define RTL838X_L2_CTRL_0			(0x3200)
-#define RTL839X_L2_CTRL_0			(0x3800)
-#define RTL930X_L2_CTRL				(0x8FD8)
-#define RTL931X_L2_CTRL				(0xC800)
 
 /* TRAPPING to CPU-PORT */
 #define RTL838X_SPCL_TRAP_IGMP_CTRL		(0x6984)
@@ -398,7 +345,7 @@ inline u32 rtl931x_get_mac_tx_pause_sts(int p)
 struct p_hdr;
 struct dsa_tag;
 
-struct rtl838x_reg {
+struct rtl838x_eth_reg {
 	irqreturn_t (*net_irq)(int irq, void *dev_id);
 	int (*mac_port_ctrl)(int port);
 	int dma_if_intr_sts;

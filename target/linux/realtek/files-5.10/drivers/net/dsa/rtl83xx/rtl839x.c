@@ -269,7 +269,7 @@ static inline int rtl839x_mac_force_mode_ctrl(int p)
 
 static inline int rtl839x_mac_port_ctrl(int p)
 {
-	return RTL839X_MAC_PORT_CTRL(p);
+	return RTL839X_MAC_PORT_CTRL + (p << 7);
 }
 
 static inline int rtl839x_l2_port_new_salrn(int p)
@@ -284,7 +284,7 @@ static inline int rtl839x_l2_port_new_sa_fwd(int p)
 
 static inline int rtl839x_mac_link_spd_sts(int p)
 {
-	return RTL839X_MAC_LINK_SPD_STS(p);
+	return RTL839X_MAC_LINK_SPD_STS + (((p >> 4) << 2));;
 }
 
 static inline int rtl839x_trk_mbr_ctr(int group)
@@ -927,7 +927,7 @@ static int rtl839x_pie_rule_del(struct rtl838x_switch_priv *priv, int index_from
  * PIE rule in the pie_rule structure and fills in the raw data fields in the
  * raw register space r[].
  * The register space configuration size is identical for the RTL8380/90 and RTL9300,
- * however the RTL9310 has 2 more registers / fields and the physical field-ids are different
+ * however the RTL931X has 2 more registers / fields and the physical field-ids are different
  * on all SoCs
  * On the RTL8390 the template mask registers are not word-aligned!
  */
@@ -1102,7 +1102,7 @@ static void rtl839x_write_pie_templated(u32 r[], struct pie_rule *pr, enum templ
  * PIE rule in the pie_rule structure by reading the raw data fields in the
  * raw register space r[].
  * The register space configuration size is identical for the RTL8380/90 and RTL9300,
- * however the RTL9310 has 2 more registers / fields and the physical field-ids
+ * however the RTL931X has 2 more registers / fields and the physical field-ids
  * On the RTL8390 the template mask registers are not word-aligned!
  */
 void rtl839x_read_pie_templated(u32 r[], struct pie_rule *pr, enum template_field_id t[])
