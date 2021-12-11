@@ -1555,7 +1555,7 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	else
 		dSds = (sds - 1) * 2;
 
-	pr_info("%s: RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR));
+	pr_debug("%s: RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR));
 	ori = sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
 	val = ori | (1 << sds);
 	sw_w32(val, RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
@@ -1704,7 +1704,7 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 
 	val = ori & ~(1 << sds);
 	sw_w32(val, RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR);
-	pr_info("%s: RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR));
+	pr_debug("%s: RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL9310_PS_SERDES_OFF_MODE_CTRL_ADDR));
 
 	switch (mode) {
 	case MII_XSGMII:
@@ -1715,7 +1715,6 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	case MII_USXGMII_10GSXGMII:
 	case MII_USXGMII_10GDXGMII:
 	case MII_USXGMII_10GQXGMII:
-
 		if (mode == MII_XSGMII)
 			rtl931x_sds_mii_mode_set(sds, mode);
 		else
