@@ -1510,6 +1510,12 @@ static void cmuType_set(u32 aSds, serdes_mode_t mode, int chiptype)
 
 static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 {
+/*
+    Warning: this sds 2 and mode sgmii is a hack for testing only
+    this combination works for edgecore 4125. other devices might
+    have different values. 
+    so this is only for testing
+*/
 	int sds = 2;
 	enum serdes_mode mode = MII_SGMII;
 
@@ -1530,7 +1536,7 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	aSds = sdsMap[sds];
 	int ret;
 	int chiptype = 0;
-
+	
 	pr_debug("%s: fibermode %08X", __func__, rtl931x_read_sds_phy(aSds, 0x1f, 0x9));
 	pr_debug("%s: serdes_mode_ctrl %08X", __func__, RTL9310_MAC_SERDES_MODE_CTRL_ADDR(2));
 	if (14 <= sds)
