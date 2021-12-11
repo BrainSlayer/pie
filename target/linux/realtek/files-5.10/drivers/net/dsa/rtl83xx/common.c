@@ -1009,7 +1009,8 @@ static int rtl83xx_fib4_del(struct rtl838x_switch_priv *priv,
 		rtl83xx_l2_nexthop_rm(priv, &r->nh);
 		pr_info("%s: Releasing packet counter %d\n", __func__, r->pr.packet_cntr);
 		set_bit(r->pr.packet_cntr, priv->packet_cntr_use_bm);
-		priv->r->pie_rule_rm(priv, &r->pr);
+		if (priv->r->pie_rule_rm)
+			priv->r->pie_rule_rm(priv, &r->pr);
 		rtl83xx_route_rm(priv, r);
 	}
 
