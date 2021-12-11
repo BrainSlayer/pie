@@ -1504,10 +1504,12 @@ static int __init rtl83xx_sw_probe(struct platform_device *pdev)
 	memset(priv->lag_primary, -1, sizeof(priv->lag_primary));
 
 	priv->ds->num_lag_ids = priv->n_lags;
-
+	
 	pr_info("Chip version %c\n", priv->version);
 
 	pr_info("%s calling rtl83xx_mdio_probe\n", __func__);
+	if (priv->r->sw_init)
+	    priv->r->sw_init(priv);
 	err = rtl83xx_mdio_probe(priv);
 	pr_info("%s returned %d\n", __func__, err);
 	if (err) {

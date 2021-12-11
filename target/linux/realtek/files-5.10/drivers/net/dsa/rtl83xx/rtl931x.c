@@ -1085,12 +1085,12 @@ typedef enum serdes_mode {
 	MII_END,
 } serdes_mode_t;
 
-static u32 rtl931x_read_sds_phy(int phy_addr, int page, int phy_reg)
+static u16 rtl931x_read_sds_phy(int phy_addr, int page, int phy_reg)
 {
 	int i;
 	u32 cmd = phy_addr << 2 | page << 7 | phy_reg << 13 | 1;
 
-	pr_debug("%s: phy_addr(SDS-ID) %d, phy_reg: %d\n", __func__, phy_addr, phy_reg);
+	pr_info("%s: phy_addr(SDS-ID) %d, phy_reg: %d\n", __func__, phy_addr, phy_reg);
 	sw_w32(cmd, RTL931X_SERDES_INDRT_ACCESS_CTRL);
 
 	for (i = 0; i < 100; i++) {
@@ -1102,11 +1102,11 @@ static u32 rtl931x_read_sds_phy(int phy_addr, int page, int phy_reg)
 	if (i >= 100)
 		return -EIO;
 
-	pr_debug("%s: returning %04x\n", __func__, sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL));
-	return sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL);
+	pr_info("%s: returning %04x\n", __func__, sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL));
+	return sw_r32(RTL931X_SERDES_INDRT_DATA_CTRL) & 0xffff;
 }
 
-static int rtl931x_write_sds_phy(int phy_addr, int page, int phy_reg, u32 v)
+static int rtl931x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v)
 {
 	int i;
 	u32 cmd;
@@ -1716,9 +1716,13 @@ static void rtl931x_sds_init(struct rtl838x_switch_priv *priv)
 	return;
 }				/* end of _dal_mango_construct_sdsMode_set */
 
-int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)
+void rtl931x_sw_init(struct rtl838x_switch_priv *priv)
 {
 	rtl931x_sds_init(priv);
+}
+
+int rtl931x_l3_setup(struct rtl838x_switch_priv *priv)
+{
 	return 0;
 }
 
@@ -1847,5 +1851,6 @@ const struct rtl838x_reg rtl931x_reg = {
 	.pie_init = rtl931x_pie_init,
 	.set_vlan_igr_filter = rtl931x_set_igr_filter,
 	.set_vlan_egr_filter = rtl931x_set_egr_filter,
+	.sw_init = rtl931x_sw_init,
 };
 

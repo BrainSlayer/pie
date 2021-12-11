@@ -981,6 +981,7 @@ struct rtl838x_reg {
 	void (*route_write)(int idx, struct rtl83xx_route *rt);
 	void (*host_route_write)(int idx, struct rtl83xx_route *rt);
 	int (*l3_setup)(struct rtl838x_switch_priv *priv);
+	void (*sw_init)(struct rtl838x_switch_priv *priv);
 	void (*set_l3_nexthop)(int idx, u16 dmac_id, u16 interface);
 	void (*get_l3_nexthop)(int idx, u16 *dmac_id, u16 *interface);
 	void (*l2_learning_setup)(void);
