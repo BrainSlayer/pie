@@ -1262,7 +1262,7 @@ int rtl931x_10gr_symErr_get(u32 sds, rtk_sds_symErr_t * info)
 	}
 
 	return ret;
-}				/* end of _phy_rtl9310_10gr_symErr_get */
+}
 #endif
 static void rtl931x_symerr_clear(u32 sds, serdes_mode_t mode)
 {
@@ -1481,13 +1481,15 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 	};
 
 	u32 sdsMap[] = { 0, 1, 2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23 };
-	u32 aSds, dSds, val, ori, model_info;
+	u32 aSds, dSds, ori, model_info, val;
 	aSds = sdsMap[sds];
 	int ret;
 	int chiptype = 0;
-	pr_debug("%s: set sds %d to mode %d\n", __func__, sds, mode);
-	pr_debug("%s: fibermode %08X", __func__, rtl931x_read_sds_phy(aSds, 0x1f, 0x9));
-	pr_debug("%s: serdes_mode_ctrl %08X", __func__, RTL931X_MAC_SERDES_MODE_CTRL_ADDR(2));
+	pr_info("%s: set sds %d to mode %d\n", __func__, sds, mode);
+	SDS_FIELD_R(aSds, 0x1F, 0x9, 11, 6, &val);
+
+	pr_info("%s: fibermode %08X stored mode %08X", __func__, rtl931x_read_sds_phy(aSds, 0x1f, 0x9), val);
+	pr_info("%s: serdes_mode_ctrl %08X", __func__, RTL931X_MAC_SERDES_MODE_CTRL_ADDR(sds));
 	if (14 <= sds)
 		return;
 
