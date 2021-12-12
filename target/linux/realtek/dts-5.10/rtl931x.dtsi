@@ -35,6 +35,12 @@
 		bootargs = "console=ttyS0,38400";
 	};
 
+	lx_clk: lx_clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <200000000>;
+	};
+
 	cpuintc: cpuintc {
 		compatible = "mti,cpu-interrupt-controller";
 		#address-cells = <0>;
@@ -78,6 +84,20 @@
 
 			#address-cells = <1>;
 			#size-cells = <0>;
+		};
+
+		watchdog0: watchdog@3260 {
+			compatible = "realtek,rtl9310-wdt";
+			reg = <0x3260 0xc>;
+
+			realtek,reset-mode = "soc";
+
+			clocks = <&lx_clk>;
+			timeout-sec = <30>;
+
+			interrupt-parent = <&gic>;
+			interrupt-names = "phase1", "phase2";
+			interrupts = <GIC_SHARED 8 IRQ_TYPE_LEVEL_HIGH>, <GIC_SHARED 9 IRQ_TYPE_LEVEL_HIGH>;
 		};
 /*
 		gpio0: gpio-controller@3300 {
