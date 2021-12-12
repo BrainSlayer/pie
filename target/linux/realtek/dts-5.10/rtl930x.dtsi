@@ -80,11 +80,10 @@
 		interrupt-controller;
 	};
 
-	osc: oscillator {
+	lx_clk: lx_clk {
 		compatible = "fixed-clock";
-		#clock-cells = <1>;
+		#clock-cells = <0>;
 		clock-frequency  = <175000000>;
-		clock-output-names = "osc";
 	};
 
 /*	soc: soc {
@@ -111,6 +110,8 @@
 				<9 &cpuintc 3>,  /* TC2 */
 				<8 &cpuintc 3>,  /* TC1 */
 				<7 &cpuintc 2>;  /* TC0 */
+				<6 &cpuintc 5>,  /* WDT_IP2 */
+				<5 &cpuintc 4>;  /* WDT_IP1 */
 		};
 /*
 		intc1: rtlintc@3018 {
@@ -171,6 +172,20 @@
 			no-loopback-test;
 
 			status = "disabled";
+		};
+
+		watchdog0: watchdog@3260 {
+			compatible = "realtek,rtl9300-wdt";
+			reg = <0x3260 0xc>;
+
+			realtek,reset-mode = "soc";
+
+			clocks = <&lx_clk>;
+			timeout-sec = <30>;
+
+			interrupt-parent = <&intc>;
+			interrupt-names = "phase1", "phase2";
+			interrupts = <5>, <6>;
 		};
 
 		gpio0: gpio-controller@b8003500 {

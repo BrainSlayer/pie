@@ -8,7 +8,7 @@ index 7e693dcbdd..eca50a6b97 100644
  
 +config I2C_RTL9300
 +	tristate "Realtek RTL9300 I2C adapter"
-+	depends on OF
++	depends on OF && RTL930X
 +	help
 +	  Say Y here to include support for the I2C adapter in Realtek RTL9300
 +	  and RTL9310 SoCs.
