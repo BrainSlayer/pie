@@ -490,6 +490,9 @@ static u64 rtl839x_read_mcast_pmask(int idx)
 	// Read MC_PMSK (2) via register RTL8390_TBL_L2
 	struct table_reg *q = rtl_table_get(RTL8390_TBL_L2, 2);
 
+	if (((soc_info.id & 0x3f) >> 1) < 2)
+		return 0x001fffffffffffff;
+
 	rtl_table_read(q, idx);
 	portmask = sw_r32(rtl_table_data(q, 0));
 	portmask <<= 32;
