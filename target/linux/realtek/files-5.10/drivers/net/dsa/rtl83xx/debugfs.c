@@ -268,6 +268,44 @@ static const struct file_operations drop_counter_fops = {
 	.open = simple_open,
 	.read = drop_counter_read,
 };
+void rtl931x_sds_init(u32 sds, enum serdes_mode mode);
+
+static ssize_t sds_write(struct file *filp, const char __user *buffer,
+				size_t count, loff_t *ppos)
+{
+	char b[64];
+	ssize_t len;
+	int ret;
+	u32 sds;
+	int m;
+	enum serdes_mode mode;
+
+	if (*ppos != 0)
+		return -EINVAL;
+
+	if (count >= sizeof(b))
+		return -ENOSPC;
+
+	len = simple_write_to_buffer(b, sizeof(b) - 1, ppos,
+				     buffer, count);
+	if (len < 0)
+		return len;
+	b[len] = '\0';
+	ret = sscanf(b, "%u %d", &sds, &m);
+	mode = m;
+	if (ret == 2) {
+		pr_info("set sds %d to mode %d\n", sds, mode);
+		rtl931x_sds_init(sds, mode);
+	}
+	return len;
+}
+
+
+static const struct file_operations sds_fops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.write = sds_write,
+};
 
 static ssize_t age_out_read(struct file *filp, char __user *buffer, size_t count,
 			     loff_t *ppos)
@@ -798,4 +836,5 @@ void rtl930x_dbgfs_init(struct rtl838x_switch_priv *priv)
 	priv->dbgfs_dir = dbg_dir;
 
 	debugfs_create_file("drop_counters", 0400, dbg_dir, priv, &drop_counter_fops);
+	debugfs_create_file("sds", 0400, dbg_dir, priv, &sds_fops);
 }
