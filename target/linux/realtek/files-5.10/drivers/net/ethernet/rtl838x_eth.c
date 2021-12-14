@@ -1643,8 +1643,9 @@ static int rtl838x_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
 	int err;
 	struct rtl838x_eth_priv *priv = bus->priv;
 
-	if (mii_id >= 24 && mii_id <= 27 && priv->id == 0x8380)
+	if (mii_id >= 24 && mii_id <= 27 && priv->id == 0x8380) {
 		return rtl838x_read_sds_phy(mii_id, regnum);
+	}
 	err = rtl838x_read_phy(mii_id, 0, regnum, &val);
 	if (err)
 		return err;
@@ -1727,6 +1728,7 @@ static int rtl838x_mdio_write(struct mii_bus *bus, int mii_id,
 	struct rtl838x_eth_priv *priv = bus->priv;
 
 	if (mii_id >= 24 && mii_id <= 27 && priv->id == 0x8380) {
+
 		if (mii_id == 26)
 			offset = 0x100;
 		sw_w32(value, RTL838X_SDS4_FIB_REG0 + offset + (regnum << 2));
@@ -1955,7 +1957,7 @@ static int rtl931x_chip_init(struct rtl838x_eth_priv *priv)
 	return 0;
 }
 void rtl931x_sds_init(u32 sds, serdes_mode_t mode);
-
+void rtl931x_set_sds(int port, u32 sds);
 static int rtl838x_mdio_init(struct rtl838x_eth_priv *priv)
 {
 	struct device_node *mii_np, *dn;
@@ -2025,8 +2027,10 @@ static int rtl838x_mdio_init(struct rtl838x_eth_priv *priv)
 
 		if (of_property_read_u32(dn, "sds", &priv->sds_id[pn]))
 			priv->sds_id[pn] = -1;
-		else
-			rtl931x_sds_init(priv->sds_id[pn], MII_SGMII);
+		else {
+			pr_info("set sds port %d to %d\n", pn, priv->sds_id[pn]);
+			rtl931x_set_sds(pn, priv->sds_id[pn]);
+		}
 
 		if (pn < MAX_PORTS) {
 			priv->smi_bus[pn] = smi_addr[0];
@@ -2226,6 +2230,7 @@ static int __init rtl838x_eth_probe(struct platform_device *pdev)
 				(void *)&dev->mem_start, GFP_KERNEL);
 	if (!priv->membase) {
 		dev_err(&pdev->dev, "cannot allocate DMA buffer\n");
+
 		err = -ENOMEM;
 		goto err_free;
 	}

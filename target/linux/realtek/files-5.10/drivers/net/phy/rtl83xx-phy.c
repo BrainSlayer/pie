@@ -2386,8 +2386,9 @@ static int rtl838x_serdes_probe(struct phy_device *phydev)
 
 	/* On the RTL8380M, PHYs 24-27 connect to the internal SerDes */
 	if (soc_info.id == 0x8380) {
-		if (addr == 24)
+		if (addr == 24) {
 			return rtl8380_configure_serdes(phydev);
+		}
 		return 0;
 	}
 	return -ENODEV;

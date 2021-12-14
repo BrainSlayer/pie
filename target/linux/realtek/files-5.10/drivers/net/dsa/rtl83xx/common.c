@@ -312,11 +312,11 @@ static int __init rtl83xx_mdio_probe(struct rtl838x_switch_priv *priv)
 	for_each_node_by_name(dn, "ethernet-phy") {
 		if (of_property_read_u32(dn, "reg", &pn))
 			continue;
-
+		pr_info("%s: priv id %X\n", __func__, priv->id);
 		// Check for the integrated SerDes of the RTL8380M first
 		if (of_property_read_bool(dn, "phy-is-integrated")
 			&& priv->id == 0x8380 && pn >= 24) {
-			pr_info("----> FÓUND A SERDES\n");
+			pr_info("----> FOUND A SERDES\n");
 			priv->ports[pn].phy = PHY_RTL838X_SDS;
 			continue;
 		}

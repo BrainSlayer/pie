@@ -184,9 +184,10 @@
 			reg = <50>;
 			compatible = "ethernet-phy-ieee802.3-c45";
 			rtl9300,smi-address = <1 1>;
+			sds = < 9 >;
 		};
 
-		/* RTL9313 Internal Serdes */
+		/* RTL9313 Internal Serdes
 		phy52: ethernet-phy@8 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			phy-is-integrated;
@@ -199,6 +200,7 @@
 			reg = <53>;
 			rtl9300,smi-address = <3 0>;
 		};
+		*/
 
 	};
 };
@@ -257,7 +259,7 @@
 			phy-mode = "usxgmii";
 		};
 
-		/* RTL9313 Internal SerDes */
+		/* RTL9313 Internal SerDes
 		port@52 {
 			reg = <52>;
 			label = "lan9";
@@ -270,6 +272,7 @@
 			phy-mode = "internal";
 			phy-handle = <&phy53>;
 		};
+		*/
 
 		/* CPU-Port */
 		port@56 {

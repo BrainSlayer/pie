@@ -19,6 +19,10 @@ u8 port_sds[RTL931X_CPU_PORT] = {2, 0, 0, 0, 0, 0, 0, 0,
 				 7, 0, 0, 0, 0, 0, 0, 0,
 				 8, 0, 9, 0, 0, 0, 0, 0};
 
+void rtl931x_set_sds(int port, u32 sds) {
+	port_sds[port] = sds;
+}
+
 static void rtl83xx_init_stats(struct rtl838x_switch_priv *priv)
 {
 	mutex_lock(&priv->reg_mutex);
@@ -314,8 +318,9 @@ static void rtl83xx_phylink_validate(struct dsa_switch *ds, int port,
 
 	/* On both the 8380 and 8382, ports 24-27 are SFP ports */
 	if (port >= 24 && port <= 27 && priv->family_id == RTL8380_FAMILY_ID)
+	{
 		phylink_set(mask, 1000baseX_Full);
-
+	}
 	/* On the RTL839x family of SoCs, ports 48 to 51 are SFP ports */
 	if (port >= 48 && port <= 51 && priv->family_id == RTL8390_FAMILY_ID)
 		phylink_set(mask, 1000baseX_Full);
@@ -431,7 +436,10 @@ static int rtl83xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
 	case 3:
 		if (priv->family_id == RTL9300_FAMILY_ID
 			&& (port == 24 || port == 26)) /* Internal serdes */
+		{
+
 			state->speed = SPEED_2500;
+		}
 		else
 			state->speed = SPEED_100; /* Is in fact 500Mbit */
 	}
@@ -730,6 +738,8 @@ void rtl9310_sds_mode_usxgmii(int sds_num)
 	sw_w32_mask(m[n] << o[n], v[n] << o[n], a[n]);
 }
 
+void rtl931x_sds_init(u32 sds, enum serdes_mode mode);
+
 static void rtl931x_phylink_mac_config(struct dsa_switch *ds, int port,
 					unsigned int mode,
 					const struct phylink_link_state *state)
@@ -740,6 +750,27 @@ static void rtl931x_phylink_mac_config(struct dsa_switch *ds, int port,
 
 	sds_num = port_sds[port];
 
+	switch (state->speed) {
+	case SPEED_10000:
+		rtl931x_sds_init(sds_num, MII_10GR);		
+		break;
+	case SPEED_2500:
+		rtl931x_sds_init(sds_num, MII_2500Base_X);
+		break;
+	case SPEED_5000:
+		rtl931x_sds_init(sds_num, MII_2500Base_X);
+		break;
+	case SPEED_1000:
+		rtl931x_sds_init(sds_num, MII_SGMII);
+		break;
+	default:
+		rtl931x_sds_init(sds_num, MII_SGMII);
+		break;
+	}
+
+
+#if 0
+	return;
 	pr_info("In %s, port %d\n", __func__, port);
 	switch (state->interface) {
 	case PHY_INTERFACE_MODE_HSGMII:
@@ -793,6 +824,7 @@ static void rtl931x_phylink_mac_config(struct dsa_switch *ds, int port,
 //	reg |= RTL931X_FORCE_EN;
  
 	sw_w32(reg, priv->r->mac_force_mode_ctrl(port));
+#endif
 }
 
 static void rtl93xx_phylink_mac_config(struct dsa_switch *ds, int port,
