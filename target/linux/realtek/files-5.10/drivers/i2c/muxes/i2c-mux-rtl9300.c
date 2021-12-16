@@ -16,7 +16,7 @@
 #define NUM_MASTERS		2
 #define NUM_BUSSES		8
 
-#define REG(mst, x)	(mux->base + x + (mst ? 0x1c : 0))
+#define REG(mst, x)	(mux->base + x + (mst ? mux->i2c->mst2_offset : 0))
 #define REG_MASK(mst, clear, set, reg)	\
 			writel((readl(REG((mst),(reg))) & ~(clear)) | (set), REG((mst),(reg)))
 

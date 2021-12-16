@@ -50,7 +50,8 @@
 #define RTL9300_I2C_FAST_FREQ		1
 
 struct rtl9300_i2c {
-	void __iomem *base;		// Must be first for i2c-mux-rtl9300 to pick up
+	void __iomem *base;
+	u32 mst2_offset;
 	struct device *dev;
 	struct i2c_adapter adap;
 	u8 bus_freq;

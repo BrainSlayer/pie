@@ -4,7 +4,7 @@
 #include <linux/of_platform.h>
 #include "i2c-rtl9300.h"
 
-#define REG(x)		(i2c->base + x + (i2c->scl_num ? 0x1c : 0))
+#define REG(x)		(i2c->base + x + (i2c->scl_num ? i2c->mst2_offset : 0))
 #define REG_MASK(clear, set, reg)	\
 			writel((readl(REG(reg)) & ~(clear)) | (set), REG(reg))
 
@@ -21,6 +21,7 @@ struct i2c_drv_data {
 			    union i2c_smbus_data * data, int len);
 	void (*writel)(struct rtl9300_i2c *i2c, u32 data);
 	void (*config_io)(struct rtl9300_i2c *i2c, int scl_num, int sda_num);
+	u32 mst2_offset;
 };
 			
 DEFINE_MUTEX(i2c_lock);
@@ -361,6 +362,7 @@ static int rtl9300_i2c_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	i2c->base = devm_ioremap_resource(&pdev->dev, res);
+	i2c->mst2_offset = drv_data->mst2_offset;
 	if (IS_ERR(i2c->base))
 		return PTR_ERR(i2c->base);
 
@@ -445,6 +447,7 @@ struct i2c_drv_data rtl9300_i2c_drv_data = {
 	.execute_xfer = rtl9300_execute_xfer,
 	.writel = rtl9300_writel,
 	.config_io = rtl9300_i2c_config_io,
+	.mst2_offset = 0x1c,
 };
 
 struct i2c_drv_data rtl9310_i2c_drv_data = {
@@ -458,6 +461,7 @@ struct i2c_drv_data rtl9310_i2c_drv_data = {
 	.execute_xfer = rtl9310_execute_xfer,
 	.writel = rtl9310_writel,
 	.config_io = rtl9310_i2c_config_io,
+	.mst2_offset = 0x18,
 };
 
 static const struct of_device_id i2c_rtl9300_dt_ids[] = {
