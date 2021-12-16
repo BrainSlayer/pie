@@ -71,15 +71,38 @@
 			sda-pin = <5>;
 			scl-pin = <13>;
 		};
+
+		i2c03: i2c-rtl9310-3 {
+			reg = <3>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			sda-pin = <0>;
+			scl-pin = <14>;
+
+			lm75a@4f {
+				compatible = "national,lm75a";
+				reg = <0x4f>;
+			};
+
+		};
 	};
 
-	sfp0: sfp-p12 {
+	sfp0: sfp-p9 {
 		compatible = "sff,sfp";
 		i2c-bus = <&i2c01>;
-//		los-gpio = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-//		tx-fault-gpio = <&gpio0 20 GPIO_ACTIVE_HIGH>;
-//		mod-def0-gpio = <&gpio0 16 GPIO_ACTIVE_LOW>;
-//		tx-disable-gpio = <&gpio0 15 GPIO_ACTIVE_HIGH>;
+		los-gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpio = <&gpio0 30 GPIO_ACTIVE_HIGH>;
+		mod-def0-gpio = <&gpio0 28 GPIO_ACTIVE_LOW>;
+//		tx-disable-gpio = <&gpio0 31 GPIO_ACTIVE_HIGH>;
+	};
+
+	sfp1: sfp-p10 {
+		compatible = "sff,sfp";
+		i2c-bus = <&i2c02>;
+		los-gpio = <&gpio0 25 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpio = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+		mod-def0-gpio = <&gpio0 24 GPIO_ACTIVE_LOW>;
+//		tx-disable-gpio = <&gpio0 27 GPIO_ACTIVE_HIGH>;
 	};
 
 /*
@@ -187,20 +210,21 @@
 			sds = < 9 >;
 		};
 
-		/* RTL9313 Internal Serdes
+		/* RTL9313 Internal Serdes */
 		phy52: ethernet-phy@8 {
-			compatible = "ethernet-phy-ieee802.3-c22";
+			compatible = "ethernet-phy-ieee802.3-c45";
 			phy-is-integrated;
 			reg = <52>;
 			rtl9300,smi-address = <2 0>;
+			sds = < 10 >;
 		};
 		phy53: ethernet-phy@9 {
-			compatible = "ethernet-phy-ieee802.3-c22";
+			compatible = "ethernet-phy-ieee802.3-c45";
 			phy-is-integrated;
 			reg = <53>;
 			rtl9300,smi-address = <3 0>;
+			sds = < 11 >;
 		};
-		*/
 
 	};
 };
@@ -259,20 +283,35 @@
 			phy-mode = "usxgmii";
 		};
 
-		/* RTL9313 Internal SerDes
+		/* RTL9313 Internal SerDes */
 		port@52 {
 			reg = <52>;
 			label = "lan9";
-			phy-mode = "internal";
+			phy-mode = "10gbase-r";
 			phy-handle = <&phy52>;
+			sfp = <&sfp0>;
+			fixed-link {
+				managed;
+				in-band-status;
+				speed = <10000>;
+				full-duplex;
+				pause;
+			};
 		};
 		port@53 {
 			reg = <53>;
 			label = "lan10";
-			phy-mode = "internal";
+			phy-mode = "10gbase-r";
 			phy-handle = <&phy53>;
+			sfp = <&sfp1>;
+			fixed-link {
+				managed;
+				in-band-status;
+				speed = <10000>;
+				full-duplex;
+				pause;
+			};
 		};
-		*/
 
 		/* CPU-Port */
 		port@56 {
