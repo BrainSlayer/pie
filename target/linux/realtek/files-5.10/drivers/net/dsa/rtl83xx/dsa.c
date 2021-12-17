@@ -283,7 +283,7 @@ static void rtl83xx_phylink_validate(struct dsa_switch *ds, int port,
 	struct rtl838x_switch_priv *priv = ds->priv;
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
-	pr_debug("In %s port %d, state is %d", __func__, port, state->interface);
+	pr_info("In %s port %d, state is %d", __func__, port, state->interface);
 
 	if (!phy_interface_mode_is_rgmii(state->interface) &&
 	    state->interface != PHY_INTERFACE_MODE_NA &&
@@ -358,7 +358,9 @@ static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
 	    state->interface != PHY_INTERFACE_MODE_10GKR &&
 	    state->interface != PHY_INTERFACE_MODE_USXGMII &&
 	    state->interface != PHY_INTERFACE_MODE_INTERNAL &&
+	    state->interface != PHY_INTERFACE_MODE_10GBASER &&
 	    state->interface != PHY_INTERFACE_MODE_SGMII) {
+		pr_info("%s: zero\n", __func__);
 		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
 		dev_err(ds->dev,
 			"Unsupported interface: %d for port %d\n",
@@ -375,6 +377,7 @@ static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
 	if (state->interface == PHY_INTERFACE_MODE_USXGMII)
 		 phylink_set(mask, 10000baseT_Full);
 
+
 	/* With the exclusion of MII and Reverse MII, we support Gigabit,
 	 * including Half duplex
 	 */
@@ -386,6 +389,12 @@ static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
 
 	/* On the RTL9300 family of SoCs, ports 26 to 27 may be SFP ports TODO: take out of .dts */
 	if (priv->family_id == RTL9300_FAMILY_ID && port >= 26 && port <= 27) {
+		phylink_set(mask, 10000baseT_Full);
+		phylink_set(mask, 1000baseX_Full);
+		phylink_set(mask, 10000baseKR_Full);
+	}
+
+	if (priv->family_id == RTL9310_FAMILY_ID && port >= 52 && port <= 55) {
 		phylink_set(mask, 1000baseX_Full);
 		phylink_set(mask, 10000baseKR_Full);
 	}
@@ -394,11 +403,18 @@ static void rtl93xx_phylink_validate(struct dsa_switch *ds, int port,
 	phylink_set(mask, 10baseT_Full);
 	phylink_set(mask, 100baseT_Half);
 	phylink_set(mask, 100baseT_Full);
-
+	if (state->interface == PHY_INTERFACE_MODE_NA)
+	{
+	bitmap_or(supported, supported, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	bitmap_or(state->advertising, state->advertising, mask,
+		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	}else{
 	bitmap_and(supported, supported, mask,
 		   __ETHTOOL_LINK_MODE_MASK_NBITS);
 	bitmap_and(state->advertising, state->advertising, mask,
 		   __ETHTOOL_LINK_MODE_MASK_NBITS);
+	}
 }
 
 static int rtl83xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
@@ -505,6 +521,12 @@ static int rtl93xx_phylink_mac_link_state(struct dsa_switch *ds, int port,
 		break;
 	default:
 		pr_err("%s: unknown speed: %d\n", __func__, (u32)speed & 0xf);
+	}
+	if (priv->family_id == RTL9310_FAMILY_ID
+		&& (port >= 52 || port <=55)) { /* Internal serdes */ 
+			state->speed = SPEED_10000;
+			state->link = 1;
+			state->duplex = 1;
 	}
 
 	pr_info("%s: speed is: %d %d\n", __func__, (u32)speed & 0xf, state->speed);
@@ -749,7 +771,7 @@ static void rtl931x_phylink_mac_config(struct dsa_switch *ds, int port,
 	u32 reg;
 
 	sds_num = port_sds[port];
-
+	pr_info("%s: speed %d\n", __func__, state->speed);
 	switch (state->speed) {
 	case SPEED_10000:
 		rtl931x_sds_init(sds_num, MII_10GR);		
