@@ -209,7 +209,7 @@ irqreturn_t rtl931x_switch_irq(int irq, void *dev_id)
 }
 #define RTL931X_SERDES_INDRT_ACCESS_CTRL	(0x5638)
 #define RTL931X_SERDES_INDRT_DATA_CTRL		(0x563C)
-#define RTL931X_SERDES_MODE_CTRL		(0x13cc)
+#define RTL931X_SERDES_MODE_CTRL(idx)		(0x13CC + (((idx >> 2) << 2)))
 #define RTL931X_PS_SERDES_OFF_MODE_CTRL		(0x13f4)
 
 #define RTL931X_SMI_GLB_CTRL1		(0x0CBC)
@@ -1203,8 +1203,8 @@ static void rtl931x_sds_mii_mode_set(u32 sds, serdes_mode_t mode)
 
 	val |= (1 << 7);	// mac1g mode
 	
-	pr_debug("%s: RTL931X_MAC_SERDES_MODE_CTRL_ADDR(%d) 0x%08X\n", __func__, sds, sw_r32(RTL931X_MAC_SERDES_MODE_CTRL_ADDR(sds)));
-	sw_w32(val, RTL931X_MAC_SERDES_MODE_CTRL_ADDR(sds));
+	pr_debug("%s: RTL931X_SERDES_MODE_CTRL(%d) 0x%08X\n", __func__, sds, sw_r32(RTL931X_SERDES_MODE_CTRL(sds)));
+	sw_w32(val, RTL931X_SERDES_MODE_CTRL(sds));
 
 	return;
 }
@@ -1317,7 +1317,7 @@ static void rtl931x_sds_fiber_mode_set(u32 sds, serdes_mode_t mode)
 	rtl931x_symerr_clear(sds, mode);
 
 	val = 0x9F;
-	sw_w32(val, RTL931X_MAC_SERDES_MODE_CTRL_ADDR(sds));
+	sw_w32(val, RTL931X_SERDES_MODE_CTRL(sds));
 
 	switch (mode) {
 	case MII_SGMII:

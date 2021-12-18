@@ -533,10 +533,12 @@ typedef enum {
 #define RTL838X_ACL_PORT_LOOKUP_CTRL(p)		(0x616C + (((p) << 2)))
 #define RTL930X_ACL_PORT_LOOKUP_CTRL(p)		(0xA784 + (((p) << 2)))
 #define RTL930X_PIE_BLK_PHASE_CTRL		(0xA5A4)
-#define RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR                                                                   (0x13F4)
-#define RTL931X_MODEL_NAME_INFO_ADDR                                                                           (0x4)
-#define RTL931X_CHIP_INFO_ADDR                                                                                 (0x8)
-#define RTL931X_MAC_SERDES_MODE_CTRL_ADDR(index)                                                               (0x136C + (((index) << 2)))	/* index: 0-13 */
+
+/* RTL931X SDS */
+#define RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR	(0x13F4)
+#define RTL931X_MODEL_NAME_INFO_ADDR		(0x4)
+#define RTL931X_CHIP_INFO_ADDR			(0x8)
+#define RTL931X_MAC_SERDES_MODE_CTRL_ADDR(index)(0x136C + (((index) << 2)))	/* index: 0-13 */
 
 // PIE actions
 #define PIE_ACT_COPY_TO_PORT	2
