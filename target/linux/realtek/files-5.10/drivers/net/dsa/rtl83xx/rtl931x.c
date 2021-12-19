@@ -1623,7 +1623,7 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 		SDS_FIELD_W(dSds, 0x2, 0x0, 13, 13, 0);
 		break;
 	case MII_SGMII:
-		SDS_FIELD_W(sds, 0x24, 0x9, 15, 15, 0);
+		SDS_FIELD_W(aSds, 0x24, 0x9, 15, 15, 0);
 		break;
 	case MII_2500Base_X:
 		SDS_FIELD_W(dSds, 0x1, 0x14, 8, 8, 1);
