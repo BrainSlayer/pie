@@ -774,13 +774,13 @@ static void rtl931x_phylink_mac_config(struct dsa_switch *ds, int port,
 	pr_info("%s: speed %d\n", __func__, state->speed);
 	switch (state->speed) {
 	case SPEED_10000:
-		rtl931x_sds_init(sds_num, MII_10GR);		
+		rtl931x_sds_init(sds_num, MII_XSGMII);		
 		break;
 	case SPEED_2500:
-		rtl931x_sds_init(sds_num, MII_2500Base_X);
+		rtl931x_sds_init(sds_num, MII_HISGMII);
 		break;
 	case SPEED_5000:
-		rtl931x_sds_init(sds_num, MII_2500Base_X);
+		rtl931x_sds_init(sds_num, MII_QSGMII);
 		break;
 	case SPEED_1000:
 		rtl931x_sds_init(sds_num, MII_SGMII);

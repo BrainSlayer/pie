@@ -1666,10 +1666,10 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 	case MII_USXGMII_10GSXGMII:
 	case MII_USXGMII_10GDXGMII:
 	case MII_USXGMII_10GQXGMII:
-		if (mode == MII_XSGMII)
+//		if (mode == MII_XSGMII)
 			rtl931x_sds_mii_mode_set(sds, mode);
-		else
-			rtl931x_sds_fiber_mode_set(sds, mode);
+//		else
+//			rtl931x_sds_fiber_mode_set(sds, mode);
 
 		break;
 	case MII_100BX_FIBER:
