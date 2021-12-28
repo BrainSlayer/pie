@@ -2257,13 +2257,11 @@ static int rtl9300_config_aneg(struct phy_device *phydev)
 	v = rtl930x_read_sds_phy(sds_num, PHY_PAGE_2, PHY_CTRL_REG);
 	v &= ~BIT(12);
 	if (phydev->autoneg == AUTONEG_ENABLE)
-		v = |= BIT(12);
+		v |= BIT(12);
 	v |= BIT(9);
 	rtl930x_write_sds_phy(sds_num, PHY_PAGE_4, PHY_CTRL_REG, v);
 
-out:
-	pr_info("%s: And ret is now: %d\n", __func__, ret);
-	return ret;
+	return 0;
 }
 
 int rtl9310_configure_serdes(struct phy_device *phydev)
