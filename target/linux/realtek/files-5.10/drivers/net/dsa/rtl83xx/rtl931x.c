@@ -6,6 +6,97 @@
 extern struct mutex smi_lock;
 extern struct rtl83xx_soc_info soc_info;
 
+/* Definition of the RTL931X-specific template field IDs as used in the PIE */
+enum template_field_id {
+	TEMPLATE_FIELD_SPM0 = 1,
+	TEMPLATE_FIELD_SPM1 = 2,
+	TEMPLATE_FIELD_SPM2 = 3,
+	TEMPLATE_FIELD_SPM3 = 4,
+	TEMPLATE_FIELD_DMAC0 = 9,
+	TEMPLATE_FIELD_DMAC1 = 10,
+	TEMPLATE_FIELD_DMAC2 = 11,
+	TEMPLATE_FIELD_SMAC0 = 12,
+	TEMPLATE_FIELD_SMAC1 = 13,
+	TEMPLATE_FIELD_SMAC2 = 14,
+	TEMPLATE_FIELD_ETHERTYPE = 15,
+	TEMPLATE_FIELD_OTAG = 16,
+	TEMPLATE_FIELD_ITAG = 17,
+	TEMPLATE_FIELD_SIP0 = 18,
+	TEMPLATE_FIELD_SIP1 = 19,
+	TEMPLATE_FIELD_DIP0 = 20,
+	TEMPLATE_FIELD_DIP1 = 21,
+	TEMPLATE_FIELD_IP_TOS_PROTO = 22,
+	TEMPLATE_FIELD_L4_SPORT = 23,
+	TEMPLATE_FIELD_L4_DPORT = 24,
+	TEMPLATE_FIELD_L34_HEADER = 25,
+	TEMPLATE_FIELD_TCP_INFO = 26,
+	TEMPLATE_FIELD_SIP2 = 34,
+	TEMPLATE_FIELD_SIP3 = 35,
+	TEMPLATE_FIELD_SIP4 = 36,
+	TEMPLATE_FIELD_SIP5 = 37,
+	TEMPLATE_FIELD_SIP6 = 38,
+	TEMPLATE_FIELD_SIP7 = 39,
+	TEMPLATE_FIELD_DIP2 = 42,
+	TEMPLATE_FIELD_DIP3 = 43,
+	TEMPLATE_FIELD_DIP4 = 44,
+	TEMPLATE_FIELD_DIP5 = 45,
+	TEMPLATE_FIELD_DIP6 = 46,
+	TEMPLATE_FIELD_DIP7 = 47,
+	TEMPLATE_FIELD_FLOW_LABEL = 49,
+	TEMPLATE_FIELD_DSAP_SSAP = 50,
+	TEMPLATE_FIELD_FWD_VID = 52,
+	TEMPLATE_FIELD_RANGE_CHK = 53,
+	TEMPLATE_FIELD_SLP = 55,
+	TEMPLATE_FIELD_DLP = 56,
+	TEMPLATE_FIELD_META_DATA = 57,
+	TEMPLATE_FIELD_FIRST_MPLS1 = 60,
+	TEMPLATE_FIELD_FIRST_MPLS2 = 61,
+	TEMPLATE_FIELD_DPM3 = 8,
+};
+
+/* The meaning of TEMPLATE_FIELD_VLAN depends on phase and the configuration in
+ * RTL931X_PIE_CTRL. We use always the same definition and map to the inner VLAN tag:
+ */
+#define TEMPLATE_FIELD_VLAN TEMPLATE_FIELD_ITAG
+
+// Number of fixed templates predefined in the RTL9300 SoC
+#define N_FIXED_TEMPLATES 5
+// RTL931x specific predefined templates
+static enum template_field_id fixed_templates[N_FIXED_TEMPLATES][N_FIXED_FIELDS_RTL931X] =
+{
+	{
+		TEMPLATE_FIELD_DMAC0, TEMPLATE_FIELD_DMAC1, TEMPLATE_FIELD_DMAC2,
+		TEMPLATE_FIELD_SMAC0, TEMPLATE_FIELD_SMAC1, TEMPLATE_FIELD_SMAC2,
+		TEMPLATE_FIELD_VLAN, TEMPLATE_FIELD_IP_TOS_PROTO, TEMPLATE_FIELD_DSAP_SSAP,
+		TEMPLATE_FIELD_ETHERTYPE, TEMPLATE_FIELD_SPM0, TEMPLATE_FIELD_SPM1,
+		TEMPLATE_FIELD_SPM2, TEMPLATE_FIELD_SPM3
+	}, {
+		TEMPLATE_FIELD_SIP0, TEMPLATE_FIELD_SIP1, TEMPLATE_FIELD_DIP0,
+		TEMPLATE_FIELD_DIP1, TEMPLATE_FIELD_IP_TOS_PROTO, TEMPLATE_FIELD_TCP_INFO,
+		TEMPLATE_FIELD_L4_SPORT, TEMPLATE_FIELD_L4_DPORT, TEMPLATE_FIELD_VLAN,
+		TEMPLATE_FIELD_RANGE_CHK, TEMPLATE_FIELD_SPM0, TEMPLATE_FIELD_SPM1,
+		TEMPLATE_FIELD_SPM2, TEMPLATE_FIELD_SPM3
+	}, {
+		TEMPLATE_FIELD_DMAC0, TEMPLATE_FIELD_DMAC1, TEMPLATE_FIELD_DMAC2,
+		TEMPLATE_FIELD_VLAN, TEMPLATE_FIELD_ETHERTYPE, TEMPLATE_FIELD_IP_TOS_PROTO,
+		TEMPLATE_FIELD_SIP0, TEMPLATE_FIELD_SIP1, TEMPLATE_FIELD_DIP0,
+		TEMPLATE_FIELD_DIP1, TEMPLATE_FIELD_L4_SPORT, TEMPLATE_FIELD_L4_DPORT,
+		TEMPLATE_FIELD_META_DATA, TEMPLATE_FIELD_SLP
+	}, {
+		TEMPLATE_FIELD_DIP0, TEMPLATE_FIELD_DIP1, TEMPLATE_FIELD_DIP2,
+		TEMPLATE_FIELD_DIP3, TEMPLATE_FIELD_DIP4, TEMPLATE_FIELD_DIP5,
+		TEMPLATE_FIELD_DIP6, TEMPLATE_FIELD_DIP7, TEMPLATE_FIELD_IP_TOS_PROTO,
+		TEMPLATE_FIELD_TCP_INFO, TEMPLATE_FIELD_L4_SPORT, TEMPLATE_FIELD_L4_DPORT,
+		TEMPLATE_FIELD_RANGE_CHK, TEMPLATE_FIELD_SLP
+	}, {
+		TEMPLATE_FIELD_SIP0, TEMPLATE_FIELD_SIP1, TEMPLATE_FIELD_SIP2,
+		TEMPLATE_FIELD_SIP3, TEMPLATE_FIELD_SIP4, TEMPLATE_FIELD_SIP5,
+		TEMPLATE_FIELD_SIP6, TEMPLATE_FIELD_SIP7, TEMPLATE_FIELD_META_DATA,
+		TEMPLATE_FIELD_VLAN, TEMPLATE_FIELD_SPM0, TEMPLATE_FIELD_SPM1,
+		TEMPLATE_FIELD_SPM2, TEMPLATE_FIELD_SPM3
+	},
+};
+
 inline void rtl931x_exec_tbl0_cmd(u32 cmd)
 {
 	sw_w32(cmd, RTL931X_TBL_ACCESS_CTRL_0);
@@ -1091,7 +1182,6 @@ static int rtl931x_write_sds_phy(int phy_addr, int page, int phy_reg, u16 v)
 static void sds_field_read(u32 sds, u32 page, u32 reg, u32 endBit, u32 startBit, u32 *data)
 {
 	u32 configVal, len, mask;
-	int ret;
 
 	if (endBit < startBit)
 		return;
@@ -1113,7 +1203,6 @@ static void sds_field_read(u32 sds, u32 page, u32 reg, u32 endBit, u32 startBit,
 static void sds_field_write(u32 sds, u32 page, u32 reg, u32 endBit, u32 startBit, u32 data)
 {
 	u32 configVal, len, mask;
-	int ret;
 
 	len = endBit - startBit + 1;
 
@@ -1139,10 +1228,9 @@ static void sds_field_write(u32 sds, u32 page, u32 reg, u32 endBit, u32 startBit
 #define SDS_FIELD_W(_s, _p, _r, _end, _start, _d) \
      sds_field_write(_s, _p, _r, _end,  _start, _d)
 
-static void rtl931x_sds_rst(u32 sds)
+static void rtl931x_sds_rx_rst(u32 sds)
 {
 	u32 asds;
-	int ret;
 	u32 sdsMap[] = { 0, 1, 2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23 };
 	asds = sdsMap[sds];
 	if (sds < 2)
@@ -1164,7 +1252,6 @@ static void rtl931x_sds_rst(u32 sds)
 static void rtl931x_sds_mii_mode_set(u32 sds, serdes_mode_t mode)
 {
 	u32 val;
-	int ret;
 
 	switch (mode) {
 	case MII_DISABLE:
@@ -1201,9 +1288,10 @@ static void rtl931x_sds_mii_mode_set(u32 sds, serdes_mode_t mode)
 		return;
 	}
 
-	val |= (1 << 7);	// mac1g mode
+	val |= (1 << 7);
 	
-	pr_debug("%s: RTL931X_SERDES_MODE_CTRL(%d) 0x%08X\n", __func__, sds, sw_r32(RTL931X_SERDES_MODE_CTRL(sds)));
+	pr_info("%s: RTL931X_SERDES_MODE_CTRL(%d) 0x%08X\n", __func__, sds,
+		sw_r32(RTL931X_SERDES_MODE_CTRL(sds)));
 	sw_w32(val, RTL931X_SERDES_MODE_CTRL(sds));
 
 	return;
@@ -1268,7 +1356,6 @@ static void rtl931x_symerr_clear(u32 sds, serdes_mode_t mode)
 {
 	u32 i;
 	u32 xsg_sdsid_0, xsg_sdsid_1;
-	int ret;
 
 	/* function body */
 	switch (mode) {
@@ -1306,12 +1393,18 @@ static void rtl931x_symerr_clear(u32 sds, serdes_mode_t mode)
 	return;
 }
 
+static u32 rtl931x_get_analog_sds(u32 sds)
+{
+	u32 sds_map[] = { 0, 1, 2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23 };
+
+	if (sds < 14)
+		return sds_map[sds];
+	return sds;
+}
+	
 static void rtl931x_sds_fiber_mode_set(u32 sds, serdes_mode_t mode)
 {
-	u32 val, asds;
-	int ret;
-	u32 sdsMap[] = { 0, 1, 2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23 };
-	asds = sdsMap[sds];
+	u32 val, asds = rtl931x_get_analog_sds(sds);
 
 	/* clear symbol error count before change mode */
 	rtl931x_symerr_clear(sds, mode);
@@ -1347,22 +1440,50 @@ static void rtl931x_sds_fiber_mode_set(u32 sds, serdes_mode_t mode)
 		val = 0x1B;
 		break;
 	default:
-		return;
+		val = 0x25;
 	}
 
+	pr_info("%s writing analog SerDes Mode value %02x\n", __func__, val);
 	SDS_FIELD_W(asds, 0x1F, 0x9, 11, 6, val);
 
 	return;
 }
 
+static int rtl931x_sds_cmu_page_get(serdes_mode_t mode)
+{
+	switch (mode) {
+	case MII_SGMII:
+	case MII_1000BX_FIBER:
+	case MII_100BX_FIBER:
+	case MII_1000BX100BX_AUTO:
+		return 0x24;
+	case MII_XSMII:
+		return 0x26;
+	case MII_HISGMII:
+	case MII_2500Base_X:
+		return 0x28;
+	case MII_HISGMII_5G:
+		return 0x2a;
+	case MII_QSGMII:
+		return 0x2a;			// Code also has 0x34
+	case MII_RXAUI_LITE:
+		return 0x2c;
+	case MII_XSGMII:
+	case MII_10GR:
+		return 0x2e;
+	default:
+		return -1;
+	}
+	return -1;
+}
+
 static void cmuType_set(u32 aSds, serdes_mode_t mode, int chiptype)
 {
-	int cmuType = 0;
-	u32 cmuPage = 0;
+	int cmu_type = 0;	// Clock Management Unit?
+	u32 cmu_page = 0;
 	u32 frc_cmu_spd;
 	u32 evenSds;
 	u32 lane, frc_lc_mode_bitnum, frc_lc_mode_val_bitnum;
-	int ret;
 
 	switch (mode) {
 	case MII_DISABLE:
@@ -1377,48 +1498,39 @@ static void cmuType_set(u32 aSds, serdes_mode_t mode, int chiptype)
 	case MII_USXGMII_2_5GSXGMII:
 		return;
 	case MII_10GR1000BX_AUTO:
-		if (chiptype) {
+		if (chiptype)
 			SDS_FIELD_W(aSds, 0x24, 0xd, 14, 14, 0);
-		}
 		return;
 	case MII_QSGMII:
-		cmuType = 1;
-		cmuPage = 0x2a;
+		cmu_type = 1;
 		frc_cmu_spd = 0;
 		break;
 	case MII_HISGMII:
-		cmuType = 1;
-		cmuPage = 0x28;
+		cmu_type = 1;
 		frc_cmu_spd = 1;
 		break;
 	case MII_XSMII:
-		cmuType = 1;
-		cmuPage = 0x26;
+		cmu_type = 1;
 		frc_cmu_spd = 0;
 		break;
 	case MII_1000BX_FIBER:
-		cmuType = 1;
-		cmuPage = 0x24;
+		cmu_type = 1;
 		frc_cmu_spd = 0;
 		break;
 	case MII_100BX_FIBER:
-		cmuType = 1;
-		cmuPage = 0x24;
+		cmu_type = 1;
 		frc_cmu_spd = 0;
 		break;
 	case MII_1000BX100BX_AUTO:
-		cmuType = 1;
-		cmuPage = 0x24;
+		cmu_type = 1;
 		frc_cmu_spd = 0;
 		break;
 	case MII_SGMII:
-		cmuType = 1;
-		cmuPage = 0x24;
+		cmu_type = 1;
 		frc_cmu_spd = 0;
 		break;
 	case MII_2500Base_X:
-		cmuType = 1;
-		cmuPage = 0x28;
+		cmu_type = 1;
 		frc_cmu_spd = 1;
 		break;
 	default:
@@ -1426,6 +1538,9 @@ static void cmuType_set(u32 aSds, serdes_mode_t mode, int chiptype)
 		return;
 	}
 
+	if (cmu_type == 1)
+		cmu_page = rtl931x_sds_cmu_page_get(mode);
+	
 	lane = aSds % 2;
 
 	if (0 == lane) {
@@ -1437,10 +1552,16 @@ static void cmuType_set(u32 aSds, serdes_mode_t mode, int chiptype)
 	}
 
 	evenSds = aSds - lane;
-	if (cmuType == 1) {
-		SDS_FIELD_W(aSds, cmuPage, 0x7, 15, 15, 0);
+
+	pr_info("%s: cmu_type %0d cmu_page %x frc_cmu_spd %d lane %d aSds %d\n",
+		__func__, cmu_type, cmu_page, frc_cmu_spd, lane, aSds);
+	
+	if (cmu_type == 1) {
+		pr_info("%s A CMU page 0x28 0x7 %08x\n", __func__, rtl931x_read_sds_phy(aSds, 0x28, 0x7));
+		SDS_FIELD_W(aSds, cmu_page, 0x7, 15, 15, 0);
+		pr_info("%s B CMU page 0x28 0x7 %08x\n", __func__, rtl931x_read_sds_phy(aSds, 0x28, 0x7));
 		if (chiptype) {
-			SDS_FIELD_W(aSds, cmuPage, 0xd, 14, 14, 0);
+			SDS_FIELD_W(aSds, cmu_page, 0xd, 14, 14, 0);
 		}
 
 		SDS_FIELD_W(evenSds, 0x20, 0x12, 3, 2, 0x3);
@@ -1448,11 +1569,11 @@ static void cmuType_set(u32 aSds, serdes_mode_t mode, int chiptype)
 		SDS_FIELD_W(evenSds, 0x20, 0x12, frc_lc_mode_val_bitnum, frc_lc_mode_val_bitnum, 0);
 		SDS_FIELD_W(evenSds, 0x20, 0x12, 12, 12, 1);
 		SDS_FIELD_W(evenSds, 0x20, 0x12, 15, 13, frc_cmu_spd);
-	} else if (cmuType == 2)	// not used
+	} else if (cmu_type == 2)	// not used
 	{
-		SDS_FIELD_W(aSds, cmuPage, 0x7, 15, 15, 1);
+		SDS_FIELD_W(aSds, cmu_page, 0x7, 15, 15, 1);
 		if (chiptype) {
-			SDS_FIELD_W(aSds, cmuPage, 0xd, 14, 14, 1);
+			SDS_FIELD_W(aSds, cmu_page, 0xd, 14, 14, 1);
 		}
 
 		SDS_FIELD_W(evenSds, 0x20, 0x12, 1, 0, 0x3);
@@ -1462,6 +1583,7 @@ static void cmuType_set(u32 aSds, serdes_mode_t mode, int chiptype)
 		SDS_FIELD_W(evenSds, 0x20, 0x12, 11, 9, frc_cmu_spd);
 	}
 
+	pr_info("%s CMU page 0x28 0x7 %08x\n", __func__, rtl931x_read_sds_phy(aSds, 0x28, 0x7));
 	return;
 }
 
@@ -1480,18 +1602,29 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 		0x123, 0x123, 0x163, 0x1A3, 0x1A0, 0x1C3, 0x9C3
 	};
 
-	u32 sdsMap[] = { 0, 1, 2, 3, 6, 7, 10, 11, 14, 15, 18, 19, 22, 23 };
 	u32 aSds, dSds, ori, model_info, val;
-	aSds = sdsMap[sds];
-	int ret;
 	int chiptype = 0;
+
+	aSds = rtl931x_get_analog_sds(sds);
+
+	if (sds > 13)
+		return;
+
 	pr_info("%s: set sds %d to mode %d\n", __func__, sds, mode);
 	SDS_FIELD_R(aSds, 0x1F, 0x9, 11, 6, &val);
 
-	pr_info("%s: fibermode %08X stored mode %08X", __func__, rtl931x_read_sds_phy(aSds, 0x1f, 0x9), val);
-	pr_info("%s: serdes_mode_ctrl %08X", __func__, RTL931X_MAC_SERDES_MODE_CTRL_ADDR(sds));
-	if (14 <= sds)
-		return;
+	pr_info("%s: fibermode %08X stored mode 0x%x analog SDS %d", __func__,
+			rtl931x_read_sds_phy(aSds, 0x1f, 0x9), val, aSds);
+	pr_info("%s: SGMII mode %08X in 0x24 0x9 analog SDS %d", __func__,
+			rtl931x_read_sds_phy(aSds, 0x24, 0x9), aSds);
+	pr_info("%s: CMU mode %08X stored even SDS %d", __func__,
+			rtl931x_read_sds_phy(aSds & ~1, 0x20, 0x12), aSds & ~1);
+	pr_info("%s: serdes_mode_ctrl %08X", __func__, RTL931X_SERDES_MODE_CTRL(sds));
+	pr_info("%s CMU page 0x24 0x7 %08x\n", __func__, rtl931x_read_sds_phy(aSds, 0x24, 0x7));
+	pr_info("%s CMU page 0x26 0x7 %08x\n", __func__, rtl931x_read_sds_phy(aSds, 0x26, 0x7));
+	pr_info("%s CMU page 0x28 0x7 %08x\n", __func__, rtl931x_read_sds_phy(aSds, 0x28, 0x7));
+	pr_info("%s XSG page 0x0 0xe %08x\n", __func__, rtl931x_read_sds_phy(dSds, 0x0, 0xe));
+	pr_info("%s XSG2 page 0x0 0xe %08x\n", __func__, rtl931x_read_sds_phy(dSds + 1, 0x0, 0xe));
 
 	model_info = sw_r32(RTL931X_MODEL_NAME_INFO_ADDR);
 	if ((model_info >> 4) & 0x1) {
@@ -1506,7 +1639,10 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 	else
 		dSds = (sds - 1) * 2;
 
-	pr_debug("%s: RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR));
+	pr_info("%s: 2.5gbit %08X dsds %d", __func__,
+		rtl931x_read_sds_phy(dSds, 0x1, 0x14), dSds);
+
+	pr_info("%s: RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR 0x%08X\n", __func__, sw_r32(RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR));
 	ori = sw_r32(RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR);
 	val = ori | (1 << sds);
 	sw_w32(val, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR);
@@ -1535,7 +1671,6 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 	case MII_USXGMII_10GDXGMII:
 	case MII_USXGMII_10GQXGMII:
 		u32 i, evenSds;
-		int ret;
 		u32 op_code = 0x6003;
 
 		if (chiptype) {
@@ -1567,7 +1702,7 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 			SDS_FIELD_W(aSds, 0x2e, 0xf, 12, 6, 0x7F);
 			rtl931x_write_sds_phy(aSds, 0x2f, 0x12, 0xaaa);
 
-			rtl931x_sds_rst(sds);
+			rtl931x_sds_rx_rst(sds);
 
 			rtl931x_write_sds_phy(aSds, 0x7, 0x10, op_code);
 			rtl931x_write_sds_phy(aSds, 0x6, 0x1d, 0x0480);
@@ -1645,8 +1780,10 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 			if (1 == (val >> 28))	// consider 9311 etc. RTL9313_CHIP_ID == HWP_CHIP_ID(unit))
 			{
 				rtl931x_write_sds_phy(aSds, 0x2E, 0x1, board_sds_tx2[sds - 2]);
+				pr_info("%s AAAAAA sds %d, writing %04x\n", __func__, aSds, board_sds_tx2[sds - 2]);
 			} else {
 				rtl931x_write_sds_phy(aSds, 0x2E, 0x1, board_sds_tx[sds - 2]);
+				pr_info("%s BBBBBB sds %d, writing %04x\n", __func__, aSds, board_sds_tx[sds - 2]);
 			}
 			val = 0;
 			sw_w32(val, RTL931X_CHIP_INFO_ADDR);
@@ -1666,10 +1803,10 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 	case MII_USXGMII_10GSXGMII:
 	case MII_USXGMII_10GDXGMII:
 	case MII_USXGMII_10GQXGMII:
-//		if (mode == MII_XSGMII)
+		if (mode == MII_XSGMII)
 			rtl931x_sds_mii_mode_set(sds, mode);
-//		else
-//			rtl931x_sds_fiber_mode_set(sds, mode);
+		else
+			rtl931x_sds_fiber_mode_set(sds, mode);
 
 		break;
 	case MII_100BX_FIBER:
@@ -1683,6 +1820,98 @@ void rtl931x_sds_init(u32 sds, enum serdes_mode mode)
 
 	return;
 }				/* end of _dal_mango_construct_sdsMode_set */
+
+static void rtl931x_sds_rst(u32 sds)
+{
+	u32 o, v, o_mode;
+	int shift = ((sds & 0x3) << 3);
+
+	// TODO: We need to lock this!
+	
+	o = sw_r32(RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR);
+	v = o | BIT(sds);
+	sw_w32(v, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR);
+
+	o_mode = sw_r32(RTL931X_SERDES_MODE_CTRL(sds));
+	v = (1 << 7) | 0x1F;
+	sw_w32_mask(0xff << shift, v << shift, RTL931X_SERDES_MODE_CTRL(sds));
+	sw_w32(o_mode, RTL931X_SERDES_MODE_CTRL(sds));
+
+	sw_w32(o, RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR);
+}
+
+int rtl931x_sds_cmu_band_set(int sds, bool enable, u32 band, enum serdes_mode mode)
+{
+	u32 asds;
+	int page = rtl931x_sds_cmu_page_get(mode);
+
+	sds -= (sds % 2);
+	sds = sds & ~1;
+	asds = rtl931x_get_analog_sds(sds);
+	page += 1;
+
+	if (enable) {
+		SDS_FIELD_W(asds, page, 0x7, 13, 13, 0);
+		SDS_FIELD_W(asds, page, 0x7, 11, 11, 0);
+	} else {
+		SDS_FIELD_W(asds, page, 0x7, 13, 13, 0);
+		SDS_FIELD_W(asds, page, 0x7, 11, 11, 0);
+	}
+		
+	SDS_FIELD_W(asds, page, 0x7, 4, 0, band);
+
+	rtl931x_sds_rst(sds);
+
+	return 0;
+}   /* end of dal_mango_sds_cmuBand_set */
+
+int rtl931x_sds_cmu_band_get(int sds, enum serdes_mode mode)
+{
+	int page = rtl931x_sds_cmu_page_get(mode);
+	u32 asds, band;
+
+	sds -= (sds % 2);
+	asds = rtl931x_get_analog_sds(sds);
+	page += 1;
+	rtl931x_write_sds_phy(asds, 0x1f, 0x02, 73);
+
+	SDS_FIELD_W(asds, page, 0x5, 15, 15, 1);
+	SDS_FIELD_R(asds, 0x1f, 0x15, 8, 3, &band);
+	pr_info("%s band is: %d\n", __func__, band);
+
+	return band;
+}   /* end of dal_mango_sds_cmuBand_get */
+
+
+int rtl931x_link_sts_get(u32 sds)
+{
+	u32 sts, sts1, latch_sts, latch_sts1;
+	if (0){
+		u32 xsg_sdsid_0, xsg_sdsid_1;
+
+		xsg_sdsid_0 = sds < 2 ? sds : (sds - 1) * 2;
+		xsg_sdsid_1 = xsg_sdsid_0 + 1;
+
+		SDS_FIELD_R(xsg_sdsid_0, 0x1, 29, 8, 0, &sts);
+		SDS_FIELD_R(xsg_sdsid_1, 0x1, 29, 8, 0, &sts1);
+		SDS_FIELD_R(xsg_sdsid_0, 0x1, 30, 8, 0, &latch_sts);
+		SDS_FIELD_R(xsg_sdsid_1, 0x1, 30, 8, 0, &latch_sts1);
+	} else {
+		u32  asds, dsds;
+
+		asds = rtl931x_get_analog_sds(sds);
+		SDS_FIELD_R(asds, 0x5, 0, 12, 12, &sts);
+		SDS_FIELD_R(asds, 0x4, 1, 2, 2, &latch_sts);
+
+		dsds = sds < 2 ? sds : (sds - 1) * 2;
+		SDS_FIELD_R(dsds, 0x2, 1, 2, 2, &latch_sts1);
+		SDS_FIELD_R(dsds, 0x2, 1, 2, 2, &sts1);
+	}
+
+	pr_info("%s: serdes %d sts %d, sts1 %d, latch_sts %d, latch_sts1 %d\n", __func__,
+		sds, sts, sts1, latch_sts, latch_sts1);
+	return sts1;
+}   /* end of _phy_rtl9310_linkSts_get */
 
 void rtl931x_sw_init(struct rtl838x_switch_priv *priv)
 {

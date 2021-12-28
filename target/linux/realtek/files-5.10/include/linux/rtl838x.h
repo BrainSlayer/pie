@@ -538,7 +538,8 @@ typedef enum {
 #define RTL931X_PS_SERDES_OFF_MODE_CTRL_ADDR	(0x13F4)
 #define RTL931X_MODEL_NAME_INFO_ADDR		(0x4)
 #define RTL931X_CHIP_INFO_ADDR			(0x8)
-#define RTL931X_MAC_SERDES_MODE_CTRL_ADDR(index)(0x136C + (((index) << 2)))	/* index: 0-13 */
+#define RTL931X_MAC_SERDES_MODE_CTRL_ADDR(idx)	(0x136C + (((idx) << 2)))	/* index: 0-13 */
+#define RTL931X_SERDES_MODE_CTRL(idx)		(0x13CC + (((idx >> 2) << 2)))
 
 // PIE actions
 #define PIE_ACT_COPY_TO_PORT	2
@@ -584,6 +585,7 @@ typedef enum {
 #define PIE_BLOCK_SIZE 128
 #define MAX_PIE_ENTRIES (18 * PIE_BLOCK_SIZE)
 #define N_FIXED_FIELDS 12
+#define N_FIXED_FIELDS_RTL931X 14
 #define MAX_ROUTES 512
 #define MAX_HOST_ROUTES 1536
 #define MAX_COUNTERS 2048
