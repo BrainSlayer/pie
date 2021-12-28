@@ -2230,6 +2230,42 @@ int rtl9300_configure_serdes(struct phy_device *phydev)
 	return 0;
 }
 
+static int rtl9300_config_aneg(struct phy_device *phydev)
+{
+
+	struct device *dev = &phydev->mdio.dev;
+	int phy_addr = phydev->mdio.addr;
+	struct device_node *dn;
+	u32 sds_num = 0, dsds;
+	u32 v;
+
+	pr_info("In %s WARNING DONT CALL ME FOR RTL9300\n", __func__);
+	if (dev->of_node) {
+		dn = dev->of_node;
+		if (of_property_read_u32(dn, "sds", &sds_num))
+			sds_num = -1;
+		pr_info("%s: Port %d, SerDes is %d\n", __func__, phy_addr, sds_num);
+	} else {
+		dev_err(dev, "No DT node.\n");
+		return -EINVAL;
+	}
+
+	if (sds_num < 0)
+		return 0;
+	dsds = sds_num < 2 ? sds_num : (sds_num -1) * 2;
+
+	v = rtl930x_read_sds_phy(sds_num, PHY_PAGE_2, PHY_CTRL_REG);
+	v &= ~BIT(12);
+	if (phydev->autoneg == AUTONEG_ENABLE)
+		v = |= BIT(12);
+	v |= BIT(9);
+	rtl930x_write_sds_phy(sds_num, PHY_PAGE_4, PHY_CTRL_REG, v);
+
+out:
+	pr_info("%s: And ret is now: %d\n", __func__, ret);
+	return ret;
+}
+
 int rtl9310_configure_serdes(struct phy_device *phydev)
 {
 	struct device *dev = &phydev->mdio.dev;
@@ -2611,6 +2647,7 @@ static struct phy_driver rtl83xx_phy_driver[] = {
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
 		.set_loopback	= genphy_loopback,
+		.config_aneg	= rtl9300_config_aneg,
 	},
 };
 
